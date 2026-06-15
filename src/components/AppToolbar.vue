@@ -91,8 +91,7 @@ function moveWeek(offset: number): void {
         <el-date-picker
           :model-value="selectedWeek.start"
           class="week-picker"
-          type="week"
-          format="YYYY [第] ww [周]"
+          type="date"
           value-format="YYYY-MM-DD"
           placeholder="选择周"
           :clearable="false"
