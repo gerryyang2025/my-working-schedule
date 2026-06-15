@@ -14,7 +14,7 @@ export default defineConfig({
       env: {
         SCHEDULE_DATA_PATH: "data/e2e.local.json"
       },
-      reuseExistingServer: true
+      reuseExistingServer: false
     },
     {
       command: "npm run dev:web",

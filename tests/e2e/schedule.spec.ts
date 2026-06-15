@@ -1,5 +1,8 @@
 import { expect, test } from "@playwright/test";
 
+const quickFillDate = "2026-06-01";
+const quickFillStaffId = "staff-nurse-001";
+
 test("loads the schedule workstation", async ({ page }) => {
   await page.goto("/");
 
@@ -9,11 +12,13 @@ test("loads the schedule workstation", async ({ page }) => {
 });
 
 test("enters admin mode and quick fills a shift", async ({ page, request }) => {
+  await page.clock.setFixedTime("2026-06-16T08:00:00+08:00");
+
   await request.put("/api/data/schedule-entry", {
     headers: { "x-admin-mode": "true" },
     data: {
-      date: "2026-06-01",
-      staffId: "staff-nurse-001",
+      date: quickFillDate,
+      staffId: quickFillStaffId,
       shiftIds: [],
       note: ""
     }
