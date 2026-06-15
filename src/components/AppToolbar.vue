@@ -18,6 +18,26 @@ const emit = defineEmits<{
   printWeek: [];
   fullscreen: [];
 }>();
+
+function handleYearUpdate(value: unknown): void {
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    emit("update:year", numericValue);
+  }
+}
+
+function handleMonthUpdate(value: unknown): void {
+  const numericValue = Number(value);
+  if (Number.isFinite(numericValue)) {
+    emit("update:month", numericValue);
+  }
+}
+
+function handleSelectedDateUpdate(value: unknown): void {
+  if (typeof value === "string" && value) {
+    emit("update:selectedDate", value);
+  }
+}
 </script>
 
 <template>
@@ -28,12 +48,12 @@ const emit = defineEmits<{
         :min="2020"
         :max="2035"
         controls-position="right"
-        @update:model-value="emit('update:year', Number($event))"
+        @update:model-value="handleYearUpdate"
       />
       <el-select
         :model-value="month"
         class="month-select"
-        @update:model-value="emit('update:month', Number($event))"
+        @update:model-value="handleMonthUpdate"
       >
         <el-option v-for="item in 12" :key="item" :label="`${item}月`" :value="item" />
       </el-select>
@@ -42,7 +62,8 @@ const emit = defineEmits<{
         type="date"
         value-format="YYYY-MM-DD"
         placeholder="选择日期"
-        @update:model-value="emit('update:selectedDate', String($event))"
+        :clearable="false"
+        @update:model-value="handleSelectedDateUpdate"
       />
     </div>
 

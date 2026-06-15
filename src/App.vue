@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import { enterAdminMode, loadData } from "@/api/client";
@@ -30,17 +31,33 @@ async function handleEnterAdmin(): Promise<void> {
     return;
   }
 
-  await enterAdminMode(password);
-  adminMode.value = true;
+  try {
+    await enterAdminMode(password);
+    adminMode.value = true;
+  } catch (caughtError) {
+    adminMode.value = false;
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "管理密码验证失败");
+  }
 }
 
 async function handleFullscreen(): Promise<void> {
-  if (document.fullscreenElement) {
-    await document.exitFullscreen();
+  const root = document.documentElement;
+
+  if (!document.fullscreenEnabled || !root.requestFullscreen || !document.exitFullscreen) {
+    ElMessage.error("当前浏览器不支持全屏模式");
     return;
   }
 
-  await document.documentElement.requestFullscreen();
+  try {
+    if (document.fullscreenElement) {
+      await document.exitFullscreen();
+      return;
+    }
+
+    await root.requestFullscreen();
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "全屏切换失败");
+  }
 }
 
 function printWithMode(mode: "month" | "week"): void {
