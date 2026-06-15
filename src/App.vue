@@ -4,6 +4,7 @@ import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
 import ManagementDrawer from "@/components/ManagementDrawer.vue";
+import PrintViews from "@/components/PrintViews.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
@@ -206,43 +207,46 @@ onMounted(async () => {
       {{ error }}
     </section>
     <section v-else-if="!data" class="state-message">正在加载排班数据...</section>
-    <section v-else class="workbench">
-      <ManagementDrawer
-        v-if="data"
-        v-model="managementOpen"
-        :data="data"
-        :admin-mode="adminMode"
-        :staff-save-version="staffSaveVersion"
-        :shift-save-version="shiftSaveVersion"
-        :holiday-save-version="holidaySaveVersion"
-        :staff-saving="staffSaving"
-        :shift-saving="shiftSaving"
-        :holiday-saving="holidaySaving"
-        @save-staff="handleSaveStaff"
-        @save-shift="handleSaveShift"
-        @save-holiday="handleSaveHoliday"
-      />
-      <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
-      <ScheduleGrid
-        :staff="data.staff"
-        :days="monthDays"
-        :holidays="data.holidays"
-        :shifts="data.shifts"
-        :entries="data.scheduleEntries"
-        :selected-shift-id="selectedShiftId"
-        :admin-mode="adminMode"
-        @quick-fill="handleQuickFill"
-        @edit-cell="handleEditCell"
-      />
-      <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
-      <CellEditorDialog
-        v-model="editorOpen"
-        :staff="editingStaff"
-        :date="editingDate"
-        :entry="editingEntry"
-        :shifts="data.shifts"
-        @save="handleEditorSave"
-      />
-    </section>
+    <template v-else>
+      <section class="workbench">
+        <ManagementDrawer
+          v-if="data"
+          v-model="managementOpen"
+          :data="data"
+          :admin-mode="adminMode"
+          :staff-save-version="staffSaveVersion"
+          :shift-save-version="shiftSaveVersion"
+          :holiday-save-version="holidaySaveVersion"
+          :staff-saving="staffSaving"
+          :shift-saving="shiftSaving"
+          :holiday-saving="holidaySaving"
+          @save-staff="handleSaveStaff"
+          @save-shift="handleSaveShift"
+          @save-holiday="handleSaveHoliday"
+        />
+        <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
+        <ScheduleGrid
+          :staff="data.staff"
+          :days="monthDays"
+          :holidays="data.holidays"
+          :shifts="data.shifts"
+          :entries="data.scheduleEntries"
+          :selected-shift-id="selectedShiftId"
+          :admin-mode="adminMode"
+          @quick-fill="handleQuickFill"
+          @edit-cell="handleEditCell"
+        />
+        <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
+        <CellEditorDialog
+          v-model="editorOpen"
+          :staff="editingStaff"
+          :date="editingDate"
+          :entry="editingEntry"
+          :shifts="data.shifts"
+          @save="handleEditorSave"
+        />
+      </section>
+      <PrintViews v-if="weeklySummary" :data="data" :days="monthDays" :summary="weeklySummary" />
+    </template>
   </main>
 </template>

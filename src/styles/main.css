@@ -269,3 +269,55 @@ body {
   padding-top: 14px;
   border-top: 1px solid #e2e8f0;
 }
+
+.print-view {
+  display: none;
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 10mm;
+  }
+
+  body {
+    min-width: 0;
+    background: #ffffff;
+  }
+
+  .app-header,
+  .toolbar,
+  .workbench,
+  .el-overlay,
+  .el-drawer {
+    display: none !important;
+  }
+
+  .print-view {
+    display: none;
+  }
+
+  body[data-print-mode="month"] .print-month,
+  body[data-print-mode="week"] .print-week {
+    display: block;
+  }
+
+  .print-view h1 {
+    margin: 0 0 8px;
+    text-align: center;
+    font-size: 18px;
+  }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+
+  .print-table th,
+  .print-table td {
+    border: 1px solid #111827;
+    padding: 4px;
+    text-align: center;
+  }
+}
