@@ -4,6 +4,12 @@ import type { PublicAppData } from "@/api/client";
 import type { CalendarDay } from "@/lib/date";
 import type { WeeklySummary } from "@/types/domain";
 
+interface PrintShiftMarker {
+  id: string;
+  shortName: string;
+  color: string;
+}
+
 const props = defineProps<{
   data: PublicAppData;
   days: CalendarDay[];
@@ -14,25 +20,36 @@ const enabledStaff = computed(() =>
   [...props.data.staff].filter((staff) => staff.enabled).sort((left, right) => left.sortOrder - right.sortOrder)
 );
 
-const shiftShortNameById = computed(() => new Map(props.data.shifts.map((shift) => [shift.id, shift.shortName])));
+const holidayByDate = computed(() => new Map(props.data.holidays.map((holiday) => [holiday.date, holiday])));
+const shiftById = computed(() => new Map(props.data.shifts.map((shift) => [shift.id, shift])));
 
-const entryShiftNamesByCell = computed(() => {
-  const cellMap = new Map<string, string>();
-  const shortNameMap = shiftShortNameById.value;
+const entryShiftsByCell = computed(() => {
+  const cellMap = new Map<string, PrintShiftMarker[]>();
+  const shiftMap = shiftById.value;
 
   for (const entry of props.data.scheduleEntries) {
-    const shiftNames = entry.shiftIds
-      .map((shiftId) => shortNameMap.get(shiftId))
-      .filter((shortName): shortName is string => Boolean(shortName));
+    const shifts = entry.shiftIds
+      .slice(0, 2)
+      .map((shiftId) => shiftMap.get(shiftId))
+      .filter((shift): shift is NonNullable<typeof shift> => Boolean(shift))
+      .map((shift) => ({
+        id: shift.id,
+        shortName: shift.shortName,
+        color: shift.color
+      }));
 
-    cellMap.set(`${entry.staffId}:${entry.date}`, shiftNames.join("/"));
+    cellMap.set(`${entry.staffId}:${entry.date}`, shifts);
   }
 
   return cellMap;
 });
 
-function getCellShiftNames(staffId: string, date: string): string {
-  return entryShiftNamesByCell.value.get(`${staffId}:${date}`) ?? "";
+function getHolidayName(date: string): string {
+  return holidayByDate.value.get(date)?.name ?? "";
+}
+
+function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
+  return entryShiftsByCell.value.get(`${staffId}:${date}`) ?? [];
 }
 </script>
 
@@ -44,7 +61,11 @@ function getCellShiftNames(staffId: string, date: string): string {
         <tr>
           <th>人员</th>
           <th v-for="day in days" :key="day.key">
-            {{ day.dayOfMonth }}<br />{{ day.weekdayName }}
+            <span class="print-day-heading">
+              <span>{{ day.dayOfMonth }}</span>
+              <span>{{ day.weekdayName }}</span>
+              <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
+            </span>
           </th>
         </tr>
       </thead>
@@ -52,7 +73,16 @@ function getCellShiftNames(staffId: string, date: string): string {
         <tr v-for="staff in enabledStaff" :key="staff.id">
           <th>{{ staff.name }}</th>
           <td v-for="day in days" :key="`${staff.id}-${day.key}`">
-            {{ getCellShiftNames(staff.id, day.key) }}
+            <span class="print-cell-shifts">
+              <span
+                v-for="shift in getCellShifts(staff.id, day.key)"
+                :key="shift.id"
+                class="print-shift-chip"
+                :style="{ color: shift.color, borderColor: shift.color }"
+              >
+                {{ shift.shortName }}
+              </span>
+            </span>
           </td>
         </tr>
       </tbody>

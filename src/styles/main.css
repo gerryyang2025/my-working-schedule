@@ -325,5 +325,46 @@ body {
     border: 1px solid #111827;
     padding: 4px;
     text-align: center;
+    vertical-align: middle;
+  }
+
+  .print-day-heading,
+  .print-cell-shifts {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .print-day-heading {
+    flex-direction: column;
+    gap: 1px;
+    line-height: 1.2;
+  }
+
+  .print-holiday-name {
+    color: #b91c1c;
+    font-size: 9px;
+    font-weight: 700;
+  }
+
+  .print-cell-shifts {
+    gap: 2px;
+    min-height: 18px;
+  }
+
+  .print-shift-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 18px;
+    min-height: 16px;
+    border: 1px solid;
+    padding: 1px 3px;
+    background: #ffffff;
+    font-size: 9px;
+    font-weight: 700;
+    line-height: 1;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
