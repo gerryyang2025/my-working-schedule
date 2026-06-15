@@ -3,6 +3,7 @@ import { Router, type NextFunction, type Response } from "express";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
+import { getNonBlankAdminPassword } from "./seed";
 
 type PublicAppData = Omit<AppData, "settings"> & {
   settings: Omit<AppData["settings"], "adminPassword">;
@@ -109,7 +110,7 @@ function parseBearerToken(header: string | undefined): string | null {
 }
 
 function getConfiguredAdminPassword(data: AppData): string {
-  return process.env.SCHEDULE_ADMIN_PASSWORD ?? data.settings.adminPassword;
+  return getNonBlankAdminPassword(process.env.SCHEDULE_ADMIN_PASSWORD, data.settings.adminPassword);
 }
 
 function parseStaffPayload(body: unknown, id: string): StaffMember | null {

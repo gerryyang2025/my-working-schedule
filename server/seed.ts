@@ -2,7 +2,14 @@ import type { AppData } from "./types";
 
 export const DEFAULT_ADMIN_PASSWORD = "change-me-before-deploy";
 
-export function createSeedData(adminPassword = process.env.SCHEDULE_ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD): AppData {
+export function getNonBlankAdminPassword(value: string | undefined, fallback: string): string {
+  const trimmedValue = value?.trim();
+  return trimmedValue ? trimmedValue : fallback;
+}
+
+export function createSeedData(adminPassword = process.env.SCHEDULE_ADMIN_PASSWORD): AppData {
+  const resolvedAdminPassword = getNonBlankAdminPassword(adminPassword, DEFAULT_ADMIN_PASSWORD);
+
   return {
     staff: [
       {
@@ -95,7 +102,7 @@ export function createSeedData(adminPassword = process.env.SCHEDULE_ADMIN_PASSWO
     ],
     scheduleEntries: [],
     settings: {
-      adminPassword,
+      adminPassword: resolvedAdminPassword,
       defaultRequiredShiftsPerWeek: 5,
       version: 1
     }

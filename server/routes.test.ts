@@ -6,6 +6,26 @@ import { createRoutes } from "./routes";
 import { createSeedData } from "./seed";
 
 const TEST_ADMIN_PASSWORD = "123456";
+const ADMIN_PASSWORD_ENV = "SCHEDULE_ADMIN_PASSWORD";
+
+async function withAdminPasswordEnv<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
+  const previous = process.env[ADMIN_PASSWORD_ENV];
+  if (value === undefined) {
+    delete process.env[ADMIN_PASSWORD_ENV];
+  } else {
+    process.env[ADMIN_PASSWORD_ENV] = value;
+  }
+
+  try {
+    return await run();
+  } finally {
+    if (previous === undefined) {
+      delete process.env[ADMIN_PASSWORD_ENV];
+    } else {
+      process.env[ADMIN_PASSWORD_ENV] = previous;
+    }
+  }
+}
 
 function createTestApp(initialData: AppData = createSeedData(TEST_ADMIN_PASSWORD)) {
   let data = structuredClone(initialData);
@@ -105,6 +125,32 @@ describe("API routes", () => {
   it("rejects admin mode with the wrong password", async () => {
     const response = await request(createTestApp()).post("/api/admin/session").send({ password: "wrong" }).expect(401);
     expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
+  });
+
+  it.each([
+    { envValue: "", password: "" },
+    { envValue: "", password: "   " },
+    { envValue: "   ", password: "" },
+    { envValue: "   ", password: "   " }
+  ])("rejects blank login when admin password env is '$envValue'", async ({ envValue, password }) => {
+    await withAdminPasswordEnv(envValue, async () => {
+      const response = await request(createTestApp()).post("/api/admin/session").send({ password }).expect(401);
+      expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
+    });
+  });
+
+  it("authenticates with a non-empty admin password env override", async () => {
+    await withAdminPasswordEnv("override-password", async () => {
+      const response = await request(createTestApp()).post("/api/admin/session").send({ password: "override-password" }).expect(200);
+      expect(response.body.token).toEqual(expect.any(String));
+    });
+  });
+
+  it("authenticates with stored admin password when env is unset", async () => {
+    await withAdminPasswordEnv(undefined, async () => {
+      const response = await request(createTestApp()).post("/api/admin/session").send({ password: TEST_ADMIN_PASSWORD }).expect(200);
+      expect(response.body.token).toEqual(expect.any(String));
+    });
   });
 
   it("rejects data writes without admin mode", async () => {
