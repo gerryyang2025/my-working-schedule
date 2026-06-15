@@ -39,6 +39,13 @@ function handleCellClick(staffId: string, date: string): void {
   }
   emit("editCell", staffId, date);
 }
+
+function handleCellDoubleClick(staffId: string, date: string): void {
+  if (!props.adminMode) {
+    return;
+  }
+  emit("editCell", staffId, date);
+}
 </script>
 
 <template>
@@ -65,7 +72,7 @@ function handleCellClick(staffId: string, date: string): void {
             :key="`${person.id}-${day.key}`"
             :class="{ editable: adminMode, weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
             @click="handleCellClick(person.id, day.key)"
-            @dblclick="emit('editCell', person.id, day.key)"
+            @dblclick="handleCellDoubleClick(person.id, day.key)"
           >
             <div class="cell-shifts">
               <span

@@ -23,7 +23,7 @@ const enabledShifts = computed(() =>
 );
 
 watch(
-  () => [props.modelValue, props.entry?.id],
+  () => [props.modelValue, props.entry?.id, props.entry?.shiftIds.join("|"), props.entry?.note],
   () => {
     localShiftIds.value = props.entry?.shiftIds ? [...props.entry.shiftIds] : [];
     note.value = props.entry?.note ?? "";
