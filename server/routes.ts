@@ -147,7 +147,7 @@ export function createRoutes(storage: StorageAdapter): Router {
                 date,
                 staffId,
                 shiftIds,
-                note
+                note: note ?? ""
               }
             ];
       const nextData = {

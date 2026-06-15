@@ -53,6 +53,15 @@ describe("API routes", () => {
     expect(response.body.scheduleEntries[0].id).toBe("2026-06-15__staff-nurse-001");
   });
 
+  it("normalizes omitted schedule entry notes to an empty string", async () => {
+    const response = await request(createTestApp())
+      .put("/api/data/schedule-entry")
+      .set("x-admin-mode", "true")
+      .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"] })
+      .expect(200);
+    expect(response.body.scheduleEntries[0].note).toBe("");
+  });
+
   it("rejects a third shift for the same person and date", async () => {
     const response = await request(createTestApp())
       .put("/api/data/schedule-entry")
