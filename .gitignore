@@ -1,0 +1,32 @@
+# macOS
+.DS_Store
+
+# Editor and local workspace files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Dependencies and build artifacts
+node_modules/
+dist/
+build/
+coverage/
+
+# Logs and runtime data
+*.log
+logs/
+tmp/
+temp/
+
+# Local data snapshots
+data/*.local.json
+data/*.bak
+
+# Source requirement attachment kept outside Git history
+排班需求.docx
