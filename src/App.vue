@@ -28,6 +28,9 @@ const editingDate = ref("");
 const staffSaveVersion = ref(0);
 const shiftSaveVersion = ref(0);
 const holidaySaveVersion = ref(0);
+const staffSaving = ref(false);
+const shiftSaving = ref(false);
+const holidaySaving = ref(false);
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value));
@@ -121,29 +124,50 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 }
 
 async function handleSaveStaff(staff: StaffMember): Promise<void> {
+  if (staffSaving.value) {
+    return;
+  }
+
+  staffSaving.value = true;
   try {
     data.value = await saveStaff(staff);
     staffSaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
+  } finally {
+    staffSaving.value = false;
   }
 }
 
 async function handleSaveShift(shift: Shift): Promise<void> {
+  if (shiftSaving.value) {
+    return;
+  }
+
+  shiftSaving.value = true;
   try {
     data.value = await saveShift(shift);
     shiftSaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
+  } finally {
+    shiftSaving.value = false;
   }
 }
 
 async function handleSaveHoliday(holiday: Holiday): Promise<void> {
+  if (holidaySaving.value) {
+    return;
+  }
+
+  holidaySaving.value = true;
   try {
     data.value = await saveHoliday(holiday);
     holidaySaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
+  } finally {
+    holidaySaving.value = false;
   }
 }
 
@@ -191,6 +215,9 @@ onMounted(async () => {
         :staff-save-version="staffSaveVersion"
         :shift-save-version="shiftSaveVersion"
         :holiday-save-version="holidaySaveVersion"
+        :staff-saving="staffSaving"
+        :shift-saving="shiftSaving"
+        :holiday-saving="holidaySaving"
         @save-staff="handleSaveStaff"
         @save-shift="handleSaveShift"
         @save-holiday="handleSaveHoliday"

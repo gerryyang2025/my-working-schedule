@@ -10,6 +10,9 @@ const props = defineProps<{
   staffSaveVersion: number;
   shiftSaveVersion: number;
   holidaySaveVersion: number;
+  staffSaving: boolean;
+  shiftSaving: boolean;
+  holidaySaving: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -139,17 +142,18 @@ watch(
         </el-table>
 
         <div class="management-form">
-          <el-input v-model="staffDraft.jobId" placeholder="工号" />
-          <el-input v-model="staffDraft.name" placeholder="姓名" />
-          <el-select v-model="staffDraft.type" placeholder="类型">
+          <el-input v-model="staffDraft.jobId" placeholder="工号" :disabled="staffSaving" />
+          <el-input v-model="staffDraft.name" placeholder="姓名" :disabled="staffSaving" />
+          <el-select v-model="staffDraft.type" placeholder="类型" :disabled="staffSaving">
             <el-option label="护士" value="nurse" />
             <el-option label="文员" value="clerk" />
             <el-option label="护士长" value="head_nurse" />
           </el-select>
-          <el-checkbox v-model="staffDraft.isAdmin">指定管理员</el-checkbox>
+          <el-checkbox v-model="staffDraft.isAdmin" :disabled="staffSaving">指定管理员</el-checkbox>
           <el-button
             type="primary"
-            :disabled="!adminMode || !staffDraft.jobId || !staffDraft.name"
+            :disabled="staffSaving || !adminMode || !staffDraft.jobId || !staffDraft.name"
+            :loading="staffSaving"
             @click="emit('saveStaff', { ...staffDraft })"
           >
             保存人员
@@ -166,14 +170,15 @@ watch(
         </el-table>
 
         <div class="management-form">
-          <el-input v-model="shiftDraft.name" placeholder="班次名称" />
-          <el-input v-model="shiftDraft.shortName" placeholder="简称" />
-          <el-color-picker v-model="shiftDraft.color" />
-          <el-input-number v-model="shiftDraft.coefficient" :min="0" :step="0.1" />
-          <el-checkbox v-model="shiftDraft.countsAttendance">计出勤</el-checkbox>
+          <el-input v-model="shiftDraft.name" placeholder="班次名称" :disabled="shiftSaving" />
+          <el-input v-model="shiftDraft.shortName" placeholder="简称" :disabled="shiftSaving" />
+          <el-color-picker v-model="shiftDraft.color" :disabled="shiftSaving" />
+          <el-input-number v-model="shiftDraft.coefficient" :min="0" :step="0.1" :disabled="shiftSaving" />
+          <el-checkbox v-model="shiftDraft.countsAttendance" :disabled="shiftSaving">计出勤</el-checkbox>
           <el-button
             type="primary"
-            :disabled="!adminMode || !shiftDraft.name || !shiftDraft.shortName"
+            :disabled="shiftSaving || !adminMode || !shiftDraft.name || !shiftDraft.shortName"
+            :loading="shiftSaving"
             @click="emit('saveShift', { ...shiftDraft })"
           >
             保存班次
@@ -189,12 +194,13 @@ watch(
         </el-table>
 
         <div class="management-form">
-          <el-date-picker v-model="holidayDraft.date" value-format="YYYY-MM-DD" placeholder="日期" />
-          <el-input v-model="holidayDraft.name" placeholder="节假日名称" />
-          <el-checkbox v-model="holidayDraft.affectsRequiredAttendance">影响满勤</el-checkbox>
+          <el-date-picker v-model="holidayDraft.date" value-format="YYYY-MM-DD" placeholder="日期" :disabled="holidaySaving" />
+          <el-input v-model="holidayDraft.name" placeholder="节假日名称" :disabled="holidaySaving" />
+          <el-checkbox v-model="holidayDraft.affectsRequiredAttendance" :disabled="holidaySaving">影响满勤</el-checkbox>
           <el-button
             type="primary"
-            :disabled="!adminMode || !holidayDraft.date || !holidayDraft.name"
+            :disabled="holidaySaving || !adminMode || !holidayDraft.date || !holidayDraft.name"
+            :loading="holidaySaving"
             @click="emit('saveHoliday', { ...holidayDraft })"
           >
             保存节假日
