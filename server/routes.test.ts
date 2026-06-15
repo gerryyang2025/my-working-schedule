@@ -285,6 +285,43 @@ describe("API routes", () => {
     expect(response.body.message).toBe("人员不存在：staff-missing");
   });
 
+  it("rejects non-empty schedule entries for disabled staff", async () => {
+    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    initialData.staff = initialData.staff.map((staff) =>
+      staff.id === "staff-nurse-001" ? { ...staff, enabled: false } : staff
+    );
+    const app = createTestApp(initialData);
+    const response = await request(app)
+      .put("/api/data/schedule-entry")
+      .set(await adminHeaders(app))
+      .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(400);
+    expect(response.body.message).toBe("人员已停用，不能新增排班：李护士");
+  });
+
+  it("allows clearing existing schedule entries for disabled staff", async () => {
+    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    initialData.staff = initialData.staff.map((staff) =>
+      staff.id === "staff-nurse-001" ? { ...staff, enabled: false } : staff
+    );
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "historical"
+      }
+    ];
+    const app = createTestApp(initialData);
+    const response = await request(app)
+      .put("/api/data/schedule-entry")
+      .set(await adminHeaders(app))
+      .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: [], note: "" })
+      .expect(200);
+    expect(response.body.scheduleEntries).toEqual([]);
+  });
+
   it("rejects unknown shifts in schedule entries", async () => {
     const app = createTestApp();
     const response = await request(app)

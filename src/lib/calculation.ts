@@ -57,11 +57,12 @@ export function calculateWeeklySummary(data: WeeklySummaryInput, selectedDate: s
   );
   const holidayDeduction = affectedHolidays.length;
   const requiredShifts = Math.max(0, data.settings.defaultRequiredShiftsPerWeek - holidayDeduction);
-  const enabledStaff = [...data.staff]
-    .filter((staff) => staff.enabled)
-    .sort((left, right) => left.sortOrder - right.sortOrder);
   const shiftMap = new Map(data.shifts.map((shift) => [shift.id, shift]));
   const weekEntries = data.scheduleEntries.filter((entry) => isWithinRange(entry.date, start, end));
+  const staffWithWeekEntries = new Set(weekEntries.map((entry) => entry.staffId));
+  const visibleStaff = [...data.staff]
+    .filter((staff) => staff.enabled || staffWithWeekEntries.has(staff.id))
+    .sort((left, right) => left.sortOrder - right.sortOrder);
 
   return {
     weekStart: start,
@@ -69,7 +70,7 @@ export function calculateWeeklySummary(data: WeeklySummaryInput, selectedDate: s
     requiredShifts,
     holidayDeduction,
     holidayNames: affectedHolidays.map((holiday) => holiday.name),
-    rows: enabledStaff.map((staff) =>
+    rows: visibleStaff.map((staff) =>
       summarizeStaff(
         staff,
         weekEntries.filter((entry) => entry.staffId === staff.id),

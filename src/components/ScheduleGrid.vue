@@ -21,8 +21,14 @@ const emit = defineEmits<{
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftMap = computed(() => new Map(props.shifts.map((shift) => [shift.id, shift])));
 const entryMap = computed(() => new Map(props.entries.map((entry) => [`${entry.date}__${entry.staffId}`, entry])));
+const visibleDayKeys = computed(() => new Set(props.days.map((day) => day.key)));
+const staffWithVisibleEntries = computed(
+  () => new Set(props.entries.filter((entry) => visibleDayKeys.value.has(entry.date)).map((entry) => entry.staffId))
+);
 const sortedStaff = computed(() =>
-  props.staff.filter((item) => item.enabled).sort((left, right) => left.sortOrder - right.sortOrder)
+  props.staff
+    .filter((item) => item.enabled || staffWithVisibleEntries.value.has(item.id))
+    .sort((left, right) => left.sortOrder - right.sortOrder)
 );
 const clickTimers = new Map<string, number>();
 
@@ -51,31 +57,35 @@ function entryFor(staffId: string, date: string): ScheduleEntry | null {
   return entryMap.value.get(`${date}__${staffId}`) ?? null;
 }
 
-function handleCellClick(staffId: string, date: string): void {
-  if (!props.adminMode) {
+function canEditStaff(staff: StaffMember): boolean {
+  return props.adminMode && staff.enabled;
+}
+
+function handleCellClick(staff: StaffMember, date: string): void {
+  if (!canEditStaff(staff)) {
     return;
   }
 
-  const key = cellKey(staffId, date);
+  const key = cellKey(staff.id, date);
   clearClickTimer(key);
   const timer = window.setTimeout(() => {
     clickTimers.delete(key);
     if (props.selectedShiftId) {
-      emit("quickFill", staffId, date);
+      emit("quickFill", staff.id, date);
       return;
     }
-    emit("editCell", staffId, date);
+    emit("editCell", staff.id, date);
   }, 180);
   clickTimers.set(key, timer);
 }
 
-function handleCellDoubleClick(staffId: string, date: string): void {
-  if (!props.adminMode) {
+function handleCellDoubleClick(staff: StaffMember, date: string): void {
+  if (!canEditStaff(staff)) {
     return;
   }
 
-  clearClickTimer(cellKey(staffId, date));
-  emit("editCell", staffId, date);
+  clearClickTimer(cellKey(staff.id, date));
+  emit("editCell", staff.id, date);
 }
 
 onBeforeUnmount(() => {
@@ -97,17 +107,18 @@ onBeforeUnmount(() => {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="person in sortedStaff" :key="person.id">
+        <tr v-for="person in sortedStaff" :key="person.id" :class="{ 'disabled-historical-row': !person.enabled }">
           <th class="sticky-col person-col">
             <strong>{{ person.name }}</strong>
             <small>{{ person.jobId }}</small>
+            <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
           </th>
           <td
             v-for="day in days"
             :key="`${person.id}-${day.key}`"
-            :class="{ editable: adminMode, weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
-            @click="handleCellClick(person.id, day.key)"
-            @dblclick="handleCellDoubleClick(person.id, day.key)"
+            :class="{ editable: canEditStaff(person), weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
+            @click="handleCellClick(person, day.key)"
+            @dblclick="handleCellDoubleClick(person, day.key)"
           >
             <div class="cell-shifts">
               <span

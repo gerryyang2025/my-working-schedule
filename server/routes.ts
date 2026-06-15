@@ -333,8 +333,12 @@ export function createRoutes(storage: StorageAdapter): Router {
       }
 
       const nextData = await storage.update((data) => {
-        if (!data.staff.some((staffMember) => staffMember.id === staffId)) {
+        const staffMember = data.staff.find((staff) => staff.id === staffId);
+        if (!staffMember) {
           throw new HttpResponseError(400, `人员不存在：${staffId}`);
+        }
+        if (!staffMember.enabled && shiftIds.length > 0) {
+          throw new HttpResponseError(400, `人员已停用，不能新增排班：${staffMember.name}`);
         }
 
         const validation = validateScheduleShiftIds(shiftIds, data.shifts);

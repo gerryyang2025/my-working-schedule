@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import PrintViews from "./PrintViews.vue";
 import type { PublicAppData } from "@/api/client";
 import type { CalendarDay } from "@/lib/date";
-import type { ScheduleEntry, Shift, WeeklySummary } from "@/types/domain";
+import type { ScheduleEntry, Shift, StaffMember, WeeklySummary } from "@/types/domain";
 
 const days: CalendarDay[] = [
   {
@@ -91,6 +91,19 @@ function createData(scheduleEntries: ScheduleEntry[]): PublicAppData {
   };
 }
 
+function disabledStaff(overrides: Partial<StaffMember> = {}): StaffMember {
+  return {
+    id: "staff-disabled",
+    jobId: "N099",
+    name: "停用护士",
+    type: "nurse",
+    isAdmin: false,
+    enabled: false,
+    sortOrder: 2,
+    ...overrides
+  };
+}
+
 const summary: WeeklySummary = {
   weekStart: "2026-06-15",
   weekEnd: "2026-06-21",
@@ -162,6 +175,55 @@ describe("PrintViews", () => {
     expect(shiftChips).toHaveLength(2);
     expect(shiftChips.map((chip) => chip.text())).toEqual(["白", "夜"]);
     expect(wrapper.find(".print-month tbody td").text()).not.toContain("停");
+  });
+
+  it("prints disabled staff with historical entries in the printed month", () => {
+    const data = createData([
+      {
+        id: "entry-disabled",
+        date: "2026-06-19",
+        staffId: "staff-disabled",
+        shiftIds: ["shift-day"],
+        note: ""
+      }
+    ]);
+    data.staff.push(disabledStaff());
+
+    const wrapper = mount(PrintViews, {
+      props: {
+        data,
+        days,
+        summary
+      }
+    });
+
+    const monthRows = wrapper.findAll(".print-month tbody tr");
+    expect(monthRows.map((row) => row.text())).toEqual(expect.arrayContaining([expect.stringContaining("停用护士")]));
+    expect(wrapper.get(".print-month tbody").text()).toContain("停用历史");
+    expect(wrapper.get(".print-month tbody").text()).toContain("白");
+  });
+
+  it("hides disabled staff without entries in the printed month", () => {
+    const data = createData([
+      {
+        id: "entry-disabled-outside-month",
+        date: "2026-07-01",
+        staffId: "staff-disabled",
+        shiftIds: ["shift-day"],
+        note: ""
+      }
+    ]);
+    data.staff.push(disabledStaff());
+
+    const wrapper = mount(PrintViews, {
+      props: {
+        data,
+        days,
+        summary
+      }
+    });
+
+    expect(wrapper.get(".print-month tbody").text()).not.toContain("停用护士");
   });
 
   it("keeps weekly print content present", () => {

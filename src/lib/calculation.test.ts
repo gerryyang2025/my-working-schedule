@@ -180,6 +180,56 @@ describe("calculateWeeklySummary", () => {
     expect(nurse.coefficientTotal).toBe(1.3);
   });
 
+  it("includes disabled staff with historical entries in the selected week", () => {
+    const data: AppData = {
+      ...baseData,
+      staff: [
+        ...baseData.staff,
+        {
+          id: "staff-disabled",
+          jobId: "100088",
+          name: "停用护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        { id: "historical-entry", date: "2026-06-17", staffId: "staff-disabled", shiftIds: ["shift-day"], note: "" }
+      ]
+    };
+
+    const disabled = getRow(calculateWeeklySummary(data, "2026-06-17"), "staff-disabled");
+    expect(disabled.staffName).toBe("停用护士");
+    expect(disabled.attendanceShifts).toBe(1);
+    expect(disabled.coefficientTotal).toBe(1.3);
+  });
+
+  it("hides disabled staff without entries in the selected week", () => {
+    const data: AppData = {
+      ...baseData,
+      staff: [
+        ...baseData.staff,
+        {
+          id: "staff-disabled",
+          jobId: "100088",
+          name: "停用护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        { id: "historical-entry", date: "2026-06-14", staffId: "staff-disabled", shiftIds: ["shift-day"], note: "" }
+      ]
+    };
+
+    const summary = calculateWeeklySummary(data, "2026-06-17");
+    expect(summary.rows.map((row) => row.staffId)).not.toContain("staff-disabled");
+  });
+
   it("floors required shifts at zero when holiday deductions exceed the weekly default", () => {
     const data: AppData = {
       ...baseData,

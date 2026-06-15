@@ -16,8 +16,17 @@ const props = defineProps<{
   summary: WeeklySummary;
 }>();
 
-const enabledStaff = computed(() =>
-  [...props.data.staff].filter((staff) => staff.enabled).sort((left, right) => left.sortOrder - right.sortOrder)
+const printedDayKeys = computed(() => new Set(props.days.map((day) => day.key)));
+const staffWithPrintedEntries = computed(
+  () =>
+    new Set(
+      props.data.scheduleEntries.filter((entry) => printedDayKeys.value.has(entry.date)).map((entry) => entry.staffId)
+    )
+);
+const printedStaff = computed(() =>
+  [...props.data.staff]
+    .filter((staff) => staff.enabled || staffWithPrintedEntries.value.has(staff.id))
+    .sort((left, right) => left.sortOrder - right.sortOrder)
 );
 
 const holidayByDate = computed(() => new Map(props.data.holidays.map((holiday) => [holiday.date, holiday])));
@@ -70,8 +79,11 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
         </tr>
       </thead>
       <tbody>
-        <tr v-for="staff in enabledStaff" :key="staff.id">
-          <th>{{ staff.name }}</th>
+        <tr v-for="staff in printedStaff" :key="staff.id" :class="{ 'disabled-historical-row': !staff.enabled }">
+          <th>
+            <span>{{ staff.name }}</span>
+            <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
+          </th>
           <td v-for="day in days" :key="`${staff.id}-${day.key}`">
             <span class="print-cell-shifts">
               <span
