@@ -26,6 +26,11 @@ export function addDays(key: string, offset: number): string {
   return toDateKey(date);
 }
 
+export function addWeeks(key: string, offset: number): string {
+  const weekStart = getWeekRange(key).start;
+  return addDays(weekStart, offset * 7);
+}
+
 export function getMonthDays(year: number, month: number): CalendarDay[] {
   const lastDay = new Date(year, month, 0).getDate();
   return Array.from({ length: lastDay }, (_, index) => {

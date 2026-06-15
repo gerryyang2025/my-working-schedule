@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMonthDays, getWeekRange, toDateKey } from "./date";
+import { addWeeks, getMonthDays, getWeekRange, toDateKey } from "./date";
 
 describe("date utilities", () => {
   it("formats local date keys as yyyy-mm-dd", () => {
@@ -26,5 +26,11 @@ describe("date utilities", () => {
       start: "2026-06-15",
       end: "2026-06-21"
     });
+  });
+
+  it("moves by natural weeks from the selected week start", () => {
+    expect(addWeeks("2026-06-17", -1)).toBe("2026-06-08");
+    expect(addWeeks("2026-06-17", 1)).toBe("2026-06-22");
+    expect(addWeeks("2026-06-21", 1)).toBe("2026-06-22");
   });
 });

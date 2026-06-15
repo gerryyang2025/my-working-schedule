@@ -1,7 +1,9 @@
 <script setup lang="ts">
-import { CalendarDays, Expand, Printer, Settings, ShieldCheck } from "lucide-vue-next";
+import { computed } from "vue";
+import { CalendarDays, ChevronLeft, ChevronRight, Expand, Printer, Settings, ShieldCheck } from "lucide-vue-next";
+import { addWeeks, getWeekRange, toDateKey } from "@/lib/date";
 
-defineProps<{
+const props = defineProps<{
   year: number;
   month: number;
   selectedDate: string;
@@ -38,6 +40,23 @@ function handleSelectedDateUpdate(value: unknown): void {
     emit("update:selectedDate", value);
   }
 }
+
+const selectedWeek = computed(() => getWeekRange(props.selectedDate));
+
+function updateToWeekStart(value: unknown): void {
+  if (typeof value === "string" && value) {
+    emit("update:selectedDate", getWeekRange(value).start);
+    return;
+  }
+
+  if (value instanceof Date) {
+    emit("update:selectedDate", getWeekRange(toDateKey(value)).start);
+  }
+}
+
+function moveWeek(offset: number): void {
+  emit("update:selectedDate", addWeeks(props.selectedDate, offset));
+}
 </script>
 
 <template>
@@ -65,6 +84,25 @@ function handleSelectedDateUpdate(value: unknown): void {
         :clearable="false"
         @update:model-value="handleSelectedDateUpdate"
       />
+      <div class="week-nav" role="group" aria-label="周选择">
+        <el-tooltip content="上一周" placement="top">
+          <el-button :icon="ChevronLeft" aria-label="上一周" @click="moveWeek(-1)" />
+        </el-tooltip>
+        <el-date-picker
+          :model-value="selectedWeek.start"
+          class="week-picker"
+          type="week"
+          format="YYYY [第] ww [周]"
+          value-format="YYYY-MM-DD"
+          placeholder="选择周"
+          :clearable="false"
+          @update:model-value="updateToWeekStart"
+        />
+        <el-tooltip content="下一周" placement="top">
+          <el-button :icon="ChevronRight" aria-label="下一周" @click="moveWeek(1)" />
+        </el-tooltip>
+      </div>
+      <span class="toolbar-week-range">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</span>
     </div>
 
     <div class="toolbar-actions">

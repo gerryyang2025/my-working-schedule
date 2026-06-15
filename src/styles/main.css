@@ -72,6 +72,22 @@ body {
   width: 108px;
 }
 
+.week-nav {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.week-picker {
+  width: 138px;
+}
+
+.toolbar-week-range {
+  white-space: nowrap;
+  color: #475569;
+  font-size: 13px;
+}
+
 .week-chip {
   padding: 6px 10px;
   border: 1px solid #bfdbfe;
