@@ -29,9 +29,9 @@ const entryShiftsByCell = computed(() => {
 
   for (const entry of props.data.scheduleEntries) {
     const shifts = entry.shiftIds
-      .slice(0, 2)
       .map((shiftId) => shiftMap.get(shiftId))
-      .filter((shift): shift is NonNullable<typeof shift> => Boolean(shift))
+      .filter((shift): shift is NonNullable<typeof shift> => Boolean(shift?.enabled))
+      .slice(0, 2)
       .map((shift) => ({
         id: shift.id,
         shortName: shift.shortName,
