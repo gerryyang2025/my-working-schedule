@@ -1,4 +1,8 @@
-import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
+import type { AppData, Holiday, ScheduleEntry, Settings, Shift, StaffMember } from "@/types/domain";
+
+export type PublicAppData = Omit<AppData, "settings"> & {
+  settings: Omit<Settings, "adminPassword">;
+};
 
 let adminMode = false;
 
@@ -28,7 +32,7 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
       errorBody = null;
     }
 
-    throw new Error(errorBody?.message || response.statusText);
+    throw new Error(errorBody?.message || response.statusText || `HTTP ${response.status}`);
   }
 
   return (await response.json()) as T;
@@ -38,8 +42,8 @@ export function setAdminMode(enabled: boolean): void {
   adminMode = enabled;
 }
 
-export function loadData(): Promise<AppData> {
-  return requestJson<AppData>("/api/data");
+export function loadData(): Promise<PublicAppData> {
+  return requestJson<PublicAppData>("/api/data");
 }
 
 export async function enterAdminMode(password: string): Promise<void> {
@@ -50,29 +54,29 @@ export async function enterAdminMode(password: string): Promise<void> {
   setAdminMode(true);
 }
 
-export function saveStaff(staff: StaffMember): Promise<AppData> {
-  return requestJson<AppData>(`/api/data/staff/${staff.id}`, {
+export function saveStaff(staff: StaffMember): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/staff/${staff.id}`, {
     method: "PUT",
     body: JSON.stringify(staff)
   });
 }
 
-export function saveShift(shift: Shift): Promise<AppData> {
-  return requestJson<AppData>(`/api/data/shift/${shift.id}`, {
+export function saveShift(shift: Shift): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/shift/${shift.id}`, {
     method: "PUT",
     body: JSON.stringify(shift)
   });
 }
 
-export function saveHoliday(holiday: Holiday): Promise<AppData> {
-  return requestJson<AppData>(`/api/data/holiday/${holiday.id}`, {
+export function saveHoliday(holiday: Holiday): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/holiday/${holiday.id}`, {
     method: "PUT",
     body: JSON.stringify(holiday)
   });
 }
 
-export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<AppData> {
-  return requestJson<AppData>("/api/data/schedule-entry", {
+export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<PublicAppData> {
+  return requestJson<PublicAppData>("/api/data/schedule-entry", {
     method: "PUT",
     body: JSON.stringify(entry)
   });

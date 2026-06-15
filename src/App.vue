@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
 import { loadData } from "@/api/client";
-import type { AppData } from "@/types/domain";
+import type { PublicAppData } from "@/api/client";
 
-const data = ref<AppData | null>(null);
+const data = ref<PublicAppData | null>(null);
 const error = ref("");
 
 onMounted(async () => {
