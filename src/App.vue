@@ -2,9 +2,12 @@
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
-import { enterAdminMode, loadData } from "@/api/client";
+import CellEditorDialog from "@/components/CellEditorDialog.vue";
+import ScheduleGrid from "@/components/ScheduleGrid.vue";
+import ShiftPalette from "@/components/ShiftPalette.vue";
+import { enterAdminMode, loadData, saveScheduleEntry } from "@/api/client";
 import type { PublicAppData } from "@/api/client";
-import { getWeekRange, toDateKey } from "@/lib/date";
+import { getMonthDays, getWeekRange, toDateKey } from "@/lib/date";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -14,8 +17,19 @@ const selectedDate = ref(today);
 const currentYear = ref(new Date().getFullYear());
 const currentMonth = ref(new Date().getMonth() + 1);
 const managementOpen = ref(false);
+const selectedShiftId = ref("");
+const editorOpen = ref(false);
+const editingStaffId = ref("");
+const editingDate = ref("");
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
+const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value));
+const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
+const editingEntry = computed(
+  () =>
+    data.value?.scheduleEntries.find((entry) => entry.staffId === editingStaffId.value && entry.date === editingDate.value) ??
+    null
+);
 
 async function refreshData(): Promise<void> {
   data.value = await loadData();
@@ -68,6 +82,34 @@ function printWithMode(mode: "month" | "week"): void {
   }, 200);
 }
 
+async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<void> {
+  try {
+    data.value = await saveScheduleEntry({ staffId, date, shiftIds, note });
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "排班保存失败");
+    throw caughtError;
+  }
+}
+
+async function handleQuickFill(staffId: string, date: string): Promise<void> {
+  if (!selectedShiftId.value) {
+    return;
+  }
+
+  await saveEntry(staffId, date, [selectedShiftId.value], "");
+}
+
+function handleEditCell(staffId: string, date: string): void {
+  editingStaffId.value = staffId;
+  editingDate.value = date;
+  editorOpen.value = true;
+}
+
+async function handleEditorSave(shiftIds: string[], note: string): Promise<void> {
+  await saveEntry(editingStaffId.value, editingDate.value, shiftIds, note);
+  editorOpen.value = false;
+}
+
 onMounted(async () => {
   try {
     await refreshData();
@@ -103,10 +145,27 @@ onMounted(async () => {
       {{ error }}
     </section>
     <section v-else-if="!data" class="state-message">正在加载排班数据...</section>
-    <section v-else class="state-message">
-      已加载 {{ data.staff.length }} 名人员和 {{ data.shifts.length }} 个班次，配置抽屉状态：{{
-        managementOpen ? "打开" : "关闭"
-      }}
+    <section v-else class="workbench">
+      <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
+      <ScheduleGrid
+        :staff="data.staff"
+        :days="monthDays"
+        :holidays="data.holidays"
+        :shifts="data.shifts"
+        :entries="data.scheduleEntries"
+        :selected-shift-id="selectedShiftId"
+        :admin-mode="adminMode"
+        @quick-fill="handleQuickFill"
+        @edit-cell="handleEditCell"
+      />
+      <CellEditorDialog
+        v-model="editorOpen"
+        :staff="editingStaff"
+        :date="editingDate"
+        :entry="editingEntry"
+        :shifts="data.shifts"
+        @save="handleEditorSave"
+      />
     </section>
   </main>
 </template>
