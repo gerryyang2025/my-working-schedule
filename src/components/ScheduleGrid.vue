@@ -24,15 +24,27 @@ const entryMap = computed(() => new Map(props.entries.map((entry) => [`${entry.d
 const sortedStaff = computed(() =>
   props.staff.filter((item) => item.enabled).sort((left, right) => left.sortOrder - right.sortOrder)
 );
-let clickTimer: number | null = null;
+const clickTimers = new Map<string, number>();
 
-function clearClickTimer(): void {
-  if (clickTimer === null) {
+function cellKey(staffId: string, date: string): string {
+  return `${staffId}__${date}`;
+}
+
+function clearClickTimer(key: string): void {
+  const timer = clickTimers.get(key);
+  if (timer === undefined) {
     return;
   }
 
-  window.clearTimeout(clickTimer);
-  clickTimer = null;
+  window.clearTimeout(timer);
+  clickTimers.delete(key);
+}
+
+function clearAllClickTimers(): void {
+  for (const timer of clickTimers.values()) {
+    window.clearTimeout(timer);
+  }
+  clickTimers.clear();
 }
 
 function entryFor(staffId: string, date: string): ScheduleEntry | null {
@@ -44,15 +56,17 @@ function handleCellClick(staffId: string, date: string): void {
     return;
   }
 
-  clearClickTimer();
-  clickTimer = window.setTimeout(() => {
-    clickTimer = null;
+  const key = cellKey(staffId, date);
+  clearClickTimer(key);
+  const timer = window.setTimeout(() => {
+    clickTimers.delete(key);
     if (props.selectedShiftId) {
       emit("quickFill", staffId, date);
       return;
     }
     emit("editCell", staffId, date);
   }, 180);
+  clickTimers.set(key, timer);
 }
 
 function handleCellDoubleClick(staffId: string, date: string): void {
@@ -60,12 +74,12 @@ function handleCellDoubleClick(staffId: string, date: string): void {
     return;
   }
 
-  clearClickTimer();
+  clearClickTimer(cellKey(staffId, date));
   emit("editCell", staffId, date);
 }
 
 onBeforeUnmount(() => {
-  clearClickTimer();
+  clearAllClickTimers();
 });
 </script>
 
