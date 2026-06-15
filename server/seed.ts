@@ -1,6 +1,8 @@
 import type { AppData } from "./types";
 
-export function createSeedData(): AppData {
+export const DEFAULT_ADMIN_PASSWORD = "change-me-before-deploy";
+
+export function createSeedData(adminPassword = process.env.SCHEDULE_ADMIN_PASSWORD ?? DEFAULT_ADMIN_PASSWORD): AppData {
   return {
     staff: [
       {
@@ -93,7 +95,7 @@ export function createSeedData(): AppData {
     ],
     scheduleEntries: [],
     settings: {
-      adminPassword: "123456",
+      adminPassword,
       defaultRequiredShiftsPerWeek: 5,
       version: 1
     }

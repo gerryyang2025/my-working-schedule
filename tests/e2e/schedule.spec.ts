@@ -14,8 +14,13 @@ test("loads the schedule workstation", async ({ page }) => {
 test("enters admin mode and quick fills a shift", async ({ page, request }) => {
   await page.clock.setFixedTime("2026-06-16T08:00:00+08:00");
 
+  const session = await request.post("/api/admin/session", {
+    data: { password: "123456" }
+  });
+  expect(session.ok()).toBeTruthy();
+  const { token } = (await session.json()) as { token: string };
   await request.put("/api/data/schedule-entry", {
-    headers: { "x-admin-mode": "true" },
+    headers: { Authorization: `Bearer ${token}` },
     data: {
       date: quickFillDate,
       staffId: quickFillStaffId,

@@ -90,7 +90,7 @@
   ],
   "scheduleEntries": [],
   "settings": {
-    "adminPassword": "123456",
+    "adminPassword": "change-me-before-deploy",
     "defaultRequiredShiftsPerWeek": 5,
     "version": 1
   }

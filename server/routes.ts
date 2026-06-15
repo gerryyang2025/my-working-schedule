@@ -1,4 +1,5 @@
-import { Router } from "express";
+import { randomBytes } from "node:crypto";
+import { Router, type NextFunction, type Response } from "express";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
@@ -17,6 +18,24 @@ interface ScheduleEntryPayload {
 type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
 const staffTypes = new Set(["nurse", "clerk", "head_nurse"]);
+
+class HttpResponseError extends Error {
+  constructor(
+    readonly status: number,
+    message: string
+  ) {
+    super(message);
+  }
+}
+
+function handleRouteError(error: unknown, response: Response, next: NextFunction): void {
+  if (error instanceof HttpResponseError) {
+    response.status(error.status).json({ message: error.message });
+    return;
+  }
+
+  next(error);
+}
 
 function toPublicData(data: AppData): PublicAppData {
   const { adminPassword: _adminPassword, ...publicSettings } = data.settings;
@@ -61,6 +80,36 @@ function isStringArray(value: unknown): value is string[] {
 
 function isStaffType(value: unknown): value is StaffMember["type"] {
   return isString(value) && staffTypes.has(value);
+}
+
+function isValidDateKey(value: string): boolean {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!match) {
+    return false;
+  }
+
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function createAdminToken(): string {
+  return randomBytes(32).toString("base64url");
+}
+
+function parseBearerToken(header: string | undefined): string | null {
+  if (!header?.startsWith("Bearer ")) {
+    return null;
+  }
+
+  const token = header.slice("Bearer ".length).trim();
+  return token.length > 0 ? token : null;
+}
+
+function getConfiguredAdminPassword(data: AppData): string {
+  return process.env.SCHEDULE_ADMIN_PASSWORD ?? data.settings.adminPassword;
 }
 
 function parseStaffPayload(body: unknown, id: string): StaffMember | null {
@@ -143,6 +192,7 @@ function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPa
 
 export function createRoutes(storage: StorageAdapter): Router {
   const router = Router();
+  const adminTokens = new Set<string>();
 
   router.get("/health", (_request, response) => {
     response.json({ ok: true });
@@ -153,26 +203,29 @@ export function createRoutes(storage: StorageAdapter): Router {
       const data = await storage.load();
       response.json(toPublicData(data));
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 
   router.post("/admin/session", async (request, response, next) => {
     try {
       const data = await storage.load();
-      if (request.body?.password === data.settings.adminPassword) {
-        response.json({ ok: true });
+      if (request.body?.password === getConfiguredAdminPassword(data)) {
+        const token = createAdminToken();
+        adminTokens.add(token);
+        response.json({ ok: true, token });
         return;
       }
 
       response.status(401).json({ ok: false, message: "管理密码不正确" });
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 
   router.use("/data", (request, response, next) => {
-    if (request.header("x-admin-mode") === "true") {
+    const token = parseBearerToken(request.header("Authorization"));
+    if (token && adminTokens.has(token)) {
       next();
       return;
     }
@@ -188,15 +241,13 @@ export function createRoutes(storage: StorageAdapter): Router {
         return;
       }
 
-      const data = await storage.load();
-      const nextData = {
+      const nextData = await storage.update((data) => ({
         ...data,
         staff: upsertById(data.staff, staffMember)
-      };
-      await storage.save(nextData);
+      }));
       response.json(toPublicData(nextData));
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 
@@ -208,15 +259,13 @@ export function createRoutes(storage: StorageAdapter): Router {
         return;
       }
 
-      const data = await storage.load();
-      const nextData = {
+      const nextData = await storage.update((data) => ({
         ...data,
         shifts: upsertById(data.shifts, shift)
-      };
-      await storage.save(nextData);
+      }));
       response.json(toPublicData(nextData));
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 
@@ -227,22 +276,25 @@ export function createRoutes(storage: StorageAdapter): Router {
         response.status(400).json({ message: "节假日信息不完整" });
         return;
       }
-
-      const data = await storage.load();
-      const hasDuplicateDate = data.holidays.some((item) => item.id !== holiday.id && item.date === holiday.date);
-      if (hasDuplicateDate) {
-        response.status(400).json({ message: "节假日日期不能重复" });
+      if (!isValidDateKey(holiday.date)) {
+        response.status(400).json({ message: "日期格式不正确" });
         return;
       }
 
-      const nextData = {
-        ...data,
-        holidays: upsertById(data.holidays, holiday)
-      };
-      await storage.save(nextData);
+      const nextData = await storage.update((data) => {
+        const hasDuplicateDate = data.holidays.some((item) => item.id !== holiday.id && item.date === holiday.date);
+        if (hasDuplicateDate) {
+          throw new HttpResponseError(400, "节假日日期不能重复");
+        }
+
+        return {
+          ...data,
+          holidays: upsertById(data.holidays, holiday)
+        };
+      });
       response.json(toPublicData(nextData));
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 
@@ -254,44 +306,46 @@ export function createRoutes(storage: StorageAdapter): Router {
         return;
       }
 
-      const data = await storage.load();
       const { date, staffId, shiftIds, note } = payload.value;
-
-      if (!data.staff.some((staffMember) => staffMember.id === staffId)) {
-        response.status(400).json({ message: `人员不存在：${staffId}` });
+      if (!isValidDateKey(date)) {
+        response.status(400).json({ message: "日期格式不正确" });
         return;
       }
 
-      const validation = validateScheduleShiftIds(shiftIds, data.shifts);
-      if (!validation.ok) {
-        response.status(400).json({ message: validation.message });
-        return;
-      }
+      const nextData = await storage.update((data) => {
+        if (!data.staff.some((staffMember) => staffMember.id === staffId)) {
+          throw new HttpResponseError(400, `人员不存在：${staffId}`);
+        }
 
-      const id = `${date}__${staffId}`;
-      const remainingEntries = data.scheduleEntries.filter((entry) => entry.id !== id);
-      const scheduleEntries =
-        shiftIds.length === 0
-          ? remainingEntries
-          : [
-              ...remainingEntries,
-              {
-                id,
-                date,
-                staffId,
-                shiftIds,
-                note: note ?? ""
-              }
-            ];
-      const nextData = {
-        ...data,
-        scheduleEntries
-      };
+        const validation = validateScheduleShiftIds(shiftIds, data.shifts);
+        if (!validation.ok) {
+          throw new HttpResponseError(400, validation.message);
+        }
 
-      await storage.save(nextData);
+        const id = `${date}__${staffId}`;
+        const remainingEntries = data.scheduleEntries.filter((entry) => entry.id !== id);
+        const scheduleEntries =
+          shiftIds.length === 0
+            ? remainingEntries
+            : [
+                ...remainingEntries,
+                {
+                  id,
+                  date,
+                  staffId,
+                  shiftIds,
+                  note: note ?? ""
+                }
+              ];
+
+        return {
+          ...data,
+          scheduleEntries
+        };
+      });
       response.json(toPublicData(nextData));
     } catch (error) {
-      next(error);
+      handleRouteError(error, response, next);
     }
   });
 

@@ -12,7 +12,8 @@ export default defineConfig({
       command: "npm run dev:api",
       url: "http://127.0.0.1:3001/api/health",
       env: {
-        SCHEDULE_DATA_PATH: "data/e2e.local.json"
+        SCHEDULE_DATA_PATH: "data/e2e.local.json",
+        SCHEDULE_ADMIN_PASSWORD: "123456"
       },
       reuseExistingServer: false
     },

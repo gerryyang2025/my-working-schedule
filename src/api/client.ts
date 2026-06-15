@@ -5,6 +5,7 @@ export type PublicAppData = Omit<AppData, "settings"> & {
 };
 
 let adminMode = false;
+let adminToken: string | null = null;
 
 interface ApiErrorResponse {
   message?: string;
@@ -14,8 +15,8 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
 
-  if (adminMode) {
-    headers.set("x-admin-mode", "true");
+  if (adminMode && adminToken) {
+    headers.set("Authorization", `Bearer ${adminToken}`);
   }
 
   const response = await fetch(path, {
@@ -40,6 +41,9 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
 
 export function setAdminMode(enabled: boolean): void {
   adminMode = enabled;
+  if (!enabled) {
+    adminToken = null;
+  }
 }
 
 export function loadData(): Promise<PublicAppData> {
@@ -47,10 +51,11 @@ export function loadData(): Promise<PublicAppData> {
 }
 
 export async function enterAdminMode(password: string): Promise<void> {
-  await requestJson<{ ok: true }>("/api/admin/session", {
+  const session = await requestJson<{ ok: true; token: string }>("/api/admin/session", {
     method: "POST",
     body: JSON.stringify({ password })
   });
+  adminToken = session.token;
   setAdminMode(true);
 }
 
