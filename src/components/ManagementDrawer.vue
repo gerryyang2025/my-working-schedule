@@ -5,8 +5,11 @@ import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
 const props = defineProps<{
   modelValue: boolean;
-  data: PublicAppData;
+  data: Pick<PublicAppData, "staff" | "shifts" | "holidays">;
   adminMode: boolean;
+  staffSaveVersion: number;
+  shiftSaveVersion: number;
+  holidaySaveVersion: number;
 }>();
 
 const emit = defineEmits<{
@@ -44,6 +47,46 @@ const holidayDraft = reactive<Holiday>({
   affectsRequiredAttendance: true
 });
 
+function resetStaffDraft(): void {
+  Object.assign(staffDraft, {
+    id: `staff-${Date.now()}`,
+    jobId: "",
+    name: "",
+    type: "nurse",
+    isAdmin: false,
+    enabled: true,
+    sortOrder: 99
+  });
+}
+
+function resetShiftDraft(): void {
+  Object.assign(shiftDraft, {
+    id: `shift-${Date.now()}`,
+    name: "",
+    shortName: "",
+    color: "#2563EB",
+    countsAttendance: true,
+    coefficient: 1,
+    enabled: true,
+    sortOrder: 99
+  });
+}
+
+function resetHolidayDraft(): void {
+  Object.assign(holidayDraft, {
+    id: `holiday-${Date.now()}`,
+    date: "",
+    name: "",
+    affectsRequiredAttendance: true
+  });
+}
+
+function resetDrafts(): void {
+  resetStaffDraft();
+  resetShiftDraft();
+  resetHolidayDraft();
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -51,10 +94,28 @@ watch(
       return;
     }
 
-    const timestamp = Date.now();
-    staffDraft.id = `staff-${timestamp}`;
-    shiftDraft.id = `shift-${timestamp}`;
-    holidayDraft.id = `holiday-${timestamp}`;
+    resetDrafts();
+  }
+);
+
+watch(
+  () => props.staffSaveVersion,
+  () => {
+    resetStaffDraft();
+  }
+);
+
+watch(
+  () => props.shiftSaveVersion,
+  () => {
+    resetShiftDraft();
+  }
+);
+
+watch(
+  () => props.holidaySaveVersion,
+  () => {
+    resetHolidayDraft();
   }
 );
 </script>

@@ -25,6 +25,9 @@ const selectedShiftId = ref("");
 const editorOpen = ref(false);
 const editingStaffId = ref("");
 const editingDate = ref("");
+const staffSaveVersion = ref(0);
+const shiftSaveVersion = ref(0);
+const holidaySaveVersion = ref(0);
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value));
@@ -120,6 +123,7 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 async function handleSaveStaff(staff: StaffMember): Promise<void> {
   try {
     data.value = await saveStaff(staff);
+    staffSaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
   }
@@ -128,6 +132,7 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
 async function handleSaveShift(shift: Shift): Promise<void> {
   try {
     data.value = await saveShift(shift);
+    shiftSaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
   }
@@ -136,6 +141,7 @@ async function handleSaveShift(shift: Shift): Promise<void> {
 async function handleSaveHoliday(holiday: Holiday): Promise<void> {
   try {
     data.value = await saveHoliday(holiday);
+    holidaySaveVersion.value += 1;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
   }
@@ -182,6 +188,9 @@ onMounted(async () => {
         v-model="managementOpen"
         :data="data"
         :admin-mode="adminMode"
+        :staff-save-version="staffSaveVersion"
+        :shift-save-version="shiftSaveVersion"
+        :holiday-save-version="holidaySaveVersion"
         @save-staff="handleSaveStaff"
         @save-shift="handleSaveShift"
         @save-holiday="handleSaveHoliday"
