@@ -28,6 +28,8 @@ npm run dev
 
 ## 验证命令
 
+脚手架阶段可先运行 `npm run lint` 与 `npm run test`；`npm run build` 和 `npm run test:e2e` 需要后续任务补齐前端入口与 API 服务后再作为完整验证。
+
 ```bash
 npm run test
 npm run build

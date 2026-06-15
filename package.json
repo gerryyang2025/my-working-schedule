@@ -7,11 +7,11 @@
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite --host 127.0.0.1 --port 5173",
     "dev:api": "tsx watch server/index.ts",
-    "build": "vue-tsc --noEmit && vite build",
+    "build": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "lint": "vue-tsc --noEmit"
+    "lint": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",
@@ -33,7 +33,7 @@
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
     "vite": "^6.0.3",
-    "vitest": "^2.1.8",
+    "vitest": "^3.2.6",
     "vue-tsc": "^2.1.10"
   }
 }
