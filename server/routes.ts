@@ -7,6 +7,17 @@ type PublicAppData = Omit<AppData, "settings"> & {
   settings: Omit<AppData["settings"], "adminPassword">;
 };
 
+interface ScheduleEntryPayload {
+  date: string;
+  staffId: string;
+  shiftIds: string[];
+  note: string | null | undefined;
+}
+
+type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
+
+const staffTypes = new Set(["nurse", "clerk", "head_nurse"]);
+
 function toPublicData(data: AppData): PublicAppData {
   const { adminPassword: _adminPassword, ...publicSettings } = data.settings;
   return {
@@ -22,6 +33,112 @@ function upsertById<T extends { id: string }>(items: T[], next: T): T[] {
   }
 
   return items.map((item, index) => (index === existingIndex ? next : item));
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === "string";
+}
+
+function isNonEmptyString(value: unknown): value is string {
+  return isString(value) && value.trim().length > 0;
+}
+
+function isBoolean(value: unknown): value is boolean {
+  return typeof value === "boolean";
+}
+
+function isNumber(value: unknown): value is number {
+  return typeof value === "number" && Number.isFinite(value);
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(isString);
+}
+
+function isStaffType(value: unknown): value is StaffMember["type"] {
+  return isString(value) && staffTypes.has(value);
+}
+
+function parseStaffPayload(body: unknown, id: string): StaffMember | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { jobId, name, type, isAdmin, enabled, sortOrder } = body;
+  if (
+    !isString(jobId) ||
+    !isString(name) ||
+    !isStaffType(type) ||
+    !isBoolean(isAdmin) ||
+    !isBoolean(enabled) ||
+    !isNumber(sortOrder)
+  ) {
+    return null;
+  }
+
+  return { id, jobId, name, type, isAdmin, enabled, sortOrder };
+}
+
+function parseShiftPayload(body: unknown, id: string): Shift | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { name, shortName, color, countsAttendance, coefficient, enabled, sortOrder } = body;
+  if (
+    !isString(name) ||
+    !isString(shortName) ||
+    !isString(color) ||
+    !isBoolean(countsAttendance) ||
+    !isNumber(coefficient) ||
+    !isBoolean(enabled) ||
+    !isNumber(sortOrder)
+  ) {
+    return null;
+  }
+
+  return { id, name, shortName, color, countsAttendance, coefficient, enabled, sortOrder };
+}
+
+function parseHolidayPayload(body: unknown, id: string): Holiday | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { date, name, affectsRequiredAttendance } = body;
+  if (!isString(date) || !isString(name) || !isBoolean(affectsRequiredAttendance)) {
+    return null;
+  }
+
+  return { id, date, name, affectsRequiredAttendance };
+}
+
+function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPayload> {
+  if (!isRecord(body)) {
+    return { ok: false, message: "排班信息不完整" };
+  }
+
+  const { date, staffId, shiftIds, note } = body;
+  if (!isNonEmptyString(date) || !isNonEmptyString(staffId) || !isStringArray(shiftIds)) {
+    return { ok: false, message: "排班信息不完整" };
+  }
+
+  let parsedNote: string | null | undefined;
+  if (note === undefined) {
+    parsedNote = undefined;
+  } else if (note === null) {
+    parsedNote = null;
+  } else if (isString(note)) {
+    parsedNote = note;
+  } else {
+    return { ok: false, message: "备注格式不正确" };
+  }
+
+  return { ok: true, value: { date, staffId, shiftIds, note: parsedNote } };
 }
 
 export function createRoutes(storage: StorageAdapter): Router {
@@ -65,8 +182,13 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.put("/data/staff/:id", async (request, response, next) => {
     try {
+      const staffMember = parseStaffPayload(request.body, request.params.id);
+      if (!staffMember) {
+        response.status(400).json({ message: "人员信息不完整" });
+        return;
+      }
+
       const data = await storage.load();
-      const staffMember = { ...(request.body as StaffMember), id: request.params.id };
       const nextData = {
         ...data,
         staff: upsertById(data.staff, staffMember)
@@ -80,8 +202,13 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.put("/data/shift/:id", async (request, response, next) => {
     try {
+      const shift = parseShiftPayload(request.body, request.params.id);
+      if (!shift) {
+        response.status(400).json({ message: "班次信息不完整" });
+        return;
+      }
+
       const data = await storage.load();
-      const shift = { ...(request.body as Shift), id: request.params.id };
       const nextData = {
         ...data,
         shifts: upsertById(data.shifts, shift)
@@ -95,8 +222,13 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.put("/data/holiday/:id", async (request, response, next) => {
     try {
+      const holiday = parseHolidayPayload(request.body, request.params.id);
+      if (!holiday) {
+        response.status(400).json({ message: "节假日信息不完整" });
+        return;
+      }
+
       const data = await storage.load();
-      const holiday = { ...(request.body as Holiday), id: request.params.id };
       const hasDuplicateDate = data.holidays.some((item) => item.id !== holiday.id && item.date === holiday.date);
       if (hasDuplicateDate) {
         response.status(400).json({ message: "节假日日期不能重复" });
@@ -116,13 +248,14 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.put("/data/schedule-entry", async (request, response, next) => {
     try {
+      const payload = parseScheduleEntryPayload(request.body);
+      if (payload.ok === false) {
+        response.status(400).json({ message: payload.message });
+        return;
+      }
+
       const data = await storage.load();
-      const { date, staffId, shiftIds, note } = request.body as {
-        date: string;
-        staffId: string;
-        shiftIds: string[];
-        note: string;
-      };
+      const { date, staffId, shiftIds, note } = payload.value;
 
       if (!data.staff.some((staffMember) => staffMember.id === staffId)) {
         response.status(400).json({ message: `人员不存在：${staffId}` });
