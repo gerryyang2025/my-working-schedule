@@ -16,3 +16,20 @@
 - `.gitignore` 忽略本地系统文件、依赖目录、构建产物、日志、环境文件和本地需求附件。
 - `.gitattributes` 统一文本文件换行，并将常见二进制文件标记为 binary。
 - `排班需求.docx` 作为本地需求附件保留在工作区，不再纳入 Git 跟踪。
+
+## 本地开发
+
+```bash
+npm install
+npm run dev
+```
+
+默认前端地址为 `http://127.0.0.1:5173`，API 地址为 `http://127.0.0.1:3001`。
+
+## 验证命令
+
+```bash
+npm run test
+npm run build
+npm run test:e2e
+```
