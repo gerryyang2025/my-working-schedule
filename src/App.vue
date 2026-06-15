@@ -5,8 +5,10 @@ import AppToolbar from "@/components/AppToolbar.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
+import WeeklySummary from "@/components/WeeklySummary.vue";
 import { enterAdminMode, loadData, saveScheduleEntry } from "@/api/client";
 import type { PublicAppData } from "@/api/client";
+import { calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekRange, toDateKey } from "@/lib/date";
 
 const today = toDateKey(new Date());
@@ -24,6 +26,7 @@ const editingDate = ref("");
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value));
+const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
 const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
 const editingEntry = computed(
   () =>
@@ -160,6 +163,7 @@ onMounted(async () => {
         @quick-fill="handleQuickFill"
         @edit-cell="handleEditCell"
       />
+      <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
       <CellEditorDialog
         v-model="editorOpen"
         :staff="editingStaff"

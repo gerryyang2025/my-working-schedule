@@ -223,3 +223,41 @@ body {
 .full-width {
   width: 100%;
 }
+
+.weekly-summary {
+  grid-column: 1 / -1;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.weekly-summary h2 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.weekly-summary p {
+  margin: 0 0 4px;
+  color: #475569;
+}
+
+.summary-note {
+  font-size: 13px;
+}
+
+.summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.summary-table th,
+.summary-table td {
+  border: 1px solid #e2e8f0;
+  padding: 8px;
+  text-align: center;
+}
+
+.summary-table th {
+  background: #f8fafc;
+}

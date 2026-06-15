@@ -1,6 +1,10 @@
 import type { AppData, ScheduleEntry, Shift, StaffMember, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
 import { getWeekRange } from "./date";
 
+type WeeklySummaryInput = Pick<AppData, "staff" | "shifts" | "holidays" | "scheduleEntries"> & {
+  settings: Pick<AppData["settings"], "defaultRequiredShiftsPerWeek">;
+};
+
 function isWithinRange(date: string, start: string, end: string): boolean {
   return date >= start && date <= end;
 }
@@ -46,7 +50,7 @@ function summarizeStaff(
   };
 }
 
-export function calculateWeeklySummary(data: AppData, selectedDate: string): WeeklySummary {
+export function calculateWeeklySummary(data: WeeklySummaryInput, selectedDate: string): WeeklySummary {
   const { start, end } = getWeekRange(selectedDate);
   const affectedHolidays = data.holidays.filter(
     (holiday) => holiday.affectsRequiredAttendance && isWithinRange(holiday.date, start, end)
