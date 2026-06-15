@@ -1,4 +1,4 @@
-import type { AppData, ScheduleEntry, Shift, StaffMember, WeeklySummary } from "@/types/domain";
+import type { AppData, ScheduleEntry, Shift, StaffMember, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
 import { getWeekRange } from "./date";
 
 function isWithinRange(date: string, start: string, end: string): boolean {
@@ -14,7 +14,7 @@ function summarizeStaff(
   entries: ScheduleEntry[],
   shiftMap: Map<string, Shift>,
   requiredShifts: number
-) {
+): WeeklyStaffSummary {
   let attendanceShifts = 0;
   let coefficientTotal = 0;
 

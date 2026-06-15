@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { AppData } from "@/types/domain";
+import type { AppData, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
 import { calculateWeeklySummary } from "./calculation";
 
 const baseData: AppData = {
@@ -87,6 +87,12 @@ const baseData: AppData = {
   }
 };
 
+function getRow(summary: WeeklySummary, staffId: string): WeeklyStaffSummary {
+  const row = summary.rows.find((candidate) => candidate.staffId === staffId);
+  expect(row).toBeDefined();
+  return row as WeeklyStaffSummary;
+}
+
 describe("calculateWeeklySummary", () => {
   it("deducts affected holidays from required shifts", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
@@ -97,26 +103,99 @@ describe("calculateWeeklySummary", () => {
 
   it("calculates attendance by shift count instead of natural day", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
-    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse");
-    expect(nurse?.attendanceShifts).toBe(5);
-    expect(nurse?.overtimeShifts).toBe(1);
-    expect(nurse?.coefficientTotal).toBe(6.7);
+    const nurse = getRow(summary, "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(5);
+    expect(nurse.overtimeShifts).toBe(1);
+    expect(nurse.coefficientTotal).toBe(6.7);
   });
 
   it("counts clerks with the same rules as nurses", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
-    const clerk = summary.rows.find((row) => row.staffId === "staff-clerk");
-    expect(clerk?.attendanceShifts).toBe(1);
-    expect(clerk?.overtimeShifts).toBe(0);
-    expect(clerk?.coefficientTotal).toBe(1.3);
+    const clerk = getRow(summary, "staff-clerk");
+    expect(clerk.attendanceShifts).toBe(1);
+    expect(clerk.overtimeShifts).toBe(0);
+    expect(clerk.coefficientTotal).toBe(1.3);
   });
 
   it("counts head nurse attendance and overtime but excludes coefficient", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
-    const head = summary.rows.find((row) => row.staffId === "staff-head");
-    expect(head?.attendanceShifts).toBe(2);
-    expect(head?.overtimeShifts).toBe(0);
-    expect(head?.coefficientTotal).toBeNull();
-    expect(head?.coefficientExcludedReason).toBe("护士长绩效单独核算");
+    const head = getRow(summary, "staff-head");
+    expect(head.attendanceShifts).toBe(2);
+    expect(head.overtimeShifts).toBe(0);
+    expect(head.coefficientTotal).toBeNull();
+    expect(head.coefficientExcludedReason).toBe("护士长绩效单独核算");
+  });
+
+  it("skips missing shift IDs", () => {
+    const data: AppData = {
+      ...baseData,
+      scheduleEntries: [
+        { id: "missing-shift", date: "2026-06-17", staffId: "staff-nurse", shiftIds: ["shift-missing"], note: "" }
+      ]
+    };
+
+    const nurse = getRow(calculateWeeklySummary(data, "2026-06-17"), "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(0);
+    expect(nurse.coefficientTotal).toBe(0);
+  });
+
+  it("skips disabled shifts", () => {
+    const data: AppData = {
+      ...baseData,
+      shifts: [
+        ...baseData.shifts,
+        {
+          id: "shift-disabled",
+          name: "停用班",
+          shortName: "停",
+          color: "#94A3B8",
+          countsAttendance: true,
+          coefficient: 9,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        { id: "disabled-shift", date: "2026-06-17", staffId: "staff-nurse", shiftIds: ["shift-disabled"], note: "" }
+      ]
+    };
+
+    const nurse = getRow(calculateWeeklySummary(data, "2026-06-17"), "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(0);
+    expect(nurse.coefficientTotal).toBe(0);
+  });
+
+  it("ignores entries outside the selected Monday to Sunday week", () => {
+    const data: AppData = {
+      ...baseData,
+      scheduleEntries: [
+        { id: "previous-week", date: "2026-06-14", staffId: "staff-nurse", shiftIds: ["shift-day"], note: "" },
+        { id: "current-week", date: "2026-06-17", staffId: "staff-nurse", shiftIds: ["shift-day"], note: "" },
+        { id: "next-week", date: "2026-06-22", staffId: "staff-nurse", shiftIds: ["shift-night"], note: "" }
+      ]
+    };
+
+    const nurse = getRow(calculateWeeklySummary(data, "2026-06-17"), "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(1);
+    expect(nurse.coefficientTotal).toBe(1.3);
+  });
+
+  it("floors required shifts at zero when holiday deductions exceed the weekly default", () => {
+    const data: AppData = {
+      ...baseData,
+      holidays: [
+        { id: "holiday-1", date: "2026-06-15", name: "节日一", affectsRequiredAttendance: true },
+        { id: "holiday-2", date: "2026-06-16", name: "节日二", affectsRequiredAttendance: true },
+        { id: "holiday-3", date: "2026-06-17", name: "节日三", affectsRequiredAttendance: true }
+      ],
+      settings: {
+        ...baseData.settings,
+        defaultRequiredShiftsPerWeek: 1
+      }
+    };
+
+    const summary = calculateWeeklySummary(data, "2026-06-17");
+    expect(summary.holidayDeduction).toBe(3);
+    expect(summary.requiredShifts).toBe(0);
   });
 });
