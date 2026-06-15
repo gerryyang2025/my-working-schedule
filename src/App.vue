@@ -82,12 +82,13 @@ function printWithMode(mode: "month" | "week"): void {
   }, 200);
 }
 
-async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<void> {
+async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<boolean> {
   try {
     data.value = await saveScheduleEntry({ staffId, date, shiftIds, note });
+    return true;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "排班保存失败");
-    throw caughtError;
+    return false;
   }
 }
 
@@ -106,8 +107,9 @@ function handleEditCell(staffId: string, date: string): void {
 }
 
 async function handleEditorSave(shiftIds: string[], note: string): Promise<void> {
-  await saveEntry(editingStaffId.value, editingDate.value, shiftIds, note);
-  editorOpen.value = false;
+  if (await saveEntry(editingStaffId.value, editingDate.value, shiftIds, note)) {
+    editorOpen.value = false;
+  }
 }
 
 onMounted(async () => {

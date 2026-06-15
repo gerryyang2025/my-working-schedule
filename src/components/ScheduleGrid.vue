@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, onBeforeUnmount } from "vue";
 import type { CalendarDay } from "@/lib/date";
 import type { Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
 
@@ -24,6 +24,16 @@ const entryMap = computed(() => new Map(props.entries.map((entry) => [`${entry.d
 const sortedStaff = computed(() =>
   props.staff.filter((item) => item.enabled).sort((left, right) => left.sortOrder - right.sortOrder)
 );
+let clickTimer: number | null = null;
+
+function clearClickTimer(): void {
+  if (clickTimer === null) {
+    return;
+  }
+
+  window.clearTimeout(clickTimer);
+  clickTimer = null;
+}
 
 function entryFor(staffId: string, date: string): ScheduleEntry | null {
   return entryMap.value.get(`${date}__${staffId}`) ?? null;
@@ -33,19 +43,30 @@ function handleCellClick(staffId: string, date: string): void {
   if (!props.adminMode) {
     return;
   }
-  if (props.selectedShiftId) {
-    emit("quickFill", staffId, date);
-    return;
-  }
-  emit("editCell", staffId, date);
+
+  clearClickTimer();
+  clickTimer = window.setTimeout(() => {
+    clickTimer = null;
+    if (props.selectedShiftId) {
+      emit("quickFill", staffId, date);
+      return;
+    }
+    emit("editCell", staffId, date);
+  }, 180);
 }
 
 function handleCellDoubleClick(staffId: string, date: string): void {
   if (!props.adminMode) {
     return;
   }
+
+  clearClickTimer();
   emit("editCell", staffId, date);
 }
+
+onBeforeUnmount(() => {
+  clearClickTimer();
+});
 </script>
 
 <template>
