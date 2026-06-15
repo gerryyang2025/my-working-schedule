@@ -3,11 +3,13 @@ import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
+import ManagementDrawer from "@/components/ManagementDrawer.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
-import { enterAdminMode, loadData, saveScheduleEntry } from "@/api/client";
+import { enterAdminMode, loadData, saveHoliday, saveScheduleEntry, saveShift, saveStaff } from "@/api/client";
 import type { PublicAppData } from "@/api/client";
+import type { Holiday, Shift, StaffMember } from "@/types/domain";
 import { calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekRange, toDateKey } from "@/lib/date";
 
@@ -115,6 +117,30 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
   }
 }
 
+async function handleSaveStaff(staff: StaffMember): Promise<void> {
+  try {
+    data.value = await saveStaff(staff);
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
+  }
+}
+
+async function handleSaveShift(shift: Shift): Promise<void> {
+  try {
+    data.value = await saveShift(shift);
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
+  }
+}
+
+async function handleSaveHoliday(holiday: Holiday): Promise<void> {
+  try {
+    data.value = await saveHoliday(holiday);
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
+  }
+}
+
 onMounted(async () => {
   try {
     await refreshData();
@@ -151,6 +177,15 @@ onMounted(async () => {
     </section>
     <section v-else-if="!data" class="state-message">正在加载排班数据...</section>
     <section v-else class="workbench">
+      <ManagementDrawer
+        v-if="data"
+        v-model="managementOpen"
+        :data="data"
+        :admin-mode="adminMode"
+        @save-staff="handleSaveStaff"
+        @save-shift="handleSaveShift"
+        @save-holiday="handleSaveHoliday"
+      />
       <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
       <ScheduleGrid
         :staff="data.staff"

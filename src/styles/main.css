@@ -261,3 +261,11 @@ body {
 .summary-table th {
   background: #f8fafc;
 }
+
+.management-form {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid #e2e8f0;
+}
