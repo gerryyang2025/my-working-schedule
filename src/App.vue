@@ -8,7 +8,7 @@ import PrintViews from "@/components/PrintViews.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
-import { enterAdminMode, loadData, saveHoliday, saveScheduleEntry, saveShift, saveStaff } from "@/api/client";
+import { deleteHoliday, enterAdminMode, loadData, saveHoliday, saveScheduleEntry, saveShift, saveStaff } from "@/api/client";
 import type { PublicAppData } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 import { calculateWeeklySummary } from "@/lib/calculation";
@@ -172,6 +172,22 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
   }
 }
 
+async function handleDeleteHoliday(holidayId: string): Promise<void> {
+  if (holidaySaving.value) {
+    return;
+  }
+
+  holidaySaving.value = true;
+  try {
+    data.value = await deleteHoliday(holidayId);
+    holidaySaveVersion.value += 1;
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日删除失败");
+  } finally {
+    holidaySaving.value = false;
+  }
+}
+
 onMounted(async () => {
   try {
     await refreshData();
@@ -223,6 +239,7 @@ onMounted(async () => {
           @save-staff="handleSaveStaff"
           @save-shift="handleSaveShift"
           @save-holiday="handleSaveHoliday"
+          @delete-holiday="handleDeleteHoliday"
         />
         <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
         <ScheduleGrid

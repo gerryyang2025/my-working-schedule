@@ -209,6 +209,31 @@ describe("API routes", () => {
     expect(response.body.holidays).toContainEqual({ id: "holiday-2026-10-01", ...createHolidayPayload() });
   });
 
+  it("rejects holiday deletes without admin mode", async () => {
+    await request(createTestApp()).delete("/api/data/holiday/holiday-2026-06-19").expect(401);
+  });
+
+  it("deletes an existing holiday and returns public data", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .delete("/api/data/holiday/holiday-2026-06-19")
+      .set(await adminHeaders(app))
+      .expect(200);
+    expect(response.body.holidays).not.toContainEqual(
+      expect.objectContaining({ id: "holiday-2026-06-19" })
+    );
+    expect(response.body.settings.adminPassword).toBeUndefined();
+  });
+
+  it("returns 404 when deleting a missing holiday", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .delete("/api/data/holiday/holiday-missing")
+      .set(await adminHeaders(app))
+      .expect(404);
+    expect(response.body.message).toBe("节假日不存在");
+  });
+
   it("rejects duplicate holiday dates", async () => {
     const app = createTestApp();
     const response = await request(app)

@@ -270,6 +270,12 @@ body {
   border-top: 1px solid #e2e8f0;
 }
 
+.management-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .print-view {
   display: none;
 }

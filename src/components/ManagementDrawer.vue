@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, watch } from "vue";
+import { computed, reactive, watch } from "vue";
 import type { PublicAppData } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
@@ -20,6 +20,7 @@ const emit = defineEmits<{
   saveStaff: [staff: StaffMember];
   saveShift: [shift: Shift];
   saveHoliday: [holiday: Holiday];
+  deleteHoliday: [holidayId: string];
 }>();
 
 const staffDraft = reactive<StaffMember>({
@@ -49,6 +50,8 @@ const holidayDraft = reactive<Holiday>({
   name: "",
   affectsRequiredAttendance: true
 });
+
+const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
 
 function resetStaffDraft(): void {
   Object.assign(staffDraft, {
@@ -88,6 +91,30 @@ function resetDrafts(): void {
   resetStaffDraft();
   resetShiftDraft();
   resetHolidayDraft();
+}
+
+function loadStaffDraft(staff: StaffMember): void {
+  if (props.staffSaving) {
+    return;
+  }
+
+  Object.assign(staffDraft, staff);
+}
+
+function loadShiftDraft(shift: Shift): void {
+  if (props.shiftSaving) {
+    return;
+  }
+
+  Object.assign(shiftDraft, shift);
+}
+
+function loadHolidayDraft(holiday: Holiday): void {
+  if (props.holidaySaving) {
+    return;
+  }
+
+  Object.assign(holidayDraft, holiday);
 }
 
 watch(
@@ -134,11 +161,13 @@ watch(
 
     <el-tabs>
       <el-tab-pane label="人员">
-        <el-table :data="data.staff" size="small">
+        <el-table :data="data.staff" size="small" @row-click="loadStaffDraft">
           <el-table-column prop="jobId" label="工号" width="90" />
           <el-table-column prop="name" label="姓名" />
           <el-table-column prop="type" label="类型" width="100" />
           <el-table-column prop="isAdmin" label="管理员" width="90" />
+          <el-table-column prop="enabled" label="启用" width="80" />
+          <el-table-column prop="sortOrder" label="排序" width="80" />
         </el-table>
 
         <div class="management-form">
@@ -150,23 +179,30 @@ watch(
             <el-option label="护士长" value="head_nurse" />
           </el-select>
           <el-checkbox v-model="staffDraft.isAdmin" :disabled="staffSaving">指定管理员</el-checkbox>
-          <el-button
-            type="primary"
-            :disabled="staffSaving || !adminMode || !staffDraft.jobId || !staffDraft.name"
-            :loading="staffSaving"
-            @click="emit('saveStaff', { ...staffDraft })"
-          >
-            保存人员
-          </el-button>
+          <el-checkbox v-model="staffDraft.enabled" :disabled="staffSaving">启用</el-checkbox>
+          <el-input-number v-model="staffDraft.sortOrder" :min="0" :step="1" :disabled="staffSaving" />
+          <div class="management-actions">
+            <el-button :disabled="staffSaving" @click="resetStaffDraft">新增人员</el-button>
+            <el-button
+              type="primary"
+              :disabled="staffSaving || !adminMode || !staffDraft.jobId || !staffDraft.name"
+              :loading="staffSaving"
+              @click="emit('saveStaff', { ...staffDraft })"
+            >
+              保存人员
+            </el-button>
+          </div>
         </div>
       </el-tab-pane>
 
       <el-tab-pane label="班次">
-        <el-table :data="data.shifts" size="small">
+        <el-table :data="data.shifts" size="small" @row-click="loadShiftDraft">
           <el-table-column prop="shortName" label="简称" width="80" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="coefficient" label="系数" width="80" />
           <el-table-column prop="countsAttendance" label="计出勤" width="90" />
+          <el-table-column prop="enabled" label="启用" width="80" />
+          <el-table-column prop="sortOrder" label="排序" width="80" />
         </el-table>
 
         <div class="management-form">
@@ -175,36 +211,56 @@ watch(
           <el-color-picker v-model="shiftDraft.color" :disabled="shiftSaving" />
           <el-input-number v-model="shiftDraft.coefficient" :min="0" :step="0.1" :disabled="shiftSaving" />
           <el-checkbox v-model="shiftDraft.countsAttendance" :disabled="shiftSaving">计出勤</el-checkbox>
-          <el-button
-            type="primary"
-            :disabled="shiftSaving || !adminMode || !shiftDraft.name || !shiftDraft.shortName"
-            :loading="shiftSaving"
-            @click="emit('saveShift', { ...shiftDraft })"
-          >
-            保存班次
-          </el-button>
+          <el-checkbox v-model="shiftDraft.enabled" :disabled="shiftSaving">启用</el-checkbox>
+          <el-input-number v-model="shiftDraft.sortOrder" :min="0" :step="1" :disabled="shiftSaving" />
+          <div class="management-actions">
+            <el-button :disabled="shiftSaving" @click="resetShiftDraft">新增班次</el-button>
+            <el-button
+              type="primary"
+              :disabled="shiftSaving || !adminMode || !shiftDraft.name || !shiftDraft.shortName"
+              :loading="shiftSaving"
+              @click="emit('saveShift', { ...shiftDraft })"
+            >
+              保存班次
+            </el-button>
+          </div>
         </div>
       </el-tab-pane>
 
       <el-tab-pane label="节假日">
-        <el-table :data="data.holidays" size="small">
+        <el-table :data="data.holidays" size="small" @row-click="loadHolidayDraft">
           <el-table-column prop="date" label="日期" width="120" />
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="affectsRequiredAttendance" label="影响满勤" width="100" />
         </el-table>
 
         <div class="management-form">
-          <el-date-picker v-model="holidayDraft.date" value-format="YYYY-MM-DD" placeholder="日期" :disabled="holidaySaving" />
+          <el-date-picker
+            v-model="holidayDraft.date"
+            value-format="YYYY-MM-DD"
+            placeholder="日期"
+            :disabled="holidaySaving"
+          />
           <el-input v-model="holidayDraft.name" placeholder="节假日名称" :disabled="holidaySaving" />
           <el-checkbox v-model="holidayDraft.affectsRequiredAttendance" :disabled="holidaySaving">影响满勤</el-checkbox>
-          <el-button
-            type="primary"
-            :disabled="holidaySaving || !adminMode || !holidayDraft.date || !holidayDraft.name"
-            :loading="holidaySaving"
-            @click="emit('saveHoliday', { ...holidayDraft })"
-          >
-            保存节假日
-          </el-button>
+          <div class="management-actions">
+            <el-button :disabled="holidaySaving" @click="resetHolidayDraft">新增节假日</el-button>
+            <el-button
+              type="primary"
+              :disabled="holidaySaving || !adminMode || !holidayDraft.date || !holidayDraft.name"
+              :loading="holidaySaving"
+              @click="emit('saveHoliday', { ...holidayDraft })"
+            >
+              保存节假日
+            </el-button>
+            <el-popconfirm title="确认删除该节假日？" @confirm="emit('deleteHoliday', holidayDraft.id)">
+              <template #reference>
+                <el-button type="danger" :disabled="holidaySaving || !adminMode || !isExistingHolidayDraft">
+                  删除节假日
+                </el-button>
+              </template>
+            </el-popconfirm>
+          </div>
         </div>
       </el-tab-pane>
     </el-tabs>

@@ -299,6 +299,25 @@ export function createRoutes(storage: StorageAdapter): Router {
     }
   });
 
+  router.delete("/data/holiday/:id", async (request, response, next) => {
+    try {
+      const nextData = await storage.update((data) => {
+        const holidays = data.holidays.filter((holiday) => holiday.id !== request.params.id);
+        if (holidays.length === data.holidays.length) {
+          throw new HttpResponseError(404, "节假日不存在");
+        }
+
+        return {
+          ...data,
+          holidays
+        };
+      });
+      response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
   router.put("/data/schedule-entry", async (request, response, next) => {
     try {
       const payload = parseScheduleEntryPayload(request.body);

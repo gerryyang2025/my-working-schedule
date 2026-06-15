@@ -80,6 +80,12 @@ export function saveHoliday(holiday: Holiday): Promise<PublicAppData> {
   });
 }
 
+export function deleteHoliday(id: string): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/holiday/${id}`, {
+    method: "DELETE"
+  });
+}
+
 export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<PublicAppData> {
   return requestJson<PublicAppData>("/api/data/schedule-entry", {
     method: "PUT",
