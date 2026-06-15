@@ -4,10 +4,12 @@
 
 ## 当前文档
 
-- [产品需求.md](产品需求.md)：原始产品需求说明。
-- [技术方案.md](技术方案.md)：初步技术方案。
-- [方案细节.md](方案细节.md)：落地前需要确认的细节。
+- [产品需求.md](docs/产品需求.md)：总体需求说明，已标注一期范围与后续扩展。
+- [技术方案.md](docs/技术方案.md)：一期技术方案与后续正式架构演进。
+- [方案细节.md](docs/方案细节.md)：一期落地细节与执行计划对齐说明。
+- [风格样式.md](docs/风格样式.md)：Web 界面风格建议，已标注一期采用 Element Plus。
 - [一期设计规格](docs/superpowers/specs/2026-06-15-nursing-schedule-design.md)：已确认的一期设计范围与规则。
+- [一期实现计划](docs/superpowers/plans/2026-06-16-nursing-schedule-implementation.md)：按任务拆分的实现步骤与验证命令。
 
 ## Git 约定
 
