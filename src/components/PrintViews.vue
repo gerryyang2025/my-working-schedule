@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { PublicAppData } from "@/api/client";
+import { listDateKeys, parseDateKey } from "@/lib/date";
 import type { CalendarDay } from "@/lib/date";
 import type { WeeklySummary } from "@/types/domain";
 
@@ -9,6 +10,14 @@ interface PrintShiftMarker {
   shortName: string;
   color: string;
 }
+
+interface PrintWeekDay {
+  key: string;
+  dayOfMonth: number;
+  weekdayName: string;
+}
+
+const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
 const props = defineProps<{
   data: PublicAppData;
@@ -31,6 +40,16 @@ const printedStaff = computed(() =>
 
 const holidayByDate = computed(() => new Map(props.data.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftById = computed(() => new Map(props.data.shifts.map((shift) => [shift.id, shift])));
+const weekDays = computed<PrintWeekDay[]>(() =>
+  listDateKeys(props.summary.weekStart, props.summary.weekEnd).map((key) => {
+    const date = parseDateKey(key);
+    return {
+      key,
+      dayOfMonth: date.getDate(),
+      weekdayName: WEEKDAY_NAMES[date.getDay()]
+    };
+  })
+);
 
 const entryShiftsByCell = computed(() => {
   const cellMap = new Map<string, PrintShiftMarker[]>();
@@ -108,6 +127,42 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
       {{ summary.holidayDeduction }} 个。
     </p>
     <p v-if="summary.holidayNames.length">节假日：{{ summary.holidayNames.join("、") }}</p>
+
+    <section class="print-week-detail">
+      <h2>周排班明细</h2>
+      <table class="print-table">
+        <thead>
+          <tr>
+            <th>人员</th>
+            <th v-for="day in weekDays" :key="day.key">
+              <span class="print-day-heading">
+                <span>{{ day.dayOfMonth }}</span>
+                <span>{{ day.weekdayName }}</span>
+                <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
+              </span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in summary.rows" :key="row.staffId">
+            <th>{{ row.staffName }}</th>
+            <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`">
+              <span class="print-cell-shifts">
+                <span
+                  v-for="shift in getCellShifts(row.staffId, day.key)"
+                  :key="shift.id"
+                  class="print-shift-chip"
+                  :style="{ color: shift.color, borderColor: shift.color }"
+                >
+                  {{ shift.shortName }}
+                </span>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
     <table class="print-table">
       <thead>
         <tr>

@@ -39,7 +39,7 @@ test("enters admin mode and quick fills a shift", async ({ page, request }) => {
   await expect(page.getByRole("button", { name: /编辑模式/ })).toBeVisible();
   await page.getByRole("button", { name: /A1/ }).click();
 
-  const targetCell = page.locator("tbody tr").nth(1).locator("td").first();
+  const targetCell = page.getByTestId(`schedule-cell-${quickFillStaffId}-${quickFillDate}`);
   await expect(targetCell).toBeEmpty();
   await targetCell.click();
 

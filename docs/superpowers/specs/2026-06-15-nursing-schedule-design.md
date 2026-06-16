@@ -124,7 +124,7 @@
 
 ## 数据与存储
 
-一期采用前端 Web 加简单后端和 JSON 文件存储。前端通过 API 读写数据，后端负责读写本地 JSON 文件。后续可在保持 API 结构稳定的前提下替换为 Go/Gin/etcd。
+一期采用前端 Web 加简单后端和 JSON 文件存储。前端通过 API 读写数据，后端负责读写本地 JSON 文件。`data/app-data.json` 作为仓库种子数据，开发运行时默认写入已忽略的 `data/app-data.local.json`，也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。后续可在保持 API 结构稳定的前提下替换为 Go/Gin/etcd。
 
 数据分为：
 

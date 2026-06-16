@@ -4,7 +4,7 @@
 
 **Goal:** Build the phase-one International Medical Department nursing schedule web app with editable staff, shifts, holidays, schedule entries, weekly calculations, full-screen display, and print views.
 
-**Architecture:** Use a Vue 3 single-page app for the scheduling workstation and an Express API for persistence. The frontend talks only to API endpoints; the server stores one JSON document in `data/app-data.json`, keeping the storage boundary replaceable by Go/Gin/etcd later.
+**Architecture:** Use a Vue 3 single-page app for the scheduling workstation and an Express API for persistence. The frontend talks only to API endpoints; `data/app-data.json` remains the tracked seed dataset, while development runtime data defaults to ignored `data/app-data.local.json`, keeping the storage boundary replaceable by Go/Gin/etcd later.
 
 **Tech Stack:** Vue 3, Vite, TypeScript, Element Plus, Express, Vitest, Vue Test Utils, Supertest, Playwright, JSON file storage.
 
@@ -24,7 +24,7 @@ Create these files:
 - `vite.config.ts`: Vite configuration and test environment.
 - `index.html`: Vite HTML entry.
 - `playwright.config.ts`: Playwright configuration.
-- `data/app-data.json`: tracked seed dataset used by the local server.
+- `data/app-data.json`: tracked seed dataset used to initialize local runtime data.
 - `server/types.ts`: server-side domain types.
 - `server/seed.ts`: initial seed data.
 - `server/storage.ts`: JSON file load/save helpers.
@@ -485,7 +485,7 @@ export function createSeedData(): AppData {
     ],
     scheduleEntries: [],
     settings: {
-      adminPassword: "123456",
+      adminPassword: "change-me-before-deploy",
       defaultRequiredShiftsPerWeek: 5,
       version: 1
     }
@@ -590,7 +590,7 @@ Create `data/app-data.json` with the exact JSON returned by `createSeedData()`:
   ],
   "scheduleEntries": [],
   "settings": {
-    "adminPassword": "123456",
+    "adminPassword": "change-me-before-deploy",
     "defaultRequiredShiftsPerWeek": 5,
     "version": 1
   }
@@ -982,7 +982,7 @@ const baseData: AppData = {
     { id: "e6", date: "2026-06-15", staffId: "staff-head", shiftIds: ["shift-day", "shift-night"], note: "" }
   ],
   settings: {
-    adminPassword: "123456",
+    adminPassword: "change-me-before-deploy",
     defaultRequiredShiftsPerWeek: 5,
     version: 1
   }
@@ -1257,9 +1257,9 @@ export interface StorageAdapter {
   save(data: AppData): Promise<void>;
 }
 
-const DATA_PATH = resolve(process.cwd(), "data/app-data.json");
+export const DEFAULT_STORAGE_PATH = resolve(process.cwd(), "data/app-data.local.json");
 
-export function createJsonStorage(path = DATA_PATH): StorageAdapter {
+export function createJsonStorage(path = DEFAULT_STORAGE_PATH): StorageAdapter {
   return {
     async load() {
       try {
@@ -1304,6 +1304,10 @@ function requireAdminHeader(value: unknown): boolean {
   return value === "true";
 }
 
+function getConfiguredAdminPassword(data: AppData): string {
+  return process.env.SCHEDULE_ADMIN_PASSWORD?.trim() || data.settings.adminPassword;
+}
+
 function upsertById<T extends { id: string }>(items: T[], next: T): T[] {
   const exists = items.some((item) => item.id === next.id);
   if (!exists) {
@@ -1325,7 +1329,7 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.post("/admin/session", async (request, response) => {
     const data = await storage.load();
-    if (request.body?.password === data.settings.adminPassword) {
+    if (request.body?.password === getConfiguredAdminPassword(data)) {
       response.json({ ok: true });
       return;
     }

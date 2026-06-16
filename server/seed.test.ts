@@ -21,12 +21,12 @@ describe("seed data", () => {
     expect(data.settings.adminPassword).toBe(DEFAULT_ADMIN_PASSWORD);
   });
 
-  it("uses a non-empty admin password env override", () => {
+  it("does not persist a non-empty admin password env override", () => {
     process.env[ADMIN_PASSWORD_ENV] = "override-password";
 
     const data = createSeedData();
 
-    expect(data.settings.adminPassword).toBe("override-password");
+    expect(data.settings.adminPassword).toBe(DEFAULT_ADMIN_PASSWORD);
   });
 
   it("uses the default admin password when env is unset", () => {

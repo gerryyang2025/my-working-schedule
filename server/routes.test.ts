@@ -487,6 +487,20 @@ describe("API routes", () => {
     expect(response.body.message).toBe("人员信息不完整");
   });
 
+  it.each([
+    ["blank job ID", { jobId: "   " }],
+    ["blank name", { name: "   " }],
+    ["fractional sort order", { sortOrder: 1.5 }]
+  ])("rejects invalid staff payload values: %s", async (_label, overrides) => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/staff/staff-bad")
+      .set(await adminHeaders(app))
+      .send(createStaffPayload(overrides))
+      .expect(400);
+    expect(response.body.message).toBe("人员信息不完整");
+  });
+
   it("rejects malformed shift payloads", async () => {
     const app = createTestApp();
     const response = await request(app)
@@ -497,12 +511,38 @@ describe("API routes", () => {
     expect(response.body.message).toBe("班次信息不完整");
   });
 
+  it.each([
+    ["blank name", { name: "   " }],
+    ["blank short name", { shortName: "   " }],
+    ["invalid color", { color: "red" }],
+    ["negative coefficient", { coefficient: -0.5 }],
+    ["fractional sort order", { sortOrder: 1.5 }]
+  ])("rejects invalid shift payload values: %s", async (_label, overrides) => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/shift/shift-bad")
+      .set(await adminHeaders(app))
+      .send(createShiftPayload(overrides))
+      .expect(400);
+    expect(response.body.message).toBe("班次信息不完整");
+  });
+
   it("rejects malformed holiday payloads", async () => {
     const app = createTestApp();
     const response = await request(app)
       .put("/api/data/holiday/holiday-bad")
       .set(await adminHeaders(app))
       .send({ name: "缺字段" })
+      .expect(400);
+    expect(response.body.message).toBe("节假日信息不完整");
+  });
+
+  it("rejects blank holiday names", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/holiday/holiday-bad")
+      .set(await adminHeaders(app))
+      .send(createHolidayPayload({ name: "   " }))
       .expect(400);
     expect(response.body.message).toBe("节假日信息不完整");
   });

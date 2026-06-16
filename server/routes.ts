@@ -75,6 +75,14 @@ function isNumber(value: unknown): value is number {
   return typeof value === "number" && Number.isFinite(value);
 }
 
+function isNonNegativeInteger(value: unknown): value is number {
+  return isNumber(value) && Number.isInteger(value) && value >= 0;
+}
+
+function isNonNegativeNumber(value: unknown): value is number {
+  return isNumber(value) && value >= 0;
+}
+
 function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(isString);
 }
@@ -94,6 +102,10 @@ function isValidDateKey(value: string): boolean {
   const day = Number(match[3]);
   const date = new Date(Date.UTC(year, month - 1, day));
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function isHexColor(value: unknown): value is string {
+  return isString(value) && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
 function createAdminToken(): string {
@@ -120,17 +132,17 @@ function parseStaffPayload(body: unknown, id: string): StaffMember | null {
 
   const { jobId, name, type, isAdmin, enabled, sortOrder } = body;
   if (
-    !isString(jobId) ||
-    !isString(name) ||
+    !isNonEmptyString(jobId) ||
+    !isNonEmptyString(name) ||
     !isStaffType(type) ||
     !isBoolean(isAdmin) ||
     !isBoolean(enabled) ||
-    !isNumber(sortOrder)
+    !isNonNegativeInteger(sortOrder)
   ) {
     return null;
   }
 
-  return { id, jobId, name, type, isAdmin, enabled, sortOrder };
+  return { id, jobId: jobId.trim(), name: name.trim(), type, isAdmin, enabled, sortOrder };
 }
 
 function parseShiftPayload(body: unknown, id: string): Shift | null {
@@ -140,18 +152,18 @@ function parseShiftPayload(body: unknown, id: string): Shift | null {
 
   const { name, shortName, color, countsAttendance, coefficient, enabled, sortOrder } = body;
   if (
-    !isString(name) ||
-    !isString(shortName) ||
-    !isString(color) ||
+    !isNonEmptyString(name) ||
+    !isNonEmptyString(shortName) ||
+    !isHexColor(color) ||
     !isBoolean(countsAttendance) ||
-    !isNumber(coefficient) ||
+    !isNonNegativeNumber(coefficient) ||
     !isBoolean(enabled) ||
-    !isNumber(sortOrder)
+    !isNonNegativeInteger(sortOrder)
   ) {
     return null;
   }
 
-  return { id, name, shortName, color, countsAttendance, coefficient, enabled, sortOrder };
+  return { id, name: name.trim(), shortName: shortName.trim(), color, countsAttendance, coefficient, enabled, sortOrder };
 }
 
 function parseHolidayPayload(body: unknown, id: string): Holiday | null {
@@ -160,11 +172,11 @@ function parseHolidayPayload(body: unknown, id: string): Holiday | null {
   }
 
   const { date, name, affectsRequiredAttendance } = body;
-  if (!isString(date) || !isString(name) || !isBoolean(affectsRequiredAttendance)) {
+  if (!isString(date) || !isNonEmptyString(name) || !isBoolean(affectsRequiredAttendance)) {
     return null;
   }
 
-  return { id, date, name, affectsRequiredAttendance };
+  return { id, date, name: name.trim(), affectsRequiredAttendance };
 }
 
 function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPayload> {

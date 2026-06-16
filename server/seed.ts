@@ -7,7 +7,7 @@ export function getNonBlankAdminPassword(value: string | undefined, fallback: st
   return trimmedValue ? trimmedValue : fallback;
 }
 
-export function createSeedData(adminPassword = process.env.SCHEDULE_ADMIN_PASSWORD): AppData {
+export function createSeedData(adminPassword = DEFAULT_ADMIN_PASSWORD): AppData {
   const resolvedAdminPassword = getNonBlankAdminPassword(adminPassword, DEFAULT_ADMIN_PASSWORD);
 
   return {

@@ -51,3 +51,11 @@ npm run test
 npm run build
 npm run test:e2e
 ```
+
+首次运行 E2E 如提示缺少浏览器，请执行：
+
+```bash
+npx playwright install chromium
+```
+
+E2E 会为 API 服务使用系统临时目录中的独立数据文件，不会读写 `data/app-data.local.json`。

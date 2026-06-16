@@ -344,6 +344,15 @@ body {
     font-size: 18px;
   }
 
+  .print-week-detail {
+    margin: 8px 0 10px;
+  }
+
+  .print-week-detail h2 {
+    margin: 0 0 6px;
+    font-size: 13px;
+  }
+
   .print-table {
     width: 100%;
     border-collapse: collapse;

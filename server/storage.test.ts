@@ -40,4 +40,13 @@ describe("JSON storage", () => {
     await expect(createJsonStorage(path).load()).rejects.toThrow(SyntaxError);
     await expect(readFile(path, "utf8")).resolves.toBe(malformed);
   });
+
+  it("throws on invalid app data structure without overwriting the existing file", async () => {
+    const path = await createTempDataPath();
+    const invalidData = "{}\n";
+    await writeFile(path, invalidData, "utf8");
+
+    await expect(createJsonStorage(path).load()).rejects.toThrow("数据文件结构不正确");
+    await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
+  });
 });

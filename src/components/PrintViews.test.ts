@@ -58,13 +58,14 @@ const shifts: Shift[] = [
   }
 ];
 
-function createEntry(shiftIds: string[]): ScheduleEntry {
+function createEntry(shiftIds: string[], overrides: Partial<ScheduleEntry> = {}): ScheduleEntry {
   return {
     id: "entry-1",
     date: "2026-06-19",
     staffId: "staff-1",
     shiftIds,
-    note: ""
+    note: "",
+    ...overrides
   };
 }
 
@@ -241,5 +242,26 @@ describe("PrintViews", () => {
     expect(weeklyPrint.text()).toContain("节假日：端午节");
     expect(weeklyPrint.text()).toContain("王护士");
     expect(weeklyPrint.text()).toContain("5.50");
+  });
+
+  it("prints weekly schedule details by weekday", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([
+          createEntry(["shift-day"], { id: "entry-week-tuesday", date: "2026-06-16" }),
+          createEntry(["shift-night"], { id: "entry-week-friday", date: "2026-06-19" })
+        ]),
+        days,
+        summary
+      }
+    });
+
+    const detailTable = wrapper.get(".print-week-detail");
+    expect(detailTable.text()).toContain("周排班明细");
+    expect(detailTable.text()).toContain("周一");
+    expect(detailTable.text()).toContain("周日");
+    expect(detailTable.text()).toContain("王护士");
+    expect(detailTable.text()).toContain("白");
+    expect(detailTable.text()).toContain("夜");
   });
 });

@@ -116,6 +116,7 @@ onBeforeUnmount(() => {
           <td
             v-for="day in days"
             :key="`${person.id}-${day.key}`"
+            :data-testid="`schedule-cell-${person.id}-${day.key}`"
             :class="{ editable: canEditStaff(person), weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
             @click="handleCellClick(person, day.key)"
             @dblclick="handleCellDoubleClick(person, day.key)"

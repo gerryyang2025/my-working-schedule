@@ -103,6 +103,12 @@ describe("ScheduleGrid", () => {
     expect(bodyText).not.toContain("停用护士");
   });
 
+  it("adds stable test ids to schedule cells", () => {
+    const wrapper = mountGrid([]);
+
+    expect(wrapper.find('[data-testid="schedule-cell-staff-enabled-2026-06-19"]').exists()).toBe(true);
+  });
+
   it("does not emit quick-fill or edit events for disabled historical cells", async () => {
     vi.useFakeTimers();
     const wrapper = mountGrid([
