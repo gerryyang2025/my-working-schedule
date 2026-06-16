@@ -68,6 +68,7 @@ Environment:
   PUBLIC_HOST                 Host/IP shown for external access (default: detected LAN IP)
   VITE_API_PROXY_TARGET       Vite API proxy target (default: http://127.0.0.1:PORT)
   SCHEDULE_DATA_PATH          Optional API data file override
+  SCHEDULE_CONFIG_PATH        Optional API config file override
   SCHEDULE_ADMIN_PASSWORD     Optional admin password override
 EOF
 }

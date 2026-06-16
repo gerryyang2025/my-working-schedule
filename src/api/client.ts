@@ -1,8 +1,6 @@
-import type { AppData, Holiday, ScheduleEntry, Settings, Shift, StaffMember } from "@/types/domain";
+import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
 
-export type PublicAppData = Omit<AppData, "settings"> & {
-  settings: Omit<Settings, "adminPassword">;
-};
+export type PublicAppData = AppData;
 
 let adminMode = false;
 let adminToken: string | null = null;

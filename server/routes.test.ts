@@ -6,28 +6,8 @@ import { createRoutes } from "./routes";
 import { createSeedData } from "./seed";
 
 const TEST_ADMIN_PASSWORD = "123456";
-const ADMIN_PASSWORD_ENV = "SCHEDULE_ADMIN_PASSWORD";
 
-async function withAdminPasswordEnv<T>(value: string | undefined, run: () => Promise<T>): Promise<T> {
-  const previous = process.env[ADMIN_PASSWORD_ENV];
-  if (value === undefined) {
-    delete process.env[ADMIN_PASSWORD_ENV];
-  } else {
-    process.env[ADMIN_PASSWORD_ENV] = value;
-  }
-
-  try {
-    return await run();
-  } finally {
-    if (previous === undefined) {
-      delete process.env[ADMIN_PASSWORD_ENV];
-    } else {
-      process.env[ADMIN_PASSWORD_ENV] = previous;
-    }
-  }
-}
-
-function createTestApp(initialData: AppData = createSeedData(TEST_ADMIN_PASSWORD)) {
+function createTestApp(initialData: AppData = createSeedData(), adminPassword = TEST_ADMIN_PASSWORD) {
   let data = structuredClone(initialData);
   let updateQueue = Promise.resolve();
   const app = express();
@@ -50,7 +30,7 @@ function createTestApp(initialData: AppData = createSeedData(TEST_ADMIN_PASSWORD
     }
   };
   app.use(express.json());
-  app.use("/api", createRoutes(storage));
+  app.use("/api", createRoutes(storage, { adminPassword }));
   return app;
 }
 
@@ -127,30 +107,30 @@ describe("API routes", () => {
     expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
   });
 
-  it.each([
-    { envValue: "", password: "" },
-    { envValue: "", password: "   " },
-    { envValue: "   ", password: "" },
-    { envValue: "   ", password: "   " }
-  ])("rejects blank login when admin password env is '$envValue'", async ({ envValue, password }) => {
-    await withAdminPasswordEnv(envValue, async () => {
-      const response = await request(createTestApp()).post("/api/admin/session").send({ password }).expect(401);
-      expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
-    });
+  it.each(["", "   "])("rejects blank login password %j", async (password) => {
+    const response = await request(createTestApp()).post("/api/admin/session").send({ password }).expect(401);
+    expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
   });
 
-  it("authenticates with a non-empty admin password env override", async () => {
-    await withAdminPasswordEnv("override-password", async () => {
-      const response = await request(createTestApp()).post("/api/admin/session").send({ password: "override-password" }).expect(200);
-      expect(response.body.token).toEqual(expect.any(String));
-    });
+  it("authenticates with the injected server admin password", async () => {
+    const response = await request(createTestApp(createSeedData(), "server-config-password"))
+      .post("/api/admin/session")
+      .send({ password: "server-config-password" })
+      .expect(200);
+
+    expect(response.body.token).toEqual(expect.any(String));
   });
 
-  it("authenticates with stored admin password when env is unset", async () => {
-    await withAdminPasswordEnv(undefined, async () => {
-      const response = await request(createTestApp()).post("/api/admin/session").send({ password: TEST_ADMIN_PASSWORD }).expect(200);
-      expect(response.body.token).toEqual(expect.any(String));
-    });
+  it("does not authenticate with a legacy password stored in app data", async () => {
+    const legacyData = createSeedData() as AppData & { settings: AppData["settings"] & { adminPassword: string } };
+    legacyData.settings.adminPassword = "legacy-data-password";
+
+    const response = await request(createTestApp(legacyData, "server-config-password"))
+      .post("/api/admin/session")
+      .send({ password: "legacy-data-password" })
+      .expect(401);
+
+    expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });
   });
 
   it("rejects data writes without admin mode", async () => {
@@ -286,7 +266,7 @@ describe("API routes", () => {
   });
 
   it("rejects non-empty schedule entries for disabled staff", async () => {
-    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    const initialData = createSeedData();
     initialData.staff = initialData.staff.map((staff) =>
       staff.id === "staff-nurse-001" ? { ...staff, enabled: false } : staff
     );
@@ -300,7 +280,7 @@ describe("API routes", () => {
   });
 
   it("allows clearing existing schedule entries for disabled staff", async () => {
-    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    const initialData = createSeedData();
     initialData.staff = initialData.staff.map((staff) =>
       staff.id === "staff-nurse-001" ? { ...staff, enabled: false } : staff
     );
@@ -333,7 +313,7 @@ describe("API routes", () => {
   });
 
   it("rejects disabled shifts in schedule entries", async () => {
-    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    const initialData = createSeedData();
     initialData.shifts = initialData.shifts.map((shift) => (shift.id === "shift-a1" ? { ...shift, enabled: false } : shift));
     const app = createTestApp(initialData);
     const response = await request(app)
@@ -370,7 +350,7 @@ describe("API routes", () => {
   });
 
   it("deletes existing schedule entries when shiftIds is empty", async () => {
-    const initialData = createSeedData(TEST_ADMIN_PASSWORD);
+    const initialData = createSeedData();
     initialData.scheduleEntries = [
       {
         id: "2026-06-15__staff-nurse-001",
@@ -420,7 +400,7 @@ describe("API routes", () => {
   });
 
   it("preserves both concurrent schedule-entry saves", async () => {
-    let data = createSeedData(TEST_ADMIN_PASSWORD);
+    let data = createSeedData();
     let updateQueue = Promise.resolve();
     let gateLoads = false;
     let concurrentSnapshot: AppData | null = null;
@@ -452,7 +432,7 @@ describe("API routes", () => {
       }
     };
     app.use(express.json());
-    app.use("/api", createRoutes(storage));
+    app.use("/api", createRoutes(storage, { adminPassword: TEST_ADMIN_PASSWORD }));
     const headers = await adminHeaders(app);
 
     gateLoads = true;

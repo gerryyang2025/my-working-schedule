@@ -81,7 +81,6 @@ const baseData: AppData = {
     { id: "e6", date: "2026-06-15", staffId: "staff-head", shiftIds: ["shift-day", "shift-night"], note: "" }
   ],
   settings: {
-    adminPassword: "123456",
     defaultRequiredShiftsPerWeek: 5,
     version: 1
   }

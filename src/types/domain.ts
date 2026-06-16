@@ -37,7 +37,6 @@ export interface ScheduleEntry {
 }
 
 export interface Settings {
-  adminPassword: string;
   defaultRequiredShiftsPerWeek: number;
   version: number;
 }

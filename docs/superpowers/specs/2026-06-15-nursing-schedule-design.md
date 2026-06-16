@@ -126,13 +126,15 @@
 
 一期采用前端 Web 加简单后端和 JSON 文件存储。前端通过 API 读写数据，后端负责读写本地 JSON 文件。`data/app-data.json` 作为仓库种子数据，开发运行时默认写入已忽略的 `data/app-data.local.json`，也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。后续可在保持 API 结构稳定的前提下替换为 Go/Gin/etcd。
 
+管理密码不写入排班数据文件，由服务端配置提供。优先读取 `SCHEDULE_ADMIN_PASSWORD` 环境变量，其次读取 `config/server.local.json` 或 `SCHEDULE_CONFIG_PATH` 指定的配置文件。
+
 数据分为：
 
 - `staff`：人员资料。
 - `shifts`：班次配置。
 - `holidays`：节假日配置。
 - `scheduleEntries`：排班记录。
-- `settings`：管理密码、默认满勤班次数、版本等系统配置。
+- `settings`：默认满勤班次数、版本等业务配置。
 
 `scheduleEntries` 以日期和工号定位，每条记录最多保存两个班次。记录中保存班次标识，展示和统计时再读取当前班次配置。
 

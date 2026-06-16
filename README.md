@@ -39,7 +39,33 @@ npm run dev
 
 开发服务默认把运行时排班数据写入 `data/app-data.local.json`，该文件已被 `.gitignore` 忽略；`data/app-data.json` 只作为仓库种子数据保留。需要重置本地验证数据时，删除 `data/app-data.local.json` 后重新启动服务即可。也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。
 
-管理密码会优先读取环境变量 `SCHEDULE_ADMIN_PASSWORD`。仓库中的种子数据仅使用占位密码 `change-me-before-deploy`，正式部署前请务必通过环境变量配置实际管理密码。
+管理员密码只从服务端配置读取，不再保存在排班数据文件中。优先级如下：
+
+1. `SCHEDULE_ADMIN_PASSWORD` 环境变量
+2. `config/server.local.json` 或 `SCHEDULE_CONFIG_PATH` 指定的配置文件
+
+首次部署可复制示例配置：
+
+```bash
+cp config/server.example.json config/server.local.json
+```
+
+然后编辑 `config/server.local.json` 中的 `adminPassword`：
+
+```json
+{
+  "host": "0.0.0.0",
+  "port": 3001,
+  "storagePath": "data/app-data.local.json",
+  "adminPassword": "请改成真实密码"
+}
+```
+
+修改后重启服务生效：
+
+```bash
+./optools.sh dev restart
+```
 
 ## 本地启停
 
@@ -70,7 +96,7 @@ PUBLIC_HOST=192.168.x.x ./optools.sh dev start
 
 如果启动提示缺少 `concurrently`、`vite` 或 `tsx`，说明当前环境没有安装开发依赖，请先执行 `npm ci --include=dev` 或 `npm install --include=dev`。
 
-对外访问会暴露排班管理界面到当前网络，请务必通过 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理密码；公网访问还需要额外配置防火墙、路由或反向代理。
+对外访问会暴露排班管理界面到当前网络，请务必通过 `config/server.local.json` 或 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理密码；公网访问还需要额外配置防火墙、路由或反向代理。
 
 ## 验证命令
 

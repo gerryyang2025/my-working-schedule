@@ -97,7 +97,7 @@ function isSettings(value: unknown): value is Settings {
     return false;
   }
 
-  return isString(value.adminPassword) && isNumber(value.defaultRequiredShiftsPerWeek) && isNumber(value.version);
+  return isNumber(value.defaultRequiredShiftsPerWeek) && isNumber(value.version);
 }
 
 function assertAppData(value: unknown): asserts value is AppData {

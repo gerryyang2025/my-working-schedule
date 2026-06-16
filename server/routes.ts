@@ -3,11 +3,12 @@ import { Router, type NextFunction, type Response } from "express";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
-import { getNonBlankAdminPassword } from "./seed";
 
-type PublicAppData = Omit<AppData, "settings"> & {
-  settings: Omit<AppData["settings"], "adminPassword">;
-};
+type PublicAppData = AppData;
+
+interface RouteOptions {
+  adminPassword: string;
+}
 
 interface ScheduleEntryPayload {
   date: string;
@@ -39,10 +40,12 @@ function handleRouteError(error: unknown, response: Response, next: NextFunction
 }
 
 function toPublicData(data: AppData): PublicAppData {
-  const { adminPassword: _adminPassword, ...publicSettings } = data.settings;
   return {
     ...data,
-    settings: publicSettings
+    settings: {
+      defaultRequiredShiftsPerWeek: data.settings.defaultRequiredShiftsPerWeek,
+      version: data.settings.version
+    }
   };
 }
 
@@ -119,10 +122,6 @@ function parseBearerToken(header: string | undefined): string | null {
 
   const token = header.slice("Bearer ".length).trim();
   return token.length > 0 ? token : null;
-}
-
-function getConfiguredAdminPassword(data: AppData): string {
-  return getNonBlankAdminPassword(process.env.SCHEDULE_ADMIN_PASSWORD, data.settings.adminPassword);
 }
 
 function parseStaffPayload(body: unknown, id: string): StaffMember | null {
@@ -203,7 +202,12 @@ function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPa
   return { ok: true, value: { date, staffId, shiftIds, note: parsedNote } };
 }
 
-export function createRoutes(storage: StorageAdapter): Router {
+export function createRoutes(storage: StorageAdapter, options: RouteOptions): Router {
+  const adminPassword = options.adminPassword.trim();
+  if (!adminPassword) {
+    throw new Error("管理员密码未配置");
+  }
+
   const router = Router();
   const adminTokens = new Set<string>();
 
@@ -222,8 +226,7 @@ export function createRoutes(storage: StorageAdapter): Router {
 
   router.post("/admin/session", async (request, response, next) => {
     try {
-      const data = await storage.load();
-      if (request.body?.password === getConfiguredAdminPassword(data)) {
+      if (request.body?.password === adminPassword) {
         const token = createAdminToken();
         adminTokens.add(token);
         response.json({ ok: true, token });
