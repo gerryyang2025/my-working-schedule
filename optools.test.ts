@@ -1,7 +1,8 @@
 import { execFile, type ExecFileException } from "node:child_process";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { afterEach, describe, expect, it } from "vitest";
 
 interface CommandResult {
@@ -41,6 +42,20 @@ function runOptools(args: string[], env: Record<string, string> = {}): Promise<C
   });
 }
 
+async function readUntilContains(path: string, expected: string): Promise<string> {
+  let content = "";
+
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    content = await readFile(path, "utf8").catch(() => "");
+    if (content.includes(expected)) {
+      return content;
+    }
+    await delay(100);
+  }
+
+  return content;
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -53,18 +68,25 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh dev start");
     expect(result.stdout).toContain("./optools.sh dev status");
     expect(result.stdout).toContain("./optools.sh dev stop");
+    expect(result.stdout).toContain("HOST");
+    expect(result.stdout).toContain("WEB_HOST");
+    expect(result.stdout).toContain("PUBLIC_HOST");
   });
 
   it("reports stopped when no dev pid exists", async () => {
     const stateDir = await createStateDir();
     const result = await runOptools(["dev", "status"], {
       OPTOOLS_STATE_DIR: stateDir,
-      OPTOOLS_LOG_DIR: stateDir
+      OPTOOLS_LOG_DIR: stateDir,
+      PUBLIC_HOST: "10.10.10.10"
     });
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("dev service: stopped");
     expect(result.stdout).toContain(`pid file: ${join(stateDir, "dev.pid")}`);
+    expect(result.stdout).toContain("bind host: 0.0.0.0");
+    expect(result.stdout).toContain("web url: http://10.10.10.10:5173");
+    expect(result.stdout).toContain("api url: http://10.10.10.10:3001");
   });
 
   it("reports running when the stored dev pid is alive", async () => {
@@ -96,13 +118,14 @@ describe("optools.sh", () => {
     const env = {
       OPTOOLS_STATE_DIR: stateDir,
       OPTOOLS_LOG_DIR: stateDir,
+      PUBLIC_HOST: "10.10.10.10",
       PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
     };
 
     await mkdir(fakeBinDir, { recursive: true });
     await writeFile(
       fakeNpmPath,
-      '#!/usr/bin/env bash\nprintf "fake npm %s\\n" "$*"\nsleep 30\n',
+      '#!/usr/bin/env bash\nprintf "fake npm %s\\n" "$*"\nprintf "HOST=%s WEB_HOST=%s WEB_PORT=%s PORT=%s VITE_API_PROXY_TARGET=%s\\n" "$HOST" "$WEB_HOST" "$WEB_PORT" "$PORT" "$VITE_API_PROXY_TARGET"\nsleep 30\n',
       "utf8"
     );
     await chmod(fakeNpmPath, 0o755);
@@ -111,10 +134,20 @@ describe("optools.sh", () => {
       const start = await runOptools(["dev", "start"], env);
       expect(start.code).toBe(0);
       expect(start.stdout).toContain("dev service: started");
+      expect(start.stdout).toContain("web: http://10.10.10.10:5173");
+      expect(start.stdout).toContain("api: http://10.10.10.10:3001");
 
       const status = await runOptools(["dev", "status"], env);
       expect(status.code).toBe(0);
       expect(status.stdout).toContain("dev service: running");
+
+      const log = await readUntilContains(
+        join(stateDir, "dev.log"),
+        "HOST=0.0.0.0 WEB_HOST=0.0.0.0 WEB_PORT=5173 PORT=3001 VITE_API_PROXY_TARGET=http://127.0.0.1:3001"
+      );
+      expect(log).toContain(
+        "HOST=0.0.0.0 WEB_HOST=0.0.0.0 WEB_PORT=5173 PORT=3001 VITE_API_PROXY_TARGET=http://127.0.0.1:3001"
+      );
     } finally {
       const stop = await runOptools(["dev", "stop"], env);
       expect(stop.code).toBe(0);

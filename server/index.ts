@@ -1,14 +1,14 @@
 import express from "express";
+import { resolveServerConfig } from "./config";
 import { createRoutes } from "./routes";
 import { createJsonStorage } from "./storage";
 
 const app = express();
-const port = Number(process.env.PORT ?? 3001);
-const storagePath = process.env.SCHEDULE_DATA_PATH;
+const { host, port, storagePath } = resolveServerConfig();
 
 app.use(express.json());
 app.use("/api", createRoutes(createJsonStorage(storagePath)));
 
-app.listen(port, "127.0.0.1", () => {
-  console.log(`Schedule API listening at http://127.0.0.1:${port}`);
+app.listen(port, host, () => {
+  console.log(`Schedule API listening at http://${host}:${port}`);
 });

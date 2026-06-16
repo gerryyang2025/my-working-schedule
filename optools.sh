@@ -2,14 +2,47 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+detect_public_host() {
+  local ip=""
+
+  if command -v ipconfig >/dev/null 2>&1; then
+    for iface in en0 en1; do
+      ip="$(ipconfig getifaddr "$iface" 2>/dev/null || true)"
+      if [[ -n "$ip" ]]; then
+        echo "$ip"
+        return
+      fi
+    done
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    ip="$(hostname -I 2>/dev/null || true)"
+    ip="${ip%% *}"
+    if [[ -n "$ip" ]]; then
+      echo "$ip"
+      return
+    fi
+  fi
+
+  echo "127.0.0.1"
+}
+
 STATE_DIR="${OPTOOLS_STATE_DIR:-"$ROOT_DIR/tmp/optools"}"
 LOG_DIR="${OPTOOLS_LOG_DIR:-"$ROOT_DIR/logs/optools"}"
 PID_FILE="${OPTOOLS_DEV_PID_FILE:-"$STATE_DIR/dev.pid"}"
 LOG_FILE="${OPTOOLS_DEV_LOG_FILE:-"$LOG_DIR/dev.log"}"
 API_PORT="${PORT:-3001}"
+PORT="$API_PORT"
+HOST="${HOST:-0.0.0.0}"
+WEB_HOST="${WEB_HOST:-0.0.0.0}"
 WEB_PORT="${WEB_PORT:-5173}"
+PUBLIC_HOST="${PUBLIC_HOST:-$(detect_public_host)}"
+VITE_API_PROXY_TARGET="${VITE_API_PROXY_TARGET:-"http://127.0.0.1:${API_PORT}"}"
 API_HEALTH_URL="${OPTOOLS_API_HEALTH_URL:-"http://127.0.0.1:${API_PORT}/api/health"}"
 WEB_URL="${OPTOOLS_WEB_URL:-"http://127.0.0.1:${WEB_PORT}"}"
+
+export HOST WEB_HOST WEB_PORT PORT VITE_API_PROXY_TARGET
 
 usage() {
   cat <<EOF
@@ -26,8 +59,12 @@ Environment:
   OPTOOLS_STATE_DIR           Runtime pid directory (default: tmp/optools)
   OPTOOLS_LOG_DIR             Runtime log directory (default: logs/optools)
   OPTOOLS_DEV_COMMAND         Command used by dev start (default: npm run dev)
+  HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
-  WEB_PORT                    Web port label for status output (default: 5173)
+  WEB_HOST                    Web bind host (default: 0.0.0.0)
+  WEB_PORT                    Web port used by npm run dev:web (default: 5173)
+  PUBLIC_HOST                 Host/IP shown for external access (default: detected LAN IP)
+  VITE_API_PROXY_TARGET       Vite API proxy target (default: http://127.0.0.1:PORT)
   SCHEDULE_DATA_PATH          Optional API data file override
   SCHEDULE_ADMIN_PASSWORD     Optional admin password override
 EOF
@@ -118,7 +155,10 @@ dev_status() {
 
   echo "pid file: $PID_FILE"
   echo "log file: $LOG_FILE"
-  echo "web url: http://127.0.0.1:${WEB_PORT}"
+  echo "bind host: ${HOST}"
+  echo "web bind host: ${WEB_HOST}"
+  echo "api url: http://${PUBLIC_HOST}:${API_PORT}"
+  echo "web url: http://${PUBLIC_HOST}:${WEB_PORT}"
   health_status "api health" "$API_HEALTH_URL"
   health_status "web health" "$WEB_URL"
 }
@@ -156,8 +196,10 @@ dev_start() {
 
   echo "dev service: started"
   echo "pid: $pid"
-  echo "api: http://127.0.0.1:${API_PORT}"
-  echo "web: http://127.0.0.1:${WEB_PORT}"
+  echo "bind host: ${HOST}"
+  echo "web bind host: ${WEB_HOST}"
+  echo "api: http://${PUBLIC_HOST}:${API_PORT}"
+  echo "web: http://${PUBLIC_HOST}:${WEB_PORT}"
   echo "log file: $LOG_FILE"
 }
 

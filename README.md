@@ -35,7 +35,7 @@ npm install
 npm run dev
 ```
 
-默认前端地址为 `http://127.0.0.1:5173`，API 地址为 `http://127.0.0.1:3001`。
+默认前端开发服务监听 `0.0.0.0:5173`，API 监听 `0.0.0.0:3001`，同一局域网内可通过本机真实 IP 访问，例如 `http://192.168.x.x:5173`。如需仅本机访问，可使用 `HOST=127.0.0.1 WEB_HOST=127.0.0.1 npm run dev`。
 
 开发服务默认把运行时排班数据写入 `data/app-data.local.json`，该文件已被 `.gitignore` 忽略；`data/app-data.json` 只作为仓库种子数据保留。需要重置本地验证数据时，删除 `data/app-data.local.json` 后重新启动服务即可。也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。
 
@@ -54,6 +54,21 @@ npm run dev
 ```
 
 脚本会以 daemon 方式启动 `npm run dev`，PID 写入 `tmp/optools/dev.pid`，日志写入 `logs/optools/dev.log`。该脚本仅用于本地开发模式；正式部署启停后续单独实现。
+
+开发 daemon 默认对外监听。启动后可通过状态命令查看当前机器对外访问地址：
+
+```bash
+./optools.sh dev start
+./optools.sh dev status
+```
+
+如自动检测的局域网 IP 不符合预期，可手动指定：
+
+```bash
+PUBLIC_HOST=192.168.x.x ./optools.sh dev start
+```
+
+对外访问会暴露排班管理界面到当前网络，请务必通过 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理密码；公网访问还需要额外配置防火墙、路由或反向代理。
 
 ## 验证命令
 
