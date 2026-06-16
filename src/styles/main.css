@@ -92,6 +92,35 @@ body {
   font-size: 13px;
 }
 
+.app-info-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 12px;
+  margin-bottom: 12px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  padding: 10px 12px;
+}
+
+.app-info-block {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.app-info-block h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: 14px;
+}
+
+.app-info-block p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
 .workbench {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);
@@ -288,6 +317,10 @@ body {
   background: #f8fafc;
 }
 
+.summary-compact-list {
+  display: none;
+}
+
 .management-form {
   display: grid;
   gap: 10px;
@@ -300,6 +333,10 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.management-mobile-list {
+  display: none;
 }
 
 .print-view {
@@ -324,6 +361,21 @@ body {
   .week-chip {
     width: 100%;
     text-align: center;
+  }
+
+  .app-info-panel {
+    grid-template-columns: 1fr;
+    gap: 8px;
+    padding: 9px 10px;
+  }
+
+  .app-info-block h2 {
+    font-size: 13px;
+  }
+
+  .app-info-block p {
+    font-size: 12px;
+    line-height: 1.5;
   }
 
   .toolbar {
@@ -422,44 +474,138 @@ body {
     padding: 10px;
   }
 
-  .summary-table,
-  .summary-table thead,
-  .summary-table tbody,
-  .summary-table tr,
-  .summary-table th,
-  .summary-table td {
-    display: block;
-  }
-
-  .summary-table thead {
+  .summary-table {
     display: none;
   }
 
-  .summary-table tr {
+  .summary-compact-list {
+    display: grid;
+    gap: 6px;
+    margin-top: 10px;
+  }
+
+  .summary-compact-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    min-height: 44px;
     border: 1px solid #e2e8f0;
-    margin-top: 8px;
+    padding: 7px 8px;
     background: #ffffff;
   }
 
-  .summary-table td {
+  .summary-compact-person {
     display: flex;
-    justify-content: space-between;
-    gap: 12px;
-    border: 0;
-    border-bottom: 1px solid #e2e8f0;
-    padding: 7px 8px;
+    flex: 0 0 auto;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 96px;
+  }
+
+  .summary-compact-person strong {
+    font-size: 13px;
+  }
+
+  .summary-compact-person span,
+  .summary-compact-metrics {
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .summary-compact-metrics {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 4px 8px;
     text-align: right;
   }
 
-  .summary-table td:last-child {
-    border-bottom: 0;
+  .management-drawer {
+    width: 100vw !important;
+    max-width: 100vw;
   }
 
-  .summary-table td::before {
-    content: attr(data-label);
-    color: #64748b;
-    font-weight: 600;
+  .management-drawer .el-drawer__body {
+    overflow-x: hidden;
+    padding: 12px;
+  }
+
+  .management-drawer .el-tabs__nav-wrap {
+    overflow-x: auto;
+  }
+
+  .management-drawer .el-table {
+    display: none;
+  }
+
+  .management-mobile-list {
+    display: grid;
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .management-mobile-item {
+    display: grid;
+    gap: 5px;
+    width: 100%;
+    border: 1px solid #e2e8f0;
+    padding: 8px 10px;
+    background: #ffffff;
+    color: inherit;
+    font: inherit;
     text-align: left;
+    cursor: pointer;
+  }
+
+  .management-mobile-item:disabled {
+    cursor: not-allowed;
+    opacity: 0.62;
+  }
+
+  .management-mobile-main,
+  .management-mobile-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .management-mobile-main {
+    justify-content: space-between;
+  }
+
+  .management-mobile-main strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .management-mobile-main span,
+  .management-mobile-meta {
+    color: #64748b;
+    font-size: 12px;
+  }
+
+  .management-mobile-meta {
+    flex-wrap: wrap;
+  }
+
+  .management-form {
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+  }
+
+  .management-form .el-input,
+  .management-form .el-select,
+  .management-form .el-input-number,
+  .management-form .el-date-editor,
+  .management-form .el-color-picker {
+    width: 100%;
+  }
+
+  .management-actions .el-button {
+    flex: 1 1 120px;
   }
 }
 

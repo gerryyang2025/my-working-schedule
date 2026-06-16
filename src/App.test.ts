@@ -88,6 +88,21 @@ function mountApp() {
 }
 
 describe("App", () => {
+  it("renders concise usage and calculation guidance below the title", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+
+    const infoPanel = wrapper.get(".app-info-panel");
+    expect(infoPanel.text()).toContain("快速上手");
+    expect(infoPanel.text()).toContain("选择日期查看所在周");
+    expect(infoPanel.text()).toContain("点击格子快速排班");
+    expect(infoPanel.text()).toContain("核算规则");
+    expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
+    expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
+    expect(infoPanel.text()).toContain("护士长绩效系数单独核算");
+  });
+
   it("passes only the selected natural week to the schedule grid", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 17));

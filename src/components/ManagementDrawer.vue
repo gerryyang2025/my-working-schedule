@@ -53,6 +53,18 @@ const holidayDraft = reactive<Holiday>({
 
 const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
 
+function staffTypeLabel(type: StaffMember["type"]): string {
+  if (type === "head_nurse") {
+    return "护士长";
+  }
+
+  if (type === "clerk") {
+    return "文员";
+  }
+
+  return "护士";
+}
+
 function resetStaffDraft(): void {
   Object.assign(staffDraft, {
     id: `staff-${Date.now()}`,
@@ -152,6 +164,7 @@ watch(
 
 <template>
   <el-drawer
+    class="management-drawer"
     :model-value="modelValue"
     title="系统配置"
     size="560px"
@@ -169,6 +182,27 @@ watch(
           <el-table-column prop="enabled" label="启用" width="80" />
           <el-table-column prop="sortOrder" label="排序" width="80" />
         </el-table>
+
+        <div class="management-mobile-list">
+          <button
+            v-for="staff in data.staff"
+            :key="staff.id"
+            class="management-mobile-item management-mobile-staff"
+            type="button"
+            :disabled="staffSaving"
+            @click="loadStaffDraft(staff)"
+          >
+            <span class="management-mobile-main">
+              <strong>{{ staff.name }}</strong>
+              <span>{{ staff.jobId }}</span>
+            </span>
+            <span class="management-mobile-meta">
+              <span>{{ staffTypeLabel(staff.type) }}</span>
+              <span>{{ staff.isAdmin ? "管理员" : "普通用户" }}</span>
+              <span>{{ staff.enabled ? "启用" : "停用" }}</span>
+            </span>
+          </button>
+        </div>
 
         <div class="management-form">
           <el-input v-model="staffDraft.jobId" placeholder="工号" :disabled="staffSaving" />
@@ -205,6 +239,27 @@ watch(
           <el-table-column prop="sortOrder" label="排序" width="80" />
         </el-table>
 
+        <div class="management-mobile-list">
+          <button
+            v-for="shift in data.shifts"
+            :key="shift.id"
+            class="management-mobile-item management-mobile-shift"
+            type="button"
+            :disabled="shiftSaving"
+            @click="loadShiftDraft(shift)"
+          >
+            <span class="management-mobile-main">
+              <strong>{{ shift.shortName }}</strong>
+              <span>{{ shift.name }}</span>
+            </span>
+            <span class="management-mobile-meta">
+              <span>系数 {{ shift.coefficient }}</span>
+              <span>{{ shift.countsAttendance ? "计出勤" : "不计出勤" }}</span>
+              <span>{{ shift.enabled ? "启用" : "停用" }}</span>
+            </span>
+          </button>
+        </div>
+
         <div class="management-form">
           <el-input v-model="shiftDraft.name" placeholder="班次名称" :disabled="shiftSaving" />
           <el-input v-model="shiftDraft.shortName" placeholder="简称" :disabled="shiftSaving" />
@@ -233,6 +288,25 @@ watch(
           <el-table-column prop="name" label="名称" />
           <el-table-column prop="affectsRequiredAttendance" label="影响满勤" width="100" />
         </el-table>
+
+        <div class="management-mobile-list">
+          <button
+            v-for="holiday in data.holidays"
+            :key="holiday.id"
+            class="management-mobile-item management-mobile-holiday"
+            type="button"
+            :disabled="holidaySaving"
+            @click="loadHolidayDraft(holiday)"
+          >
+            <span class="management-mobile-main">
+              <strong>{{ holiday.name }}</strong>
+              <span>{{ holiday.date }}</span>
+            </span>
+            <span class="management-mobile-meta">
+              <span>{{ holiday.affectsRequiredAttendance ? "影响满勤" : "不影响满勤" }}</span>
+            </span>
+          </button>
+        </div>
 
         <div class="management-form">
           <el-date-picker

@@ -209,6 +209,20 @@ onMounted(async () => {
       <div class="week-chip">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</div>
     </header>
 
+    <section class="app-info-panel" aria-label="系统使用说明与核算规则">
+      <div class="app-info-block">
+        <h2>快速上手</h2>
+        <p>选择日期查看所在周；选择班次画笔后点击格子快速排班，点击格子可编辑一天最多两个班次。</p>
+      </div>
+      <div class="app-info-block">
+        <h2>核算规则</h2>
+        <p>
+          按班次而不是自然日计出勤；满勤默认 5 个班次，影响满勤的节假日会扣减；加班 = max(0, 出勤班次 -
+          满勤标准)；总系数按班次系数累加，护士长绩效系数单独核算。
+        </p>
+      </div>
+    </section>
+
     <AppToolbar
       v-model:selected-date="selectedDate"
       :admin-mode="adminMode"
