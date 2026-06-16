@@ -10,7 +10,7 @@
 
 body {
   margin: 0;
-  min-width: 1024px;
+  min-width: 0;
   background: #f8f9fa;
 }
 
@@ -66,10 +66,6 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.month-select {
-  width: 108px;
 }
 
 .week-nav {
@@ -152,7 +148,7 @@ body {
 .schedule-grid {
   border-collapse: separate;
   border-spacing: 0;
-  min-width: 1280px;
+  min-width: 680px;
   width: 100%;
   font-size: 13px;
 }
@@ -308,6 +304,163 @@ body {
 
 .print-view {
   display: none;
+}
+
+@media (max-width: 768px) {
+  .app-shell {
+    padding: 10px;
+  }
+
+  .app-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .app-header h1 {
+    font-size: 20px;
+  }
+
+  .week-chip {
+    width: 100%;
+    text-align: center;
+  }
+
+  .toolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .toolbar-group,
+  .toolbar-actions {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .toolbar-group > .el-date-editor.el-input,
+  .toolbar-group > .el-date-editor.el-input__wrapper {
+    flex: 1 1 164px;
+    min-width: 164px;
+  }
+
+  .week-nav {
+    flex: 0 0 auto;
+  }
+
+  .toolbar-week-range {
+    flex-basis: 100%;
+    text-align: center;
+  }
+
+  .toolbar-actions {
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .toolbar-actions .el-button {
+    flex: 0 0 auto;
+  }
+
+  .workbench {
+    display: block;
+  }
+
+  .shift-palette {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin-bottom: 10px;
+    padding: 8px;
+  }
+
+  .shift-palette h2 {
+    margin-bottom: 6px;
+  }
+
+  .shift-list {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+  }
+
+  .shift-button {
+    flex: 0 0 auto;
+    min-width: 64px;
+  }
+
+  .schedule-grid-wrap {
+    max-height: none;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-grid {
+    min-width: 560px;
+    font-size: 12px;
+  }
+
+  .schedule-grid th,
+  .schedule-grid td {
+    min-width: 56px;
+    height: 52px;
+  }
+
+  .person-col {
+    min-width: 100px;
+    padding: 0 6px;
+  }
+
+  .shift-chip {
+    min-width: 28px;
+    padding: 2px 3px;
+  }
+
+  .weekly-summary {
+    margin-top: 10px;
+    padding: 10px;
+  }
+
+  .summary-table,
+  .summary-table thead,
+  .summary-table tbody,
+  .summary-table tr,
+  .summary-table th,
+  .summary-table td {
+    display: block;
+  }
+
+  .summary-table thead {
+    display: none;
+  }
+
+  .summary-table tr {
+    border: 1px solid #e2e8f0;
+    margin-top: 8px;
+    background: #ffffff;
+  }
+
+  .summary-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    border: 0;
+    border-bottom: 1px solid #e2e8f0;
+    padding: 7px 8px;
+    text-align: right;
+  }
+
+  .summary-table td:last-child {
+    border-bottom: 0;
+  }
+
+  .summary-table td::before {
+    content: attr(data-label);
+    color: #64748b;
+    font-weight: 600;
+    text-align: left;
+  }
 }
 
 @media print {

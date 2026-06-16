@@ -60,6 +60,21 @@ export function getWeekRange(dateKey: string): { start: string; end: string } {
   };
 }
 
+export function getWeekDays(dateKey: string): CalendarDay[] {
+  const { start, end } = getWeekRange(dateKey);
+  return listDateKeys(start, end).map((key) => {
+    const date = parseDateKey(key);
+    const weekday = date.getDay();
+    return {
+      key,
+      dayOfMonth: date.getDate(),
+      weekday,
+      weekdayName: WEEKDAY_NAMES[weekday],
+      isWeekend: weekday === 0 || weekday === 6
+    };
+  });
+}
+
 export function listDateKeys(start: string, end: string): string[] {
   const keys: string[] = [];
   let cursor = start;

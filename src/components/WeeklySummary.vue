@@ -31,12 +31,12 @@ defineProps<{
       </thead>
       <tbody>
         <tr v-for="row in summary.rows" :key="row.staffId">
-          <td>{{ row.staffName }}</td>
-          <td>{{ row.staffType === "head_nurse" ? "护士长" : row.staffType === "clerk" ? "文员" : "护士" }}</td>
-          <td>{{ row.attendanceShifts }}</td>
-          <td>{{ row.requiredShifts }}</td>
-          <td>{{ row.overtimeShifts }}</td>
-          <td>{{ row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2) }}</td>
+          <td data-label="人员">{{ row.staffName }}</td>
+          <td data-label="类型">{{ row.staffType === "head_nurse" ? "护士长" : row.staffType === "clerk" ? "文员" : "护士" }}</td>
+          <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
+          <td data-label="满勤标准">{{ row.requiredShifts }}</td>
+          <td data-label="加班班次">{{ row.overtimeShifts }}</td>
+          <td data-label="总系数">{{ row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2) }}</td>
         </tr>
       </tbody>
     </table>

@@ -12,15 +12,13 @@ import { deleteHoliday, enterAdminMode, loadData, saveHoliday, saveScheduleEntry
 import type { PublicAppData } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 import { calculateWeeklySummary } from "@/lib/calculation";
-import { getMonthDays, getWeekRange, toDateKey } from "@/lib/date";
+import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
 const error = ref("");
 const adminMode = ref(false);
 const selectedDate = ref(today);
-const currentYear = ref(new Date().getFullYear());
-const currentMonth = ref(new Date().getMonth() + 1);
 const managementOpen = ref(false);
 const selectedShiftId = ref("");
 const editorOpen = ref(false);
@@ -34,7 +32,11 @@ const shiftSaving = ref(false);
 const holidaySaving = ref(false);
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
-const monthDays = computed(() => getMonthDays(currentYear.value, currentMonth.value));
+const scheduleDays = computed(() => getWeekDays(selectedDate.value));
+const printMonthDays = computed(() => {
+  const date = parseDateKey(selectedDate.value);
+  return getMonthDays(date.getFullYear(), date.getMonth() + 1);
+});
 const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
 const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
 const editingEntry = computed(
@@ -208,8 +210,6 @@ onMounted(async () => {
     </header>
 
     <AppToolbar
-      v-model:year="currentYear"
-      v-model:month="currentMonth"
       v-model:selected-date="selectedDate"
       :admin-mode="adminMode"
       @enter-admin="handleEnterAdmin"
@@ -244,7 +244,7 @@ onMounted(async () => {
         <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
         <ScheduleGrid
           :staff="data.staff"
-          :days="monthDays"
+          :days="scheduleDays"
           :holidays="data.holidays"
           :shifts="data.shifts"
           :entries="data.scheduleEntries"
@@ -263,7 +263,7 @@ onMounted(async () => {
           @save="handleEditorSave"
         />
       </section>
-      <PrintViews v-if="weeklySummary" :data="data" :days="monthDays" :summary="weeklySummary" />
+      <PrintViews v-if="weeklySummary" :data="data" :days="printMonthDays" :summary="weeklySummary" />
     </template>
   </main>
 </template>

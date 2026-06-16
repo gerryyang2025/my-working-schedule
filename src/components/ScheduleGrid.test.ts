@@ -109,6 +109,17 @@ describe("ScheduleGrid", () => {
     expect(wrapper.find('[data-testid="schedule-cell-staff-enabled-2026-06-19"]').exists()).toBe(true);
   });
 
+  it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid([]);
+    const cell = wrapper.get('[data-testid="schedule-cell-staff-enabled-2026-06-19"]');
+
+    await cell.trigger("click");
+    vi.advanceTimersByTime(200);
+
+    expect(wrapper.emitted("quickFill")).toEqual([["staff-enabled", "2026-06-19"]]);
+  });
+
   it("does not emit quick-fill or edit events for disabled historical cells", async () => {
     vi.useFakeTimers();
     const wrapper = mountGrid([

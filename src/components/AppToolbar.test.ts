@@ -54,8 +54,6 @@ const ElTooltipStub = defineComponent({
 function mountToolbar(selectedDate = "2026-06-17") {
   return mount(AppToolbar, {
     props: {
-      year: 2026,
-      month: 6,
       selectedDate,
       adminMode: false
     },
@@ -85,6 +83,13 @@ describe("AppToolbar", () => {
     expect(dateSelectors[0].attributes("data-placeholder")).toBe("选择日期");
     expect(wrapper.find('input[data-placeholder="选择周"]').exists()).toBe(false);
     expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-12-28 至 2027-01-03");
+  });
+
+  it("does not render standalone year or month controls in the weekly toolbar", () => {
+    const wrapper = mountToolbar();
+
+    expect(wrapper.find('[data-testid="year-input"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="month-select"]').exists()).toBe(false);
   });
 
   it("returns to the current natural week from the today shortcut", async () => {

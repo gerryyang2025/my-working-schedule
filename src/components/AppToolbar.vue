@@ -4,15 +4,11 @@ import { CalendarDays, ChevronLeft, ChevronRight, Expand, Printer, Settings, Shi
 import { addWeeks, getWeekRange, toDateKey } from "@/lib/date";
 
 const props = defineProps<{
-  year: number;
-  month: number;
   selectedDate: string;
   adminMode: boolean;
 }>();
 
 const emit = defineEmits<{
-  "update:year": [value: number];
-  "update:month": [value: number];
   "update:selectedDate": [value: string];
   enterAdmin: [];
   openManagement: [];
@@ -20,20 +16,6 @@ const emit = defineEmits<{
   printWeek: [];
   fullscreen: [];
 }>();
-
-function handleYearUpdate(value: unknown): void {
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue)) {
-    emit("update:year", numericValue);
-  }
-}
-
-function handleMonthUpdate(value: unknown): void {
-  const numericValue = Number(value);
-  if (Number.isFinite(numericValue)) {
-    emit("update:month", numericValue);
-  }
-}
 
 function handleSelectedDateUpdate(value: unknown): void {
   if (typeof value === "string" && value) {
@@ -55,20 +37,6 @@ function moveToCurrentWeek(): void {
 <template>
   <section class="toolbar">
     <div class="toolbar-group">
-      <el-input-number
-        :model-value="year"
-        :min="2020"
-        :max="2035"
-        controls-position="right"
-        @update:model-value="handleYearUpdate"
-      />
-      <el-select
-        :model-value="month"
-        class="month-select"
-        @update:model-value="handleMonthUpdate"
-      >
-        <el-option v-for="item in 12" :key="item" :label="`${item}月`" :value="item" />
-      </el-select>
       <el-date-picker
         :model-value="selectedDate"
         type="date"
