@@ -1,7 +1,8 @@
 import { mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import AppToolbar from "./AppToolbar.vue";
+import { getWeekRange, toDateKey } from "@/lib/date";
 
 const ElButtonStub = defineComponent({
   name: "ElButton",
@@ -72,22 +73,29 @@ function mountToolbar(selectedDate = "2026-06-17") {
 }
 
 describe("AppToolbar", () => {
-  it("uses a date-based week selector with an explicit Monday-to-Sunday range label", () => {
-    const wrapper = mountToolbar("2026-12-30");
-    const weekSelector = wrapper.get('input[data-placeholder="选择周"]');
+  afterEach(() => {
+    vi.useRealTimers();
+  });
 
-    expect(weekSelector.attributes("data-type")).toBe("date");
-    expect(weekSelector.attributes("data-format")).toBeUndefined();
+  it("uses one date selector with an explicit Monday-to-Sunday range label", () => {
+    const wrapper = mountToolbar("2026-12-30");
+    const dateSelectors = wrapper.findAll('input[data-type="date"]');
+
+    expect(dateSelectors).toHaveLength(1);
+    expect(dateSelectors[0].attributes("data-placeholder")).toBe("选择日期");
+    expect(wrapper.find('input[data-placeholder="选择周"]').exists()).toBe(false);
     expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-12-28 至 2027-01-03");
   });
 
-  it("selects the Monday-start week for the chosen date without relying on week picker semantics", async () => {
+  it("returns to the current natural week from the today shortcut", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 18));
     const wrapper = mountToolbar();
-    const weekSelector = wrapper.get('input[data-placeholder="选择周"]');
+    const buttons = wrapper.findAll("button");
 
-    await weekSelector.setValue("2026-06-14");
+    await buttons[1].trigger("click");
 
-    expect(wrapper.emitted("update:selectedDate")).toEqual([["2026-06-08"]]);
+    expect(wrapper.emitted("update:selectedDate")).toEqual([[getWeekRange(toDateKey(new Date())).start]]);
   });
 
   it("moves previous and next week from the current Monday-start week", async () => {
@@ -95,7 +103,7 @@ describe("AppToolbar", () => {
     const buttons = wrapper.findAll("button");
 
     await buttons[0].trigger("click");
-    await buttons[1].trigger("click");
+    await buttons[2].trigger("click");
 
     expect(wrapper.emitted("update:selectedDate")).toEqual([["2026-06-08"], ["2026-06-22"]]);
   });

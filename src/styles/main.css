@@ -78,8 +78,8 @@ body {
   gap: 4px;
 }
 
-.week-picker {
-  width: 138px;
+.current-week-button {
+  width: 64px;
 }
 
 .toolbar-week-range {

@@ -43,19 +43,12 @@ function handleSelectedDateUpdate(value: unknown): void {
 
 const selectedWeek = computed(() => getWeekRange(props.selectedDate));
 
-function updateToWeekStart(value: unknown): void {
-  if (typeof value === "string" && value) {
-    emit("update:selectedDate", getWeekRange(value).start);
-    return;
-  }
-
-  if (value instanceof Date) {
-    emit("update:selectedDate", getWeekRange(toDateKey(value)).start);
-  }
-}
-
 function moveWeek(offset: number): void {
   emit("update:selectedDate", addWeeks(props.selectedDate, offset));
+}
+
+function moveToCurrentWeek(): void {
+  emit("update:selectedDate", getWeekRange(toDateKey(new Date())).start);
 }
 </script>
 
@@ -88,15 +81,7 @@ function moveWeek(offset: number): void {
         <el-tooltip content="上一周" placement="top">
           <el-button :icon="ChevronLeft" aria-label="上一周" @click="moveWeek(-1)" />
         </el-tooltip>
-        <el-date-picker
-          :model-value="selectedWeek.start"
-          class="week-picker"
-          type="date"
-          value-format="YYYY-MM-DD"
-          placeholder="选择周"
-          :clearable="false"
-          @update:model-value="updateToWeekStart"
-        />
+        <el-button class="current-week-button" @click="moveToCurrentWeek">本周</el-button>
         <el-tooltip content="下一周" placement="top">
           <el-button :icon="ChevronRight" aria-label="下一周" @click="moveWeek(1)" />
         </el-tooltip>
