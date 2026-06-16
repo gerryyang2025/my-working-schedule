@@ -111,6 +111,33 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("Usage:");
   });
 
+  it("fails early with install guidance when local development dependencies are missing", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const emptyNodeBinDir = join(stateDir, "empty-node-bin");
+    const fakeNpmPath = join(fakeBinDir, "npm");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await mkdir(emptyNodeBinDir, { recursive: true });
+    await writeFile(fakeNpmPath, "#!/usr/bin/env bash\nprintf 'npm should not run\\n'\n", "utf8");
+    await chmod(fakeNpmPath, 0o755);
+
+    const result = await runOptools(["dev", "start"], {
+      OPTOOLS_STATE_DIR: stateDir,
+      OPTOOLS_LOG_DIR: stateDir,
+      OPTOOLS_NODE_MODULES_BIN_DIR: emptyNodeBinDir,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("missing local development dependencies");
+    expect(result.stderr).toContain("concurrently");
+    expect(result.stderr).toContain("npm ci --include=dev");
+    expect(result.stdout).not.toContain("dev service: started");
+    const log = await readFile(join(stateDir, "dev.log"), "utf8").catch(() => "");
+    expect(log).not.toContain("starting npm run dev");
+  });
+
   it("keeps daemonized dev command alive after start returns and stops it", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");

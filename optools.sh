@@ -32,6 +32,7 @@ STATE_DIR="${OPTOOLS_STATE_DIR:-"$ROOT_DIR/tmp/optools"}"
 LOG_DIR="${OPTOOLS_LOG_DIR:-"$ROOT_DIR/logs/optools"}"
 PID_FILE="${OPTOOLS_DEV_PID_FILE:-"$STATE_DIR/dev.pid"}"
 LOG_FILE="${OPTOOLS_DEV_LOG_FILE:-"$LOG_DIR/dev.log"}"
+NODE_MODULES_BIN_DIR="${OPTOOLS_NODE_MODULES_BIN_DIR:-"$ROOT_DIR/node_modules/.bin"}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -59,6 +60,7 @@ Environment:
   OPTOOLS_STATE_DIR           Runtime pid directory (default: tmp/optools)
   OPTOOLS_LOG_DIR             Runtime log directory (default: logs/optools)
   OPTOOLS_DEV_COMMAND         Command used by dev start (default: npm run dev)
+  OPTOOLS_NODE_MODULES_BIN_DIR Local npm bin directory (default: node_modules/.bin)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -101,8 +103,58 @@ health_status() {
   fi
 }
 
+join_by_comma() {
+  local joined=""
+  local item
+
+  for item in "$@"; do
+    if [[ -n "$joined" ]]; then
+      joined+=", "
+    fi
+    joined+="$item"
+  done
+
+  echo "$joined"
+}
+
+check_dev_start_prerequisites() {
+  local command="$1"
+
+  if [[ "$command" != "npm run dev" ]]; then
+    return 0
+  fi
+
+  if ! command -v npm >/dev/null 2>&1; then
+    {
+      echo "dev service: cannot start"
+      echo "missing command: npm"
+      echo "install Node.js and npm before starting the dev service."
+    } >&2
+    return 1
+  fi
+
+  local missing=()
+  local binary
+  for binary in concurrently vite tsx; do
+    if [[ ! -x "$NODE_MODULES_BIN_DIR/$binary" ]]; then
+      missing+=("$binary")
+    fi
+  done
+
+  if ((${#missing[@]} > 0)); then
+    {
+      echo "dev service: cannot start"
+      echo "missing local development dependencies: $(join_by_comma "${missing[@]}")"
+      echo "run: npm ci --include=dev"
+      echo "or: npm install --include=dev"
+      echo "hint: if dependencies were installed with --omit=dev or NODE_ENV=production, reinstall with dev dependencies."
+    } >&2
+    return 1
+  fi
+}
+
 launch_dev_daemon() {
-  local command="${OPTOOLS_DEV_COMMAND:-npm run dev}"
+  local command="$1"
 
   if command -v python3 >/dev/null 2>&1; then
     OPTOOLS_LAUNCH_COMMAND="$command" \
@@ -167,6 +219,7 @@ dev_start() {
   ensure_runtime_dirs
 
   local pid
+  local command="${OPTOOLS_DEV_COMMAND:-npm run dev}"
   pid="$(read_pid)"
   if is_pid_running "$pid"; then
     echo "dev service: already running"
@@ -178,12 +231,14 @@ dev_start() {
     rm -f "$PID_FILE"
   fi
 
+  check_dev_start_prerequisites "$command" || return 1
+
   {
     echo
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] starting npm run dev"
   } >> "$LOG_FILE"
 
-  launch_dev_daemon
+  launch_dev_daemon "$command"
 
   sleep 1
   pid="$(read_pid)"

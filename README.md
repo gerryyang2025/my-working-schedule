@@ -68,6 +68,8 @@ npm run dev
 PUBLIC_HOST=192.168.x.x ./optools.sh dev start
 ```
 
+如果启动提示缺少 `concurrently`、`vite` 或 `tsx`，说明当前环境没有安装开发依赖，请先执行 `npm ci --include=dev` 或 `npm install --include=dev`。
+
 对外访问会暴露排班管理界面到当前网络，请务必通过 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理密码；公网访问还需要额外配置防火墙、路由或反向代理。
 
 ## 验证命令
