@@ -23,6 +23,6 @@
     "server/**/*.ts",
     "tests/**/*.ts",
     "vite.config.ts",
-    "playwright.config.test.ts"
+    "*.test.ts"
   ]
 }

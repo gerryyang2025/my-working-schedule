@@ -42,6 +42,20 @@ npm run dev
 
 管理密码会优先读取环境变量 `SCHEDULE_ADMIN_PASSWORD`。仓库中的种子数据仅使用占位密码 `change-me-before-deploy`，正式部署前请务必通过环境变量配置实际管理密码。
 
+## 本地启停
+
+开发模式可以使用根目录脚本后台管理：
+
+```bash
+./optools.sh dev start
+./optools.sh dev status
+./optools.sh dev logs
+./optools.sh dev stop
+./optools.sh dev restart
+```
+
+脚本会以 daemon 方式启动 `npm run dev`，PID 写入 `tmp/optools/dev.pid`，日志写入 `logs/optools/dev.log`。该脚本仅用于本地开发模式；正式部署启停后续单独实现。
+
 ## 验证命令
 
 当前完整验证命令如下：
