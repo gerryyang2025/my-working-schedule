@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { createJsonStorage } from "./storage";
+import { DEFAULT_STORAGE_PATH, createJsonStorage } from "./storage";
 
 const tempDirs: string[] = [];
 
@@ -17,6 +17,10 @@ afterEach(async () => {
 });
 
 describe("JSON storage", () => {
+  it("uses an ignored local file for the default runtime data path", () => {
+    expect(DEFAULT_STORAGE_PATH.endsWith("data/app-data.local.json")).toBe(true);
+  });
+
   it("creates seed data when the file is missing", async () => {
     const path = await createTempDataPath();
     const storage = createJsonStorage(path);

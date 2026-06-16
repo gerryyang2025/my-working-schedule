@@ -4,13 +4,15 @@ import { dirname, resolve } from "node:path";
 import { createSeedData } from "./seed";
 import type { AppData } from "./types";
 
+export const DEFAULT_STORAGE_PATH = resolve(process.cwd(), "data/app-data.local.json");
+
 export interface StorageAdapter {
   load(): Promise<AppData>;
   save(data: AppData): Promise<void>;
   update(mutator: (current: AppData) => AppData | Promise<AppData>): Promise<AppData>;
 }
 
-export function createJsonStorage(path = resolve(process.cwd(), "data/app-data.json")): StorageAdapter {
+export function createJsonStorage(path = DEFAULT_STORAGE_PATH): StorageAdapter {
   let updateQueue = Promise.resolve();
 
   async function saveData(data: AppData) {

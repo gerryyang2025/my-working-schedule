@@ -38,6 +38,8 @@ npm run dev
 
 默认前端地址为 `http://127.0.0.1:5173`，API 地址为 `http://127.0.0.1:3001`。
 
+开发服务默认把运行时排班数据写入 `data/app-data.local.json`，该文件已被 `.gitignore` 忽略；`data/app-data.json` 只作为仓库种子数据保留。需要重置本地验证数据时，删除 `data/app-data.local.json` 后重新启动服务即可。也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。
+
 管理密码会优先读取环境变量 `SCHEDULE_ADMIN_PASSWORD`。仓库中的种子数据仅使用占位密码 `change-me-before-deploy`，正式部署前请务必通过环境变量配置实际管理密码。
 
 ## 验证命令
