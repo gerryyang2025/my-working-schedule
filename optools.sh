@@ -76,6 +76,24 @@ ensure_runtime_dirs() {
   mkdir -p "$STATE_DIR" "$LOG_DIR"
 }
 
+timestamp_ms() {
+  if command -v python3 >/dev/null 2>&1; then
+    python3 -c 'from datetime import datetime; print(datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")[:-3])'
+    return
+  fi
+
+  local timestamp
+  timestamp="$(date '+%Y-%m-%d %H:%M:%S.%3N' 2>/dev/null || true)"
+  if [[ -z "$timestamp" || "$timestamp" == *"%3N"* ]]; then
+    timestamp="$(date '+%Y-%m-%d %H:%M:%S').000"
+  fi
+  echo "$timestamp"
+}
+
+append_dev_log() {
+  printf '\n[%s] %s\n' "$(timestamp_ms)" "$*" >> "$LOG_FILE"
+}
+
 read_pid() {
   if [[ -f "$PID_FILE" ]]; then
     tr -d '[:space:]' < "$PID_FILE"
@@ -233,10 +251,7 @@ dev_start() {
 
   check_dev_start_prerequisites "$command" || return 1
 
-  {
-    echo
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] starting npm run dev"
-  } >> "$LOG_FILE"
+  append_dev_log "starting npm run dev"
 
   launch_dev_daemon "$command"
 

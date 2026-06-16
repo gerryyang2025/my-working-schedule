@@ -172,6 +172,7 @@ describe("optools.sh", () => {
         join(stateDir, "dev.log"),
         "HOST=0.0.0.0 WEB_HOST=0.0.0.0 WEB_PORT=5173 PORT=3001 VITE_API_PROXY_TARGET=http://127.0.0.1:3001"
       );
+      expect(log).toMatch(/\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] starting npm run dev/);
       expect(log).toContain(
         "HOST=0.0.0.0 WEB_HOST=0.0.0.0 WEB_PORT=5173 PORT=3001 VITE_API_PROXY_TARGET=http://127.0.0.1:3001"
       );
