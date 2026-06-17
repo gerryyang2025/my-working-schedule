@@ -77,6 +77,7 @@ function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>
       startMonth: "2026-06",
       endMonth: "2026-06",
       isRangeMode: false,
+      isRangeValid: true,
       sourceMonths: [],
       ...overrides
     }
@@ -222,6 +223,24 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.text()).toContain("2026-07 使用实时排班");
     expect(wrapper.find('[data-testid="confirm-settlement-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="cancel-settlement-button"]').exists()).toBe(false);
+  });
+
+  it("renders an invalid range warning without settlement actions or bonus rows", async () => {
+    const wrapper = mountPanel({
+      startMonth: "2026-08",
+      endMonth: "2026-07",
+      isRangeMode: true,
+      isRangeValid: false,
+      sourceMonths: []
+    });
+
+    expect(wrapper.get('[data-testid="bonus-range-error"]').text()).toBe("月份范围不正确，请调整开始月份和结束月份。");
+    expect(wrapper.text()).not.toContain("临时试算，不会保存或锁定排班");
+    expect(wrapper.find('[data-testid="confirm-settlement-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="cancel-settlement-button"]').exists()).toBe(false);
+    expect(wrapper.find(".bonus-table").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("李护士");
+    expect(wrapper.text()).not.toContain("段护士长");
   });
 
   it("emits month range updates", async () => {

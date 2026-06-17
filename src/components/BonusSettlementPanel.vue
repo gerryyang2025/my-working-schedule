@@ -23,6 +23,7 @@ const props = defineProps<{
   startMonth: string;
   endMonth: string;
   isRangeMode: boolean;
+  isRangeValid: boolean;
   sourceMonths: RangeSourceMonth[];
 }>();
 
@@ -65,13 +66,16 @@ const canConfirm = computed(
   () =>
     props.adminMode &&
     !props.isRangeMode &&
+    props.isRangeValid &&
     !isSettled.value &&
     !props.saving &&
     !props.canceling &&
     bonusPoolState.value.isValid &&
     previewAllocation.value.canSettle
 );
-const canCancel = computed(() => props.adminMode && !props.isRangeMode && isSettled.value && !props.saving && !props.canceling);
+const canCancel = computed(
+  () => props.adminMode && !props.isRangeMode && props.isRangeValid && isSettled.value && !props.saving && !props.canceling
+);
 
 watch(
   () => props.month,
@@ -187,7 +191,11 @@ function rowNote(row: MonthlySettlementRow): string {
       </label>
     </div>
 
-    <p v-if="isRangeMode" class="settlement-range-notice">
+    <p v-if="isRangeMode && !isRangeValid" data-testid="bonus-range-error" class="settlement-warning" role="alert">
+      月份范围不正确，请调整开始月份和结束月份。
+    </p>
+
+    <p v-else-if="isRangeMode" class="settlement-range-notice">
       临时试算，不会保存或锁定排班。
       <span v-for="item in sourceMonths" :key="item.month">
         {{ item.month }} 使用{{ item.source === "settlement" ? "月结快照" : "实时排班" }}
@@ -248,7 +256,7 @@ function rowNote(row: MonthlySettlementRow): string {
       {{ allocationMessage }}
     </p>
 
-    <div class="bonus-table-wrap">
+    <div v-if="!isRangeMode || isRangeValid" class="bonus-table-wrap">
       <table class="bonus-table">
         <thead>
           <tr>

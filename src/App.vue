@@ -83,7 +83,8 @@ const bonusRangeSummary = computed(() => {
 
   return calculateRangeBonusSummary(data.value, bonusStartMonth.value, bonusEndMonth.value);
 });
-const isBonusRangeMode = computed(() => bonusStartMonth.value !== bonusEndMonth.value);
+const isBonusRangeMode = computed(() => bonusStartMonth.value !== selectedMonth.value || bonusEndMonth.value !== selectedMonth.value);
+const isBonusRangeValid = computed(() => !isBonusRangeMode.value || bonusRangeSummary.value?.isValidRange !== false);
 const displayedBonusSummary = computed(() => (isBonusRangeMode.value ? bonusRangeSummary.value : monthlySummary.value));
 const currentMonthlySettlement = computed<MonthlySettlement | null>(() => {
   return data.value?.monthlySettlements.find((settlement) => settlement.month === selectedMonth.value) ?? null;
@@ -650,6 +651,7 @@ onMounted(async () => {
               :saving="settlementSaving"
               :canceling="settlementCanceling"
               :is-range-mode="isBonusRangeMode"
+              :is-range-valid="isBonusRangeValid"
               :source-months="bonusRangeSummary?.sourceMonths ?? []"
               @confirm-settlement="handleConfirmSettlement"
               @cancel-settlement="handleCancelSettlement"

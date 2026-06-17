@@ -140,7 +140,7 @@ const PrintViewsStub = defineComponent({
 
 const BonusSettlementPanelStub = defineComponent({
   name: "BonusSettlementPanel",
-  props: ["month", "monthlySummary", "settlement", "startMonth", "endMonth", "isRangeMode", "sourceMonths"],
+  props: ["month", "monthlySummary", "settlement", "startMonth", "endMonth", "isRangeMode", "isRangeValid", "sourceMonths"],
   emits: ["confirmSettlement", "cancelSettlement", "update:startMonth", "update:endMonth"],
   setup() {
     return { draftBonusPool: ref("") };
@@ -149,11 +149,15 @@ const BonusSettlementPanelStub = defineComponent({
     <section data-testid="bonus-panel">
       <span data-testid="bonus-month">{{ month }}</span>
       <span data-testid="bonus-range">{{ startMonth }}-{{ endMonth }} {{ isRangeMode ? "range" : "single" }}</span>
+      <span data-testid="bonus-range-valid">{{ isRangeValid ? "valid" : "invalid" }}</span>
       <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
       <span data-testid="bonus-summary">
         {{ monthlySummary.rows.map((row) => [row.staffName, row.attendanceShifts, row.coefficientTotal === null ? "null" : row.coefficientTotal.toFixed(2)].join(":")).join("|") }}
       </span>
       <input data-testid="bonus-draft-input" v-model="draftBonusPool" />
+      <button data-testid="set-start-may" type="button" @click="$emit('update:startMonth', '2026-05')">set start may</button>
+      <button data-testid="set-end-may" type="button" @click="$emit('update:endMonth', '2026-05')">set end may</button>
+      <button data-testid="set-start-august" type="button" @click="$emit('update:startMonth', '2026-08')">set start august</button>
       <button data-testid="set-end-july" type="button" @click="$emit('update:endMonth', '2026-07')">set july</button>
       <button data-testid="confirm-settlement" type="button" @click="$emit('confirmSettlement', { month, bonusPool: 1000 })">confirm</button>
       <button data-testid="cancel-settlement" type="button" @click="$emit('cancelSettlement', month)">cancel</button>
@@ -579,6 +583,58 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+  });
+
+  it("uses range trial mode for the same non-selected start and end month", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        { id: "2026-05-01__staff-nurse-001", date: "2026-05-01", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+      ],
+      monthlySettlements: [
+        {
+          id: "settlement-2026-06",
+          month: "2026-06",
+          monthStart: "2026-06-01",
+          monthEnd: "2026-06-30",
+          totalDays: 30,
+          bonusPool: 1000,
+          coefficientTotal: 1.5,
+          settledAt: "2026-06-30T10:00:00.000Z",
+          rows: []
+        }
+      ]
+    });
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="set-start-may"]').trigger("click");
+    await wrapper.get('[data-testid="set-end-may"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-05-2026-05 range");
+    expect(wrapper.get('[data-testid="bonus-range-valid"]').text()).toBe("valid");
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
+    expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+    vi.useRealTimers();
+  });
+
+  it("marks reversed bonus ranges invalid", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="set-start-august"]').trigger("click");
+    await wrapper.get('[data-testid="set-end-july"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-08-2026-07 range");
+    expect(wrapper.get('[data-testid="bonus-range-valid"]').text()).toBe("invalid");
+    vi.useRealTimers();
   });
 
   it("resets the bonus range when the selected date changes within the same month", async () => {
