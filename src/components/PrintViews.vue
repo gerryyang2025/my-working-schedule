@@ -40,6 +40,13 @@ const printedStaff = computed(() =>
 );
 
 const holidayByDate = computed(() => new Map(props.data.holidays.map((holiday) => [holiday.date, holiday])));
+const monthStart = computed(() => props.days[0]?.key ?? "");
+const monthEnd = computed(() => props.days[props.days.length - 1]?.key ?? "");
+const monthHolidays = computed(() =>
+  props.data.holidays
+    .filter((holiday) => printedDayKeys.value.has(holiday.date))
+    .sort((left, right) => left.date.localeCompare(right.date))
+);
 const shiftById = computed(() => new Map(props.data.shifts.map((shift) => [shift.id, shift])));
 const weekDays = computed<PrintWeekDay[]>(() =>
   listDateKeys(props.summary.weekStart, props.summary.weekEnd).map((key) => {
@@ -84,7 +91,13 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
 
 <template>
   <section class="print-view print-month" :class="{ 'print-preview-active': previewMode === 'month' }">
-    <h1>国际医学部护理排班表</h1>
+    <h1>国际医学部护理月排班表</h1>
+    <p>
+      {{ monthStart }} 至 {{ monthEnd }}；共 {{ days.length }} 天；节假日 {{ monthHolidays.length }} 个。
+    </p>
+    <p v-if="monthHolidays.length">
+      节假日：{{ monthHolidays.map((holiday) => `${holiday.date} ${holiday.name}`).join("、") }}
+    </p>
     <table class="print-table">
       <thead>
         <tr>

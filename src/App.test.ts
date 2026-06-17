@@ -43,6 +43,16 @@ const testData: PublicAppData = {
       coefficient: 1.5,
       enabled: true,
       sortOrder: 1
+    },
+    {
+      id: "shift-rest",
+      name: "休息",
+      shortName: "休",
+      color: "#64748B",
+      countsAttendance: false,
+      coefficient: 0,
+      enabled: true,
+      sortOrder: 2
     }
   ],
   holidays: [],
@@ -273,6 +283,9 @@ describe("App", () => {
     expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
     expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
     expect(infoPanel.text()).toContain("护士长绩效系数单独核算");
+    expect(infoPanel.text()).toContain("班次系数");
+    expect(infoPanel.text()).toContain("A1组长 1.50");
+    expect(infoPanel.text()).toContain("休息 不计出勤");
   });
 
   it("uses an in-page password dialog and shows clear feedback after entering admin mode", async () => {
@@ -349,13 +362,9 @@ describe("App", () => {
     }
   });
 
-  it("generates a PDF from the mobile system print button when native print is unreliable", async () => {
+  it("hides the duplicate system print button in the mobile print preview", async () => {
     const restoreMobileViewport = mockMobileViewport(true);
     const { printSpy, restore: restorePrint } = mockSystemPrint();
-    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(false);
-    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
-    const pdfFile = new File(["pdf"], "month-schedule.pdf", { type: "application/pdf" });
-    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
 
     try {
       const wrapper = mountApp();
@@ -363,26 +372,13 @@ describe("App", () => {
       await flushPromises();
       await wrapper.get('[data-testid="print-month"]').trigger("click");
       await nextTick();
-      await wrapper.get('[data-testid="print-preview-system-button"]').trigger("click");
-      await flushPromises();
 
       expect(printSpy).not.toHaveBeenCalled();
-      expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
-        element: expect.any(HTMLElement),
-        filename: "month-schedule.pdf"
-      });
-      expect(shareSpy).not.toHaveBeenCalled();
-      expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
-
-      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
-      expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
-      expect(downloadLink.attributes("download")).toBe("month-schedule.pdf");
-      expect(wrapper.get(".print-pdf-status").text()).toContain("下载");
+      expect(wrapper.get('[data-testid="print-preview-pdf-button"]').text()).toContain("生成/分享 PDF");
+      expect(wrapper.find('[data-testid="print-preview-system-button"]').exists()).toBe(false);
     } finally {
       restoreMobileViewport();
       restorePrint();
-      restoreNavigatorShare();
-      restorePdfDownloadUrl();
     }
   });
 

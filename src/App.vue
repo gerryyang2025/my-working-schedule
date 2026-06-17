@@ -56,6 +56,13 @@ const editingEntry = computed(
     data.value?.scheduleEntries.find((entry) => entry.staffId === editingStaffId.value && entry.date === editingDate.value) ??
     null
 );
+const shiftCoefficientDescriptions = computed(() =>
+  (data.value?.shifts ?? [])
+    .filter((shift) => shift.enabled)
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((shift) => `${shift.name} ${shift.countsAttendance ? shift.coefficient.toFixed(2) : "不计出勤"}`)
+    .join("；")
+);
 const canSubmitAdminPassword = computed(() => adminPassword.value.trim().length > 0 && !adminSubmitting.value);
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
@@ -185,13 +192,8 @@ function printWithMode(mode: PrintMode): void {
   invokeSystemPrint(mode);
 }
 
-async function handlePreviewPrint(): Promise<void> {
+function handlePreviewPrint(): void {
   if (!printPreviewMode.value) {
-    return;
-  }
-
-  if (isMobileViewport() || !isSystemPrintSupported.value) {
-    await handlePreviewPdfShare();
     return;
   }
 
@@ -381,6 +383,7 @@ onMounted(async () => {
           按班次而不是自然日计出勤；满勤默认 5 个班次，影响满勤的节假日会扣减；加班 = max(0, 出勤班次 -
           满勤标准)；总系数按班次系数累加，护士长绩效系数单独核算。
         </p>
+        <p v-if="shiftCoefficientDescriptions">班次系数：{{ shiftCoefficientDescriptions }}</p>
       </div>
     </section>
 
@@ -465,8 +468,12 @@ onMounted(async () => {
         >
           生成/分享 PDF
         </el-button>
-        <el-button data-testid="print-preview-system-button" :loading="pdfGenerating" @click="handlePreviewPrint">
-          {{ isMobileViewport() || !isSystemPrintSupported ? "生成 PDF 打印" : "调用系统打印" }}
+        <el-button
+          v-if="!isMobileViewport() && isSystemPrintSupported"
+          data-testid="print-preview-system-button"
+          @click="handlePreviewPrint"
+        >
+          调用系统打印
         </el-button>
       </template>
     </el-dialog>

@@ -126,6 +126,40 @@ const summary: WeeklySummary = {
 };
 
 describe("PrintViews", () => {
+  it("prints month schedule period and holiday details", () => {
+    const monthDays: CalendarDay[] = [
+      days[0],
+      {
+        key: "2026-06-20",
+        dayOfMonth: 20,
+        weekday: 6,
+        weekdayName: "周六",
+        isWeekend: true
+      },
+      {
+        key: "2026-06-21",
+        dayOfMonth: 21,
+        weekday: 0,
+        weekdayName: "周日",
+        isWeekend: true
+      }
+    ];
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days: monthDays,
+        summary
+      }
+    });
+
+    const monthPrint = wrapper.get(".print-month");
+    expect(monthPrint.text()).toContain("国际医学部护理月排班表");
+    expect(monthPrint.text()).toContain("2026-06-19 至 2026-06-21");
+    expect(monthPrint.text()).toContain("共 3 天");
+    expect(monthPrint.text()).toContain("节假日 1 个");
+    expect(monthPrint.text()).toContain("节假日：2026-06-19 端午节");
+  });
+
   it("prints holiday labels and the first two colored shift markers in month cells", () => {
     const wrapper = mount(PrintViews, {
       props: {
