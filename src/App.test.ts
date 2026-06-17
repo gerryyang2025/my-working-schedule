@@ -6,9 +6,11 @@ import type { PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
   deleteHoliday: vi.fn(),
+  deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
   loadData: vi.fn(),
   saveHoliday: vi.fn(),
+  saveMonthlySettlement: vi.fn(),
   saveScheduleEntry: vi.fn(),
   saveShift: vi.fn(),
   saveStaff: vi.fn()
@@ -112,6 +114,21 @@ const PrintViewsStub = defineComponent({
   `
 });
 
+const BonusSettlementPanelStub = defineComponent({
+  name: "BonusSettlementPanel",
+  props: ["adminMode", "monthlySummary", "month", "settlement"],
+  emits: ["confirmSettlement", "cancelSettlement"],
+  template: `
+    <section data-testid="bonus-panel">
+      <span data-testid="bonus-month">{{ month }}</span>
+      <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
+      <span data-testid="bonus-summary">{{ monthlySummary.rows.map((row) => row.staffName).join(",") }}</span>
+      <button data-testid="confirm-settlement" type="button" @click="$emit('confirmSettlement', { month, bonusPool: 1000 })">confirm</button>
+      <button data-testid="cancel-settlement" type="button" @click="$emit('cancelSettlement', month)">cancel</button>
+    </section>
+  `
+});
+
 const ElDialogStub = defineComponent({
   name: "ElDialog",
   props: ["modelValue", "title"],
@@ -139,6 +156,7 @@ function mountApp(appData: PublicAppData = testData) {
     global: {
       stubs: {
         AppToolbar: AppToolbarStub,
+        BonusSettlementPanel: BonusSettlementPanelStub,
         CellEditorDialog: EmptyStub,
         ElButton: ElButtonStub,
         ElDialog: ElDialogStub,
@@ -151,6 +169,16 @@ function mountApp(appData: PublicAppData = testData) {
       }
     }
   });
+}
+
+async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
+  apiMocks.enterAdminMode.mockResolvedValue(undefined);
+
+  await wrapper.get('[data-testid="admin-button"]').trigger("click");
+  await nextTick();
+  await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
+  await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
+  await flushPromises();
 }
 
 function mockMobileViewport(matches = true): () => void {
@@ -425,6 +453,73 @@ describe("App", () => {
       restoreMobileViewport();
       restorePrint();
     }
+  });
+
+  it("renders bonus settlement panel for the selected month", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    const wrapper = mountApp();
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="bonus-month"]').text()).toBe("2026-06");
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
+    expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士");
+    vi.useRealTimers();
+  });
+
+  it("saves monthly settlement and refreshes app data", async () => {
+    apiMocks.saveMonthlySettlement.mockResolvedValue({
+      ...testData,
+      monthlySettlements: [
+        {
+          id: "settlement-2026-06",
+          month: "2026-06",
+          monthStart: "2026-06-01",
+          monthEnd: "2026-06-30",
+          totalDays: 30,
+          bonusPool: 1000,
+          coefficientTotal: 1.5,
+          settledAt: "2026-06-30T10:00:00.000Z",
+          rows: []
+        }
+      ]
+    });
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+  });
+
+  it("cancels monthly settlement and refreshes app data", async () => {
+    apiMocks.deleteMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
+    const wrapper = mountApp({
+      ...testData,
+      monthlySettlements: [
+        {
+          id: "settlement-2026-06",
+          month: "2026-06",
+          monthStart: "2026-06-01",
+          monthEnd: "2026-06-30",
+          totalDays: 30,
+          bonusPool: 1000,
+          coefficientTotal: 1.5,
+          settledAt: "2026-06-30T10:00:00.000Z",
+          rows: []
+        }
+      ]
+    });
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await wrapper.get('[data-testid="cancel-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.deleteMonthlySettlement).toHaveBeenCalledWith("2026-06");
   });
 
   it("shares a generated PDF file from the print preview when file sharing is supported", async () => {

@@ -2,15 +2,26 @@
 import { ElMessage } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
+import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
 import ManagementDrawer from "@/components/ManagementDrawer.vue";
 import PrintViews from "@/components/PrintViews.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
-import { deleteHoliday, enterAdminMode, loadData, saveHoliday, saveScheduleEntry, saveShift, saveStaff } from "@/api/client";
+import {
+  deleteHoliday,
+  deleteMonthlySettlement,
+  enterAdminMode,
+  loadData,
+  saveHoliday,
+  saveMonthlySettlement,
+  saveScheduleEntry,
+  saveShift,
+  saveStaff
+} from "@/api/client";
 import type { PublicAppData } from "@/api/client";
-import type { Holiday, Shift, StaffMember } from "@/types/domain";
+import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/domain";
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
@@ -36,6 +47,8 @@ const holidaySaveVersion = ref(0);
 const staffSaving = ref(false);
 const shiftSaving = ref(false);
 const holidaySaving = ref(false);
+const settlementSaving = ref(false);
+const settlementCanceling = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
 const printPreviewContentRef = ref<HTMLElement | null>(null);
 const pdfGenerating = ref(false);
@@ -44,6 +57,7 @@ const pdfDownloadName = ref("");
 const printPdfStatus = ref("");
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
+const selectedMonth = computed(() => selectedDate.value.slice(0, 7));
 const scheduleDays = computed(() => getWeekDays(selectedDate.value));
 const printMonthDays = computed(() => {
   const date = parseDateKey(selectedDate.value);
@@ -51,6 +65,9 @@ const printMonthDays = computed(() => {
 });
 const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
 const monthlySummary = computed(() => (data.value ? calculateMonthlySummary(data.value, printMonthDays.value) : null));
+const currentMonthlySettlement = computed<MonthlySettlement | null>(() => {
+  return data.value?.monthlySettlements.find((settlement) => settlement.month === selectedMonth.value) ?? null;
+});
 const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
 const editingEntry = computed(
   () =>
@@ -354,6 +371,40 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
   }
 }
 
+async function handleConfirmSettlement(payload: { month: string; bonusPool: number }): Promise<void> {
+  if (!adminMode.value) {
+    ElMessage.warning("请先进入编辑模式");
+    return;
+  }
+
+  try {
+    settlementSaving.value = true;
+    data.value = await saveMonthlySettlement(payload.month, payload.bonusPool);
+    ElMessage.success("月结已完成");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "月结失败");
+  } finally {
+    settlementSaving.value = false;
+  }
+}
+
+async function handleCancelSettlement(month: string): Promise<void> {
+  if (!adminMode.value) {
+    ElMessage.warning("请先进入编辑模式");
+    return;
+  }
+
+  try {
+    settlementCanceling.value = true;
+    data.value = await deleteMonthlySettlement(month);
+    ElMessage.success("月结已取消");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "取消月结失败");
+  } finally {
+    settlementCanceling.value = false;
+  }
+}
+
 onMounted(async () => {
   try {
     await refreshData();
@@ -452,6 +503,7 @@ onMounted(async () => {
           :data="data"
           :days="printMonthDays"
           :monthly-summary="monthlySummary"
+          :monthly-settlement="currentMonthlySettlement"
           :summary="weeklySummary"
           :preview-mode="printPreviewMode"
         />
@@ -515,6 +567,17 @@ onMounted(async () => {
           @edit-cell="handleEditCell"
         />
         <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
+        <BonusSettlementPanel
+          v-if="monthlySummary"
+          :admin-mode="adminMode"
+          :month="selectedMonth"
+          :monthly-summary="monthlySummary"
+          :settlement="currentMonthlySettlement"
+          :saving="settlementSaving"
+          :canceling="settlementCanceling"
+          @confirm-settlement="handleConfirmSettlement"
+          @cancel-settlement="handleCancelSettlement"
+        />
         <CellEditorDialog
           v-model="editorOpen"
           :staff="editingStaff"
@@ -529,6 +592,7 @@ onMounted(async () => {
         :data="data"
         :days="printMonthDays"
         :monthly-summary="monthlySummary"
+        :monthly-settlement="currentMonthlySettlement"
         :summary="weeklySummary"
       />
     </template>

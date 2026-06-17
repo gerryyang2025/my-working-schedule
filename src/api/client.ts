@@ -48,6 +48,16 @@ export function loadData(): Promise<PublicAppData> {
   return requestJson<PublicAppData>("/api/data");
 }
 
+function authHeaders(): HeadersInit {
+  if (!adminMode || !adminToken) {
+    return {};
+  }
+
+  return {
+    Authorization: `Bearer ${adminToken}`
+  };
+}
+
 export async function enterAdminMode(password: string): Promise<void> {
   const session = await requestJson<{ ok: true; token: string }>("/api/admin/session", {
     method: "POST",
@@ -88,5 +98,23 @@ export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<Pub
   return requestJson<PublicAppData>("/api/data/schedule-entry", {
     method: "PUT",
     body: JSON.stringify(entry)
+  });
+}
+
+export async function saveMonthlySettlement(month: string, bonusPool: number): Promise<PublicAppData> {
+  return requestJson<PublicAppData>("/api/data/monthly-settlement", {
+    method: "PUT",
+    body: JSON.stringify({ month, bonusPool }),
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders()
+    }
+  });
+}
+
+export async function deleteMonthlySettlement(month: string): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/monthly-settlement/${encodeURIComponent(month)}`, {
+    method: "DELETE",
+    headers: authHeaders()
   });
 }
