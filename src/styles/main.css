@@ -467,6 +467,23 @@ body {
   min-width: 760px;
 }
 
+.print-preview-content .print-month .print-table {
+  width: 100%;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.print-preview-content .print-month .print-table th,
+.print-preview-content .print-month .print-table td {
+  padding: 4px 2px;
+  word-break: keep-all;
+}
+
+.print-preview-content .print-month .print-table th:first-child,
+.print-preview-content .print-month .print-table td:first-child {
+  width: 58px;
+}
+
 .print-preview-content .print-table th,
 .print-preview-content .print-table td {
   border: 1px solid #cbd5e1;
@@ -523,6 +540,25 @@ body {
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
+}
+
+.print-preview-content .print-month .print-day-heading {
+  gap: 1px;
+  font-size: 10px;
+}
+
+.print-preview-content .print-month .print-holiday-name {
+  font-size: 9px;
+}
+
+.print-preview-content .print-month .print-cell-shifts {
+  gap: 1px;
+}
+
+.print-preview-content .print-month .print-shift-chip {
+  min-width: 18px;
+  padding: 1px 2px;
+  font-size: 9px;
 }
 
 @media (max-width: 768px) {
