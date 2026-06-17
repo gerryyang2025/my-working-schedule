@@ -479,9 +479,11 @@ describe("calculateRangeSummary", () => {
   it("uses only dates inside boundary weeks", () => {
     const data = createData({
       scheduleEntries: [
+        entry("2026-06-09", "staff-nurse-001", ["shift-a1"]),
         entry("2026-06-10", "staff-nurse-001", ["shift-a1"]),
         entry("2026-06-11", "staff-nurse-001", ["shift-a1"]),
-        entry("2026-06-12", "staff-nurse-001", ["shift-a1"])
+        entry("2026-06-12", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-13", "staff-nurse-001", ["shift-a1"])
       ]
     });
 
