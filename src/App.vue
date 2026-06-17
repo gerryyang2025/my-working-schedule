@@ -600,7 +600,11 @@ onMounted(async () => {
         </nav>
 
         <section class="workbench-panel">
-          <template v-if="activeWorkbenchTab === 'schedule'">
+          <section
+            v-show="activeWorkbenchTab === 'schedule'"
+            class="workbench-tab-panel"
+            data-testid="workbench-panel-schedule"
+          >
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid
               :staff="data.staff"
@@ -613,19 +617,23 @@ onMounted(async () => {
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
             />
-          </template>
-          <WeeklySummary v-else-if="activeWorkbenchTab === 'weekly' && weeklySummary" :summary="weeklySummary" />
-          <BonusSettlementPanel
-            v-else-if="activeWorkbenchTab === 'bonus' && monthlySummary"
-            :admin-mode="adminMode"
-            :month="selectedMonth"
-            :monthly-summary="monthlySummary"
-            :settlement="currentMonthlySettlement"
-            :saving="settlementSaving"
-            :canceling="settlementCanceling"
-            @confirm-settlement="handleConfirmSettlement"
-            @cancel-settlement="handleCancelSettlement"
-          />
+          </section>
+          <section v-show="activeWorkbenchTab === 'weekly'" class="workbench-tab-panel" data-testid="workbench-panel-weekly">
+            <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
+          </section>
+          <section v-show="activeWorkbenchTab === 'bonus'" class="workbench-tab-panel" data-testid="workbench-panel-bonus">
+            <BonusSettlementPanel
+              v-if="monthlySummary"
+              :admin-mode="adminMode"
+              :month="selectedMonth"
+              :monthly-summary="monthlySummary"
+              :settlement="currentMonthlySettlement"
+              :saving="settlementSaving"
+              :canceling="settlementCanceling"
+              @confirm-settlement="handleConfirmSettlement"
+              @cancel-settlement="handleCancelSettlement"
+            />
+          </section>
         </section>
 
         <CellEditorDialog

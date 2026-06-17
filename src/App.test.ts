@@ -1,5 +1,5 @@
 import { flushPromises, mount } from "@vue/test-utils";
-import { defineComponent, nextTick } from "vue";
+import { defineComponent, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
 import type { PublicAppData } from "@/api/client";
@@ -139,11 +139,15 @@ const BonusSettlementPanelStub = defineComponent({
   name: "BonusSettlementPanel",
   props: ["adminMode", "monthlySummary", "month", "settlement"],
   emits: ["confirmSettlement", "cancelSettlement"],
+  setup() {
+    return { draftBonusPool: ref("") };
+  },
   template: `
     <section data-testid="bonus-panel">
       <span data-testid="bonus-month">{{ month }}</span>
       <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
       <span data-testid="bonus-summary">{{ monthlySummary.rows.map((row) => row.staffName).join(",") }}</span>
+      <input data-testid="bonus-draft-input" v-model="draftBonusPool" />
       <button data-testid="confirm-settlement" type="button" @click="$emit('confirmSettlement', { month, bonusPool: 1000 })">confirm</button>
       <button data-testid="cancel-settlement" type="button" @click="$emit('cancelSettlement', month)">cancel</button>
     </section>
@@ -330,6 +334,14 @@ function mockPdfDownloadUrl(): { createObjectUrlSpy: ReturnType<typeof vi.fn>; r
   };
 }
 
+function expectPanelVisible(wrapper: ReturnType<typeof mountApp>, testId: string) {
+  expect(wrapper.get(`[data-testid="${testId}"]`).attributes("style") ?? "").not.toContain("display: none");
+}
+
+function expectPanelHidden(wrapper: ReturnType<typeof mountApp>, testId: string) {
+  expect(wrapper.get(`[data-testid="${testId}"]`).attributes("style") ?? "").toContain("display: none");
+}
+
 describe("App", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -414,26 +426,41 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="workbench-tab-schedule"]').classes()).toContain("active");
-    expect(wrapper.find('[data-testid="schedule-grid"]').exists()).toBe(true);
-    expect(wrapper.find('[data-testid="weekly-summary"]').exists()).toBe(false);
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expectPanelHidden(wrapper, "workbench-panel-weekly");
 
     await wrapper.get('[data-testid="jump-date"]').trigger("click");
     await wrapper.get('[data-testid="workbench-tab-weekly"]').trigger("click");
+    await nextTick();
 
-    expect(wrapper.find('[data-testid="weekly-summary"]').exists()).toBe(true);
+    expectPanelVisible(wrapper, "workbench-panel-weekly");
     expect(wrapper.get('[data-testid="weekly-summary"]').text()).toContain("2026-06-29-2026-07-05");
-    expect(wrapper.find('[data-testid="schedule-grid"]').exists()).toBe(false);
+    expectPanelHidden(wrapper, "workbench-panel-schedule");
   });
 
   it("shows the bonus panel only in the bonus tab", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    expect(wrapper.find('[data-testid="bonus-panel"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="bonus-panel"]').exists()).toBe(true);
+    expectPanelHidden(wrapper, "workbench-panel-bonus");
 
     await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
+    await nextTick();
 
-    expect(wrapper.find('[data-testid="bonus-panel"]').exists()).toBe(true);
+    expectPanelVisible(wrapper, "workbench-panel-bonus");
+  });
+
+  it("keeps an unsaved bonus draft when switching away from and back to the bonus tab", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="bonus-draft-input"]').setValue("1234");
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
+
+    expect((wrapper.get('[data-testid="bonus-draft-input"]').element as HTMLInputElement).value).toBe("1234");
   });
 
   it("opens a visible week print preview on mobile instead of silently invoking system print", async () => {
