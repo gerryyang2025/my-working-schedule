@@ -37,7 +37,21 @@ const emit = defineEmits<{
 const bonusPoolText = ref("0");
 
 const isSettled = computed(() => props.settlement !== null);
-const statusText = computed(() => (props.settlement ? "已月结" : "未月结"));
+const isInvalidRange = computed(() => props.isRangeMode && !props.isRangeValid);
+const panelTitle = computed(() =>
+  props.isRangeMode ? `${props.startMonth} 至 ${props.endMonth}` : props.month
+);
+const statusText = computed(() => {
+  if (isInvalidRange.value) {
+    return "范围无效";
+  }
+
+  if (props.isRangeMode) {
+    return "临时试算";
+  }
+
+  return props.settlement ? "已月结" : "未月结";
+});
 const bonusPoolInputValue = computed(() => (props.settlement ? formatMoney(props.settlement.bonusPool) : bonusPoolText.value));
 const bonusPoolState = computed(() => parseBonusPool(bonusPoolText.value));
 const settlementWarningId = computed(() => `bonus-settlement-warning-${props.month}`);
@@ -57,8 +71,12 @@ const previewAllocation = computed<BonusAllocation>(() => {
 const displayedRows = computed(() => props.settlement?.rows ?? previewAllocation.value.rows);
 const displayedBonusPool = computed(() => props.settlement?.bonusPool ?? previewAllocation.value.bonusPool);
 const displayedCoefficientTotal = computed(() => props.settlement?.coefficientTotal ?? previewAllocation.value.coefficientTotal);
-const bonusPoolError = computed(() => (isSettled.value || bonusPoolState.value.isValid ? "" : INVALID_BONUS_POOL_MESSAGE));
-const allocationMessage = computed(() => (isSettled.value || bonusPoolError.value ? "" : previewAllocation.value.message));
+const bonusPoolError = computed(() =>
+  isInvalidRange.value || isSettled.value || bonusPoolState.value.isValid ? "" : INVALID_BONUS_POOL_MESSAGE
+);
+const allocationMessage = computed(() =>
+  isInvalidRange.value || isSettled.value || bonusPoolError.value ? "" : previewAllocation.value.message
+);
 const bonusPoolInputDescribedBy = computed(() =>
   bonusPoolError.value || allocationMessage.value ? settlementWarningId.value : undefined
 );
@@ -175,7 +193,7 @@ function rowNote(row: MonthlySettlementRow): string {
     <header class="bonus-panel-header">
       <div>
         <p class="bonus-panel-eyebrow">月结与奖金</p>
-        <h2 id="bonus-settlement-title">{{ month }}</h2>
+        <h2 id="bonus-settlement-title">{{ panelTitle }}</h2>
       </div>
       <span class="settlement-status" :class="{ settled: isSettled }">{{ statusText }}</span>
     </header>
@@ -217,7 +235,7 @@ function rowNote(row: MonthlySettlementRow): string {
       </div>
     </div>
 
-    <div class="settlement-controls">
+    <div v-if="!isInvalidRange" class="settlement-controls">
       <label class="bonus-pool-field">
         <span>奖金总额</span>
         <input

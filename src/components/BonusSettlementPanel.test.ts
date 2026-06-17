@@ -218,6 +218,9 @@ describe("BonusSettlementPanel", () => {
       ]
     });
 
+    expect(wrapper.get("#bonus-settlement-title").text()).toBe("2026-06 至 2026-07");
+    expect(wrapper.get(".settlement-status").text()).toBe("临时试算");
+    expect(wrapper.text()).not.toContain("未月结");
     expect(wrapper.text()).toContain("临时试算，不会保存或锁定排班");
     expect(wrapper.text()).toContain("2026-06 使用月结快照");
     expect(wrapper.text()).toContain("2026-07 使用实时排班");
@@ -234,12 +237,17 @@ describe("BonusSettlementPanel", () => {
       sourceMonths: []
     });
 
+    expect(wrapper.get("#bonus-settlement-title").text()).toBe("2026-08 至 2026-07");
+    expect(wrapper.get(".settlement-status").text()).toBe("范围无效");
     expect(wrapper.get('[data-testid="bonus-range-error"]').text()).toBe("月份范围不正确，请调整开始月份和结束月份。");
     expect(wrapper.text()).not.toContain("临时试算，不会保存或锁定排班");
+    expect(wrapper.find('[data-testid="bonus-pool-input"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="confirm-settlement-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="cancel-settlement-button"]').exists()).toBe(false);
     expect(wrapper.find(".settlement-meta").exists()).toBe(false);
     expect(wrapper.find(".bonus-table").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("奖金总额格式不正确");
+    expect(wrapper.text()).not.toContain("普通人员月总系数合计为 0，无法按系数分配奖金");
     expect(wrapper.text()).not.toContain("李护士");
     expect(wrapper.text()).not.toContain("段护士长");
   });
