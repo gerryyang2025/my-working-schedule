@@ -59,6 +59,15 @@ describe("monthRangeToDates", () => {
   it("marks reversed ranges as invalid", () => {
     expect(monthRangeToDates("2026-08", "2026-07")).toBeNull();
   });
+
+  it("marks malformed and out-of-range month keys as invalid", () => {
+    expect(monthRangeToDates("", "2026-07")).toBeNull();
+    expect(monthRangeToDates("2026-07", "")).toBeNull();
+    expect(monthRangeToDates("2026-7", "2026-07")).toBeNull();
+    expect(monthRangeToDates("2026-00", "2026-07")).toBeNull();
+    expect(monthRangeToDates("2026-07", "2026-13")).toBeNull();
+    expect(monthRangeToDates("not-a-month", "2026-07")).toBeNull();
+  });
 });
 
 describe("calculateRangeBonusSummary", () => {
@@ -117,6 +126,25 @@ describe("calculateRangeBonusSummary", () => {
       monthEnd: "",
       totalDays: 0,
       holidayNames: [],
+      sourceMonths: [],
+      rows: []
+    });
+  });
+
+  it("returns an empty invalid summary for malformed and empty month keys", () => {
+    expect(calculateRangeBonusSummary(data(), "", "2026-07")).toMatchObject({
+      isValidRange: false,
+      rangeStart: "",
+      rangeEnd: "",
+      monthStart: "",
+      monthEnd: "",
+      totalDays: 0,
+      holidayNames: [],
+      sourceMonths: [],
+      rows: []
+    });
+    expect(calculateRangeBonusSummary(data(), "2026-07", "2026-13")).toMatchObject({
+      isValidRange: false,
       sourceMonths: [],
       rows: []
     });

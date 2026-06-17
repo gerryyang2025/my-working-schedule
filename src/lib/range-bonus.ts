@@ -14,13 +14,50 @@ export interface RangeBonusSummary extends MonthlySummary {
   sourceMonths: RangeSourceMonth[];
 }
 
+function invalidRangeBonusSummary(): RangeBonusSummary {
+  return {
+    isValidRange: false,
+    rangeStart: "",
+    rangeEnd: "",
+    monthStart: "",
+    monthEnd: "",
+    totalDays: 0,
+    holidayNames: [],
+    sourceMonths: [],
+    rows: []
+  };
+}
+
+function parseMonthKey(month: string): { year: number; monthNumber: number } | null {
+  const match = /^(\d{4})-(\d{2})$/.exec(month);
+
+  if (!match) {
+    return null;
+  }
+
+  const year = Number(match[1]);
+  const monthNumber = Number(match[2]);
+
+  if (monthNumber < 1 || monthNumber > 12) {
+    return null;
+  }
+
+  return { year, monthNumber };
+}
+
 export function monthRangeToDates(startMonth: string, endMonth: string): { rangeStart: string; rangeEnd: string } | null {
+  const start = parseMonthKey(startMonth);
+  const end = parseMonthKey(endMonth);
+
+  if (!start || !end) {
+    return null;
+  }
+
   if (startMonth > endMonth) {
     return null;
   }
 
-  const [endYear, endMonthNumber] = endMonth.split("-").map(Number);
-  const lastDay = new Date(endYear, endMonthNumber, 0).getDate();
+  const lastDay = new Date(end.year, end.monthNumber, 0).getDate();
 
   return {
     rangeStart: `${startMonth}-01`,
@@ -63,25 +100,23 @@ export function calculateRangeBonusSummary(data: AppData, startMonth: string, en
   const range = monthRangeToDates(startMonth, endMonth);
 
   if (!range) {
-    return {
-      isValidRange: false,
-      rangeStart: "",
-      rangeEnd: "",
-      monthStart: "",
-      monthEnd: "",
-      totalDays: 0,
-      holidayNames: [],
-      sourceMonths: [],
-      rows: []
-    };
+    return invalidRangeBonusSummary();
   }
 
   const rowsByStaffId = new Map<string, MonthlyStaffSummary>();
   const sourceMonths: RangeSourceMonth[] = [];
-  const [startYear, startMonthNumber] = startMonth.split("-").map(Number);
-  const [endYear, endMonthNumber] = endMonth.split("-").map(Number);
+  const start = parseMonthKey(startMonth);
+  const end = parseMonthKey(endMonth);
 
-  for (let absoluteMonth = startYear * 12 + startMonthNumber; absoluteMonth <= endYear * 12 + endMonthNumber; absoluteMonth += 1) {
+  if (!start || !end) {
+    return invalidRangeBonusSummary();
+  }
+
+  for (
+    let absoluteMonth = start.year * 12 + start.monthNumber;
+    absoluteMonth <= end.year * 12 + end.monthNumber;
+    absoluteMonth += 1
+  ) {
     const year = Math.floor((absoluteMonth - 1) / 12);
     const monthNumber = ((absoluteMonth - 1) % 12) + 1;
     const month = `${year}-${String(monthNumber).padStart(2, "0")}`;

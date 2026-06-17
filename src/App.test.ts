@@ -585,9 +585,11 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
   });
 
-  it("uses range trial mode for the same non-selected start and end month", async () => {
+  it("uses single-month settlement mode for the same non-selected start and end month", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 17));
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.saveMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
     const wrapper = mountApp({
       ...testData,
       scheduleEntries: [
@@ -609,15 +611,21 @@ describe("App", () => {
     });
 
     await flushPromises();
+    await enterAdminModeForTest(wrapper);
     await openBonusTab(wrapper);
     await wrapper.get('[data-testid="set-start-may"]').trigger("click");
     await wrapper.get('[data-testid="set-end-may"]').trigger("click");
     await nextTick();
 
-    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-05-2026-05 range");
+    expect(wrapper.get('[data-testid="bonus-month"]').text()).toBe("2026-05");
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-05-2026-05 single");
     expect(wrapper.get('[data-testid="bonus-range-valid"]').text()).toBe("valid");
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-05", 1000);
     vi.useRealTimers();
   });
 

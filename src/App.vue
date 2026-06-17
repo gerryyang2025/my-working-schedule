@@ -25,7 +25,7 @@ import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/dom
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
-import { calculateRangeBonusSummary } from "@/lib/range-bonus";
+import { calculateRangeBonusSummary, monthRangeToDates } from "@/lib/range-bonus";
 
 type PrintMode = "month" | "week";
 type WorkbenchTab = "schedule" | "weekly" | "bonus";
@@ -74,8 +74,17 @@ const printMonthDays = computed(() => {
   const date = parseDateKey(selectedDate.value);
   return getMonthDays(date.getFullYear(), date.getMonth() + 1);
 });
+const bonusMonthDays = computed(() => {
+  if (!monthRangeToDates(bonusStartMonth.value, bonusStartMonth.value)) {
+    return [];
+  }
+
+  const [year, monthNumber] = bonusStartMonth.value.split("-").map(Number);
+  return getMonthDays(year, monthNumber);
+});
 const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
 const monthlySummary = computed(() => (data.value ? calculateMonthlySummary(data.value, printMonthDays.value) : null));
+const bonusMonthlySummary = computed(() => (data.value ? calculateMonthlySummary(data.value, bonusMonthDays.value) : null));
 const bonusRangeSummary = computed(() => {
   if (!data.value) {
     return null;
@@ -83,11 +92,16 @@ const bonusRangeSummary = computed(() => {
 
   return calculateRangeBonusSummary(data.value, bonusStartMonth.value, bonusEndMonth.value);
 });
-const isBonusRangeMode = computed(() => bonusStartMonth.value !== selectedMonth.value || bonusEndMonth.value !== selectedMonth.value);
+const isBonusRangeMode = computed(
+  () => bonusStartMonth.value !== bonusEndMonth.value || bonusRangeSummary.value?.isValidRange === false
+);
 const isBonusRangeValid = computed(() => !isBonusRangeMode.value || bonusRangeSummary.value?.isValidRange !== false);
-const displayedBonusSummary = computed(() => (isBonusRangeMode.value ? bonusRangeSummary.value : monthlySummary.value));
+const displayedBonusSummary = computed(() => (isBonusRangeMode.value ? bonusRangeSummary.value : bonusMonthlySummary.value));
 const currentMonthlySettlement = computed<MonthlySettlement | null>(() => {
   return data.value?.monthlySettlements.find((settlement) => settlement.month === selectedMonth.value) ?? null;
+});
+const currentBonusMonthlySettlement = computed<MonthlySettlement | null>(() => {
+  return data.value?.monthlySettlements.find((settlement) => settlement.month === bonusStartMonth.value) ?? null;
 });
 const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
 const editingEntry = computed(
@@ -645,9 +659,9 @@ onMounted(async () => {
               v-model:start-month="bonusStartMonth"
               v-model:end-month="bonusEndMonth"
               :admin-mode="adminMode"
-              :month="selectedMonth"
+              :month="bonusStartMonth"
               :monthly-summary="displayedBonusSummary"
-              :settlement="isBonusRangeMode ? null : currentMonthlySettlement"
+              :settlement="isBonusRangeMode ? null : currentBonusMonthlySettlement"
               :saving="settlementSaving"
               :canceling="settlementCanceling"
               :is-range-mode="isBonusRangeMode"
