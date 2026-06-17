@@ -5,6 +5,7 @@ const INVALID_BONUS_POOL_MESSAGE = "奖金总额格式不正确";
 
 export interface BonusAllocation {
   canSettle: boolean;
+  bonusPool: number;
   coefficientTotal: number;
   rows: MonthlySettlementRow[];
   message?: string;
@@ -63,6 +64,7 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
   if (coefficientTotal === 0) {
     return {
       canSettle: false,
+      bonusPool: roundedPool,
       coefficientTotal,
       message: ZERO_COEFFICIENT_MESSAGE,
       rows: monthlySummary.rows.map((row) => createSettlementRow(row, 0))
@@ -89,14 +91,14 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
 
   return {
     canSettle: true,
+    bonusPool: roundedPool,
     coefficientTotal,
     rows
   };
 }
 
 export function createMonthlySettlement(input: CreateMonthlySettlementInput): MonthlySettlement {
-  const bonusPool = roundCurrency(input.bonusPool);
-  const allocation = calculateBonusAllocation(input.monthlySummary, bonusPool);
+  const allocation = calculateBonusAllocation(input.monthlySummary, input.bonusPool);
 
   if (!allocation.canSettle) {
     throw new Error(allocation.message);
@@ -108,7 +110,7 @@ export function createMonthlySettlement(input: CreateMonthlySettlementInput): Mo
     monthStart: input.monthlySummary.monthStart,
     monthEnd: input.monthlySummary.monthEnd,
     totalDays: input.monthlySummary.totalDays,
-    bonusPool,
+    bonusPool: allocation.bonusPool,
     coefficientTotal: allocation.coefficientTotal,
     settledAt: input.settledAt,
     rows: allocation.rows

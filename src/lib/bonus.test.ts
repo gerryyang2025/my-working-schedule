@@ -36,6 +36,12 @@ const baseSummary: MonthlySummary = {
 };
 
 describe("calculateBonusAllocation", () => {
+  it("returns the rounded bonus pool", () => {
+    const allocation = calculateBonusAllocation(baseSummary, 1500.129);
+
+    expect(allocation.bonusPool).toBe(1500.13);
+  });
+
   it("allocates bonus by monthly coefficient and excludes the head nurse", () => {
     const allocation = calculateBonusAllocation(baseSummary, 1500);
 
@@ -135,5 +141,16 @@ describe("createMonthlySettlement", () => {
         settledAt: "2026-06-30T10:00:00.000Z"
       })
     ).toThrow("普通人员月总系数合计为 0，无法按系数分配奖金");
+  });
+
+  it("throws when raw bonus pool is negative before rounding", () => {
+    expect(() =>
+      createMonthlySettlement({
+        month: "2026-06",
+        monthlySummary: baseSummary,
+        bonusPool: -0.001,
+        settledAt: "2026-06-30T10:00:00.000Z"
+      })
+    ).toThrow("奖金总额格式不正确");
   });
 });
