@@ -27,6 +27,7 @@ import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from
 import { createPrintPdfFile } from "@/lib/print-pdf";
 
 type PrintMode = "month" | "week";
+type WorkbenchTab = "schedule" | "weekly" | "bonus";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -55,6 +56,13 @@ const pdfGenerating = ref(false);
 const pdfDownloadUrl = ref("");
 const pdfDownloadName = ref("");
 const printPdfStatus = ref("");
+const activeWorkbenchTab = ref<WorkbenchTab>("schedule");
+
+const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
+  { key: "schedule", label: "排班" },
+  { key: "weekly", label: "周统计" },
+  { key: "bonus", label: "月结与奖金" }
+];
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const selectedMonth = computed(() => selectedDate.value.slice(0, 7));
@@ -577,30 +585,49 @@ onMounted(async () => {
           @save-holiday="handleSaveHoliday"
           @delete-holiday="handleDeleteHoliday"
         />
-        <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
-        <ScheduleGrid
-          :staff="data.staff"
-          :days="scheduleDays"
-          :holidays="data.holidays"
-          :shifts="data.shifts"
-          :entries="data.scheduleEntries"
-          :selected-shift-id="selectedShiftId"
-          :admin-mode="adminMode"
-          @quick-fill="handleQuickFill"
-          @edit-cell="handleEditCell"
-        />
-        <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />
-        <BonusSettlementPanel
-          v-if="monthlySummary"
-          :admin-mode="adminMode"
-          :month="selectedMonth"
-          :monthly-summary="monthlySummary"
-          :settlement="currentMonthlySettlement"
-          :saving="settlementSaving"
-          :canceling="settlementCanceling"
-          @confirm-settlement="handleConfirmSettlement"
-          @cancel-settlement="handleCancelSettlement"
-        />
+
+        <nav class="workbench-tabs" aria-label="工作台分区">
+          <button
+            v-for="tab in workbenchTabs"
+            :key="tab.key"
+            :data-testid="`workbench-tab-${tab.key}`"
+            type="button"
+            :class="{ active: activeWorkbenchTab === tab.key }"
+            @click="activeWorkbenchTab = tab.key"
+          >
+            {{ tab.label }}
+          </button>
+        </nav>
+
+        <section class="workbench-panel">
+          <template v-if="activeWorkbenchTab === 'schedule'">
+            <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
+            <ScheduleGrid
+              :staff="data.staff"
+              :days="scheduleDays"
+              :holidays="data.holidays"
+              :shifts="data.shifts"
+              :entries="data.scheduleEntries"
+              :selected-shift-id="selectedShiftId"
+              :admin-mode="adminMode"
+              @quick-fill="handleQuickFill"
+              @edit-cell="handleEditCell"
+            />
+          </template>
+          <WeeklySummary v-else-if="activeWorkbenchTab === 'weekly' && weeklySummary" :summary="weeklySummary" />
+          <BonusSettlementPanel
+            v-else-if="activeWorkbenchTab === 'bonus' && monthlySummary"
+            :admin-mode="adminMode"
+            :month="selectedMonth"
+            :monthly-summary="monthlySummary"
+            :settlement="currentMonthlySettlement"
+            :saving="settlementSaving"
+            :canceling="settlementCanceling"
+            @confirm-settlement="handleConfirmSettlement"
+            @cancel-settlement="handleCancelSettlement"
+          />
+        </section>
+
         <CellEditorDialog
           v-model="editorOpen"
           :staff="editingStaff"

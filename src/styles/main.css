@@ -144,9 +144,36 @@ body {
 
 .workbench {
   display: grid;
-  grid-template-columns: 180px minmax(0, 1fr);
+  grid-template-columns: 112px minmax(0, 1fr);
   gap: 12px;
   align-items: start;
+}
+
+.workbench-tabs {
+  display: grid;
+  gap: 8px;
+  position: sticky;
+  top: 12px;
+}
+
+.workbench-tabs button {
+  min-height: 38px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  color: #334155;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.workbench-tabs button.active {
+  border-color: #2563eb;
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.workbench-panel {
+  min-width: 0;
 }
 
 .shift-palette {
@@ -656,7 +683,20 @@ body {
   }
 
   .workbench {
-    display: block;
+    grid-template-columns: 1fr;
+  }
+
+  .workbench-tabs {
+    display: flex;
+    position: static;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .workbench-tabs button {
+    flex: 0 0 auto;
+    text-align: center;
+    white-space: nowrap;
   }
 
   .shift-palette {

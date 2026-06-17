@@ -106,6 +106,11 @@ const ScheduleGridStub = defineComponent({
   template: '<section data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</section>'
 });
 
+const WeeklySummaryStub = defineComponent({
+  name: "WeeklySummary",
+  template: '<section data-testid="weekly-summary">周统计</section>'
+});
+
 const EmptyStub = defineComponent({
   template: "<section />"
 });
@@ -180,7 +185,7 @@ function mountApp(appData: PublicAppData = testData) {
         PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
         ShiftPalette: EmptyStub,
-        WeeklySummary: EmptyStub
+        WeeklySummary: WeeklySummaryStub
       }
     }
   });
@@ -194,6 +199,10 @@ async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
   await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
   await flushPromises();
+}
+
+async function openBonusTab(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
 }
 
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -398,6 +407,33 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
+  it("shows scheduling content by default and switches workbench tabs without changing the selected date", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="workbench-tab-schedule"]').classes()).toContain("active");
+    expect(wrapper.find('[data-testid="schedule-grid"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="weekly-summary"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="jump-date"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-weekly"]').trigger("click");
+
+    expect(wrapper.find('[data-testid="weekly-summary"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="schedule-grid"]').exists()).toBe(false);
+  });
+
+  it("shows the bonus panel only in the bonus tab", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    expect(wrapper.find('[data-testid="bonus-panel"]').exists()).toBe(false);
+
+    await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
+
+    expect(wrapper.find('[data-testid="bonus-panel"]').exists()).toBe(true);
+  });
+
   it("opens a visible week print preview on mobile instead of silently invoking system print", async () => {
     const restoreMobileViewport = mockMobileViewport(true);
     const { printSpy, restore: restorePrint } = mockSystemPrint();
@@ -485,6 +521,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
+    await openBonusTab(wrapper);
 
     expect(wrapper.get('[data-testid="bonus-month"]').text()).toBe("2026-06");
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
@@ -537,6 +574,7 @@ describe("App", () => {
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
     await flushPromises();
 
@@ -556,6 +594,7 @@ describe("App", () => {
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
     await flushPromises();
 
@@ -573,6 +612,7 @@ describe("App", () => {
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
 
@@ -606,6 +646,7 @@ describe("App", () => {
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
     await wrapper.get('[data-testid="cancel-settlement"]').trigger("click");
     await flushPromises();
 
