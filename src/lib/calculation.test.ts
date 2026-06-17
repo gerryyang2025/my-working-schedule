@@ -423,21 +423,18 @@ describe("calculateRangeSummary", () => {
   it("calculates overtime by partial weeks inside the selected range", () => {
     const data = createData({
       scheduleEntries: [
-        entry("2026-06-15", "staff-nurse-001", ["shift-a1"]),
-        entry("2026-06-16", "staff-nurse-001", ["shift-a1"]),
-        entry("2026-06-17", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-17", "staff-nurse-001", ["shift-a1", "shift-p1"]),
         entry("2026-06-18", "staff-nurse-001", ["shift-a1"]),
-        entry("2026-06-19", "staff-nurse-001", ["shift-a1"]),
-        entry("2026-06-20", "staff-nurse-001", ["shift-a1"])
+        entry("2026-06-19", "staff-nurse-001", ["shift-a1"])
       ]
     });
 
-    const summary = calculateRangeSummary(data, "2026-06-15", "2026-06-21");
+    const summary = calculateRangeSummary(data, "2026-06-17", "2026-06-19");
     const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
 
-    expect(summary.rangeStart).toBe("2026-06-15");
-    expect(summary.rangeEnd).toBe("2026-06-21");
-    expect(nurse?.attendanceShifts).toBe(6);
+    expect(summary.rangeStart).toBe("2026-06-17");
+    expect(summary.rangeEnd).toBe("2026-06-19");
+    expect(nurse?.attendanceShifts).toBe(4);
     expect(nurse?.overtimeShifts).toBe(1);
   });
 
