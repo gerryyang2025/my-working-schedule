@@ -423,7 +423,6 @@ describe("API routes", () => {
       coefficientTotal: 2.7
     });
     expect(response.body.monthlySettlements[0].settledAt).toEqual(expect.any(String));
-    expect(response.body.monthlySettlements[0].rows[0]).toHaveProperty("overtimeShifts");
     expect(response.body.monthlySettlements[0].rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -431,6 +430,7 @@ describe("API routes", () => {
           staffName: "李护士",
           staffType: "nurse",
           attendanceShifts: 1,
+          overtimeShifts: 0,
           coefficientTotal: 1.5,
           bonusAmount: 555.56
         }),
@@ -439,6 +439,7 @@ describe("API routes", () => {
           staffName: "王文员",
           staffType: "clerk",
           attendanceShifts: 1,
+          overtimeShifts: 0,
           coefficientTotal: 1.2,
           bonusAmount: 444.44
         })
