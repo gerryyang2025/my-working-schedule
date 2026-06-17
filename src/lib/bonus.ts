@@ -19,17 +19,48 @@ interface CreateMonthlySettlementInput {
 }
 
 function roundCurrency(value: number): number {
-  return Math.round(value * 100) / 100;
+  return toMoneyCents(value) / 100;
 }
 
-function toCents(value: number): number {
-  return Math.round(value * 100);
-}
-
-function assertValidBonusPool(bonusPool: number): void {
-  if (!Number.isFinite(bonusPool) || bonusPool < 0) {
+function assertValidMoneyValue(value: number): void {
+  if (!Number.isFinite(value) || value < 0) {
     throw new Error(INVALID_BONUS_POOL_MESSAGE);
   }
+}
+
+function expandExponentialDecimal(value: number): string {
+  const text = value.toString();
+
+  if (!text.includes("e")) {
+    return text;
+  }
+
+  const [significand, exponentText] = text.split("e");
+  const exponent = Number(exponentText);
+  const [integerPart, fractionPart = ""] = significand.split(".");
+  const digits = `${integerPart}${fractionPart}`;
+  const decimalIndex = integerPart.length + exponent;
+
+  if (decimalIndex <= 0) {
+    return `0.${"0".repeat(Math.abs(decimalIndex))}${digits}`;
+  }
+
+  if (decimalIndex >= digits.length) {
+    return `${digits}${"0".repeat(decimalIndex - digits.length)}`;
+  }
+
+  return `${digits.slice(0, decimalIndex)}.${digits.slice(decimalIndex)}`;
+}
+
+function toMoneyCents(value: number): number {
+  assertValidMoneyValue(value);
+
+  const [integerPart, fractionPart = ""] = expandExponentialDecimal(value).split(".");
+  const centsPart = `${fractionPart}00`.slice(0, 2);
+  const roundingDigit = Number(`${fractionPart}000`.charAt(2));
+  const baseCents = Number(integerPart) * 100 + Number(centsPart);
+
+  return roundingDigit >= 5 ? baseCents + 1 : baseCents;
 }
 
 function createSettlementRow(row: MonthlySummary["rows"][number], bonusAmount: number): MonthlySettlementRow {
@@ -48,9 +79,8 @@ function createSettlementRow(row: MonthlySummary["rows"][number], bonusAmount: n
 }
 
 export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPool: number): BonusAllocation {
-  assertValidBonusPool(bonusPool);
-
-  const roundedPool = roundCurrency(bonusPool);
+  const poolCents = toMoneyCents(bonusPool);
+  const roundedPool = poolCents / 100;
   const coefficientTotal = roundCurrency(
     monthlySummary.rows.reduce((total, row) => total + (row.coefficientTotal ?? 0), 0)
   );
@@ -71,7 +101,6 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
     };
   }
 
-  const poolCents = toCents(roundedPool);
   let distributedCents = 0;
   const lastPositiveIndex = positiveParticipantIndexes[positiveParticipantIndexes.length - 1];
 
@@ -81,7 +110,9 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
 
     if (coefficient > 0) {
       const bonusCents =
-        index === lastPositiveIndex ? poolCents - distributedCents : toCents((roundedPool * coefficient) / coefficientTotal);
+        index === lastPositiveIndex
+          ? poolCents - distributedCents
+          : toMoneyCents((roundedPool * coefficient) / coefficientTotal);
       distributedCents += bonusCents;
       bonusAmount = bonusCents / 100;
     }

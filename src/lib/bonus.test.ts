@@ -42,6 +42,13 @@ describe("calculateBonusAllocation", () => {
     expect(allocation.bonusPool).toBe(1500.13);
   });
 
+  it.each([
+    [1.005, 1.01],
+    [10.075, 10.08]
+  ])("normalizes half-cent bonus pool %s to %s", (bonusPool, expected) => {
+    expect(calculateBonusAllocation(baseSummary, bonusPool).bonusPool).toBe(expected);
+  });
+
   it("allocates bonus by monthly coefficient and excludes the head nurse", () => {
     const allocation = calculateBonusAllocation(baseSummary, 1500);
 
@@ -70,6 +77,26 @@ describe("calculateBonusAllocation", () => {
     expect(allocation.canSettle).toBe(true);
     expect(allocation.rows[1].bonusAmount).toBe(0);
     expect(allocation.rows[2].bonusAmount).toBe(500);
+  });
+
+  it("keeps distributed bonuses equal to the rounded pool with excluded and zero-coefficient rows", () => {
+    const allocation = calculateBonusAllocation(
+      {
+        ...baseSummary,
+        rows: [
+          baseSummary.rows[0],
+          { ...baseSummary.rows[1], coefficientTotal: 0 },
+          baseSummary.rows[2],
+          { ...baseSummary.rows[1], staffId: "staff-nurse-2", staffName: "赵护士", coefficientTotal: 5 }
+        ]
+      },
+      100
+    );
+
+    const distributedTotal = allocation.rows.reduce((total, row) => total + row.bonusAmount, 0);
+
+    expect(allocation.rows.map((row) => row.bonusAmount)).toEqual([0, 0, 50, 50]);
+    expect(distributedTotal).toBe(allocation.bonusPool);
   });
 
   it("puts the rounding tail on the last positive-coefficient participant", () => {
@@ -126,7 +153,38 @@ describe("createMonthlySettlement", () => {
       coefficientTotal: 15,
       settledAt: "2026-06-30T10:00:00.000Z"
     });
-    expect(settlement.rows.map((row) => row.bonusAmount)).toEqual([0, 1000.09, 500.04]);
+    expect(settlement.rows).toEqual([
+      {
+        staffId: "staff-head",
+        staffName: "段护士长",
+        staffType: "head_nurse",
+        attendanceShifts: 10,
+        coefficientTotal: null,
+        coefficientExcludedReason: "护士长绩效单独核算",
+        bonusAmount: 0,
+        bonusExcludedReason: "护士长绩效单独核算"
+      },
+      {
+        staffId: "staff-nurse",
+        staffName: "李护士",
+        staffType: "nurse",
+        attendanceShifts: 12,
+        coefficientTotal: 10,
+        coefficientExcludedReason: "",
+        bonusAmount: 1000.09,
+        bonusExcludedReason: ""
+      },
+      {
+        staffId: "staff-clerk",
+        staffName: "王文员",
+        staffType: "clerk",
+        attendanceShifts: 8,
+        coefficientTotal: 5,
+        coefficientExcludedReason: "",
+        bonusAmount: 500.04,
+        bonusExcludedReason: ""
+      }
+    ]);
   });
 
   it("throws when trying to snapshot a month with zero ordinary coefficient", () => {
