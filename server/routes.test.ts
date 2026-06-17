@@ -423,6 +423,7 @@ describe("API routes", () => {
       coefficientTotal: 2.7
     });
     expect(response.body.monthlySettlements[0].settledAt).toEqual(expect.any(String));
+    expect(response.body.monthlySettlements[0].rows[0]).toHaveProperty("overtimeShifts");
     expect(response.body.monthlySettlements[0].rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({

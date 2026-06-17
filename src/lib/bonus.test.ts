@@ -65,6 +65,13 @@ describe("calculateBonusAllocation", () => {
     ]);
   });
 
+  it("copies overtime shifts into allocation rows", () => {
+    const allocation = calculateBonusAllocation(baseSummary, 1500);
+    const nurse = allocation.rows.find((row) => row.staffId === "staff-nurse");
+
+    expect(nurse?.overtimeShifts).toBe(baseSummary.rows.find((row) => row.staffId === "staff-nurse")?.overtimeShifts);
+  });
+
   it("keeps zero-coefficient ordinary staff in the result with zero bonus", () => {
     const allocation = calculateBonusAllocation(
       {
@@ -184,6 +191,9 @@ describe("createMonthlySettlement", () => {
       settledAt: "2026-06-30T10:00:00.000Z"
     });
 
+    expect(settlement.rows[0]).toMatchObject({
+      overtimeShifts: expect.any(Number)
+    });
     expect(settlement).toMatchObject({
       id: "settlement-2026-06",
       month: "2026-06",
