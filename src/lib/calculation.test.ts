@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { AppData, MonthlyStaffSummary, MonthlySummary, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
+import type {
+  AppData,
+  MonthlyStaffSummary,
+  MonthlySummary,
+  ScheduleEntry,
+  WeeklyStaffSummary,
+  WeeklySummary
+} from "@/types/domain";
 import { getMonthDays } from "./date";
-import { calculateMonthlySummary, calculateWeeklySummary } from "./calculation";
+import { calculateMonthlySummary, calculateRangeSummary, calculateWeeklySummary } from "./calculation";
 
 const baseData: AppData = {
   staff: [
@@ -98,6 +105,36 @@ function getMonthlyRow(summary: MonthlySummary, staffId: string): MonthlyStaffSu
   const row = summary.rows.find((candidate) => candidate.staffId === staffId);
   expect(row).toBeDefined();
   return row as MonthlyStaffSummary;
+}
+
+function entry(date: string, staffId: string, shiftIds: string[]): ScheduleEntry {
+  return {
+    id: `${date}__${staffId}`,
+    date,
+    staffId,
+    shiftIds,
+    note: ""
+  };
+}
+
+function createData(overrides: Partial<AppData> = {}): AppData {
+  return {
+    staff: [
+      { id: "staff-head-001", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 },
+      { id: "staff-nurse-001", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, enabled: true, sortOrder: 2 },
+      { id: "staff-clerk-001", jobId: "200001", name: "王文员", type: "clerk", isAdmin: false, enabled: true, sortOrder: 3 }
+    ],
+    shifts: [
+      { id: "shift-a1", name: "A1组长", shortName: "A1", color: "#2563EB", countsAttendance: true, coefficient: 1.5, enabled: true, sortOrder: 1 },
+      { id: "shift-p1", name: "P1", shortName: "P1", color: "#0F766E", countsAttendance: true, coefficient: 1.3, enabled: true, sortOrder: 2 },
+      { id: "shift-rest", name: "休息", shortName: "休", color: "#64748B", countsAttendance: false, coefficient: 0, enabled: true, sortOrder: 3 }
+    ],
+    holidays: [],
+    scheduleEntries: [],
+    monthlySettlements: [],
+    settings: { defaultRequiredShiftsPerWeek: 5, version: 1 },
+    ...overrides
+  };
 }
 
 describe("calculateWeeklySummary", () => {
@@ -379,5 +416,82 @@ describe("calculateMonthlySummary", () => {
 
     const summary = calculateMonthlySummary(data, monthDays);
     expect(summary.rows.map((row) => row.staffId)).not.toContain("staff-disabled");
+  });
+});
+
+describe("calculateRangeSummary", () => {
+  it("calculates overtime by partial weeks inside the selected range", () => {
+    const data = createData({
+      scheduleEntries: [
+        entry("2026-06-15", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-16", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-17", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-18", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-19", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-20", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateRangeSummary(data, "2026-06-15", "2026-06-21");
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(summary.rangeStart).toBe("2026-06-15");
+    expect(summary.rangeEnd).toBe("2026-06-21");
+    expect(nurse?.attendanceShifts).toBe(6);
+    expect(nurse?.overtimeShifts).toBe(1);
+  });
+
+  it("counts two shifts in one day as two attendance shifts for overtime", () => {
+    const data = createData({
+      scheduleEntries: [
+        entry("2026-06-15", "staff-nurse-001", ["shift-a1", "shift-p1"]),
+        entry("2026-06-16", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-17", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-18", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-19", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateRangeSummary(data, "2026-06-15", "2026-06-21");
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(nurse?.attendanceShifts).toBe(6);
+    expect(nurse?.overtimeShifts).toBe(1);
+  });
+
+  it("deducts holidays that affect required attendance inside the range", () => {
+    const data = createData({
+      holidays: [{ id: "holiday-dragon", date: "2026-06-19", name: "端午节", affectsRequiredAttendance: true }],
+      scheduleEntries: [
+        entry("2026-06-15", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-16", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-17", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-18", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-19", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateRangeSummary(data, "2026-06-15", "2026-06-21");
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(summary.holidayNames).toEqual(["端午节"]);
+    expect(nurse?.attendanceShifts).toBe(5);
+    expect(nurse?.overtimeShifts).toBe(1);
+  });
+
+  it("uses only dates inside boundary weeks", () => {
+    const data = createData({
+      scheduleEntries: [
+        entry("2026-06-10", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-11", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-12", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateRangeSummary(data, "2026-06-10", "2026-06-12");
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(nurse?.attendanceShifts).toBe(3);
+    expect(nurse?.overtimeShifts).toBe(0);
   });
 });
