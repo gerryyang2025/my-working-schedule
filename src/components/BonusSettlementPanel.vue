@@ -93,6 +93,7 @@ function createZeroBonusRows(): MonthlySettlementRow[] {
     staffName: row.staffName,
     staffType: row.staffType,
     attendanceShifts: row.attendanceShifts,
+    overtimeShifts: row.overtimeShifts,
     coefficientTotal: row.coefficientTotal,
     coefficientExcludedReason: row.coefficientExcludedReason,
     bonusAmount: 0,

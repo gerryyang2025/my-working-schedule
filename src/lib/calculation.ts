@@ -122,6 +122,7 @@ function summarizeMonthlyStaff(
     staffName: staff.name,
     staffType: staff.type,
     attendanceShifts: totals.attendanceShifts,
+    overtimeShifts: 0,
     coefficientTotal: isCoefficientExcluded ? null : totals.coefficientTotal,
     coefficientExcludedReason: isCoefficientExcluded ? "护士长绩效单独核算" : ""
   };

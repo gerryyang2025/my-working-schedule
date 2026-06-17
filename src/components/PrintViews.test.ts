@@ -144,6 +144,7 @@ const monthlySummary: MonthlySummary = {
       staffName: "王护士",
       staffType: "nurse",
       attendanceShifts: 5,
+      overtimeShifts: 1,
       coefficientTotal: 5.5,
       coefficientExcludedReason: ""
     },
@@ -152,6 +153,7 @@ const monthlySummary: MonthlySummary = {
       staffName: "李文员",
       staffType: "clerk",
       attendanceShifts: 2,
+      overtimeShifts: 0,
       coefficientTotal: 2.4,
       coefficientExcludedReason: ""
     },
@@ -160,6 +162,7 @@ const monthlySummary: MonthlySummary = {
       staffName: "段护士长",
       staffType: "head_nurse",
       attendanceShifts: 6,
+      overtimeShifts: 0,
       coefficientTotal: null,
       coefficientExcludedReason: "护士长绩效单独核算"
     }
@@ -181,6 +184,7 @@ const monthlySettlement: MonthlySettlement = {
       staffName: "王护士",
       staffType: "nurse",
       attendanceShifts: 5,
+      overtimeShifts: 1,
       coefficientTotal: 5.5,
       coefficientExcludedReason: "",
       bonusAmount: 1392.41,
@@ -191,6 +195,7 @@ const monthlySettlement: MonthlySettlement = {
       staffName: "李文员",
       staffType: "clerk",
       attendanceShifts: 2,
+      overtimeShifts: 0,
       coefficientTotal: 2.4,
       coefficientExcludedReason: "",
       bonusAmount: 607.59,

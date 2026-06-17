@@ -165,8 +165,54 @@ describe("JSON storage", () => {
 
     const storage = createJsonStorage(path);
     const data = await storage.load();
+    const persisted = JSON.parse(await readFile(path, "utf8"));
 
     expect(data.monthlySettlements[0].rows[0].overtimeShifts).toBe(0);
+    expect(persisted.monthlySettlements[0].rows[0].overtimeShifts).toBe(0);
+  });
+
+  it("throws when monthly settlement overtime shifts are present but malformed", async () => {
+    const path = await createTempDataPath();
+    const invalidData = `${JSON.stringify(
+      {
+        staff: [],
+        shifts: [],
+        holidays: [],
+        scheduleEntries: [],
+        settings: { defaultRequiredShiftsPerWeek: 5, version: 1 },
+        monthlySettlements: [
+          {
+            id: "settlement-2026-06",
+            month: "2026-06",
+            monthStart: "2026-06-01",
+            monthEnd: "2026-06-30",
+            totalDays: 30,
+            bonusPool: 1000,
+            coefficientTotal: 1.5,
+            settledAt: "2026-06-30T10:00:00.000Z",
+            rows: [
+              {
+                staffId: "staff-nurse-001",
+                staffName: "李护士",
+                staffType: "nurse",
+                attendanceShifts: 6,
+                overtimeShifts: "0",
+                coefficientTotal: 1.5,
+                coefficientExcludedReason: "",
+                bonusAmount: 1000,
+                bonusExcludedReason: ""
+              }
+            ]
+          }
+        ]
+      },
+      null,
+      2
+    )}\n`;
+    await writeFile(path, invalidData, "utf8");
+
+    await expect(createJsonStorage(path).load()).rejects.toThrow("数据文件结构不正确");
+    await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
   });
 
   it("throws on malformed JSON without overwriting the existing file", async () => {

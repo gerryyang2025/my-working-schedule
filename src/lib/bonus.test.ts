@@ -13,6 +13,7 @@ const baseSummary: MonthlySummary = {
       staffName: "段护士长",
       staffType: "head_nurse",
       attendanceShifts: 10,
+      overtimeShifts: 0,
       coefficientTotal: null,
       coefficientExcludedReason: "护士长绩效单独核算"
     },
@@ -21,6 +22,7 @@ const baseSummary: MonthlySummary = {
       staffName: "李护士",
       staffType: "nurse",
       attendanceShifts: 12,
+      overtimeShifts: 2,
       coefficientTotal: 10,
       coefficientExcludedReason: ""
     },
@@ -29,6 +31,7 @@ const baseSummary: MonthlySummary = {
       staffName: "王文员",
       staffType: "clerk",
       attendanceShifts: 8,
+      overtimeShifts: 0,
       coefficientTotal: 5,
       coefficientExcludedReason: ""
     }
@@ -197,6 +200,7 @@ describe("createMonthlySettlement", () => {
         staffName: "段护士长",
         staffType: "head_nurse",
         attendanceShifts: 10,
+        overtimeShifts: 0,
         coefficientTotal: null,
         coefficientExcludedReason: "护士长绩效单独核算",
         bonusAmount: 0,
@@ -207,6 +211,7 @@ describe("createMonthlySettlement", () => {
         staffName: "李护士",
         staffType: "nurse",
         attendanceShifts: 12,
+        overtimeShifts: 2,
         coefficientTotal: 10,
         coefficientExcludedReason: "",
         bonusAmount: 1000.09,
@@ -217,6 +222,7 @@ describe("createMonthlySettlement", () => {
         staffName: "王文员",
         staffType: "clerk",
         attendanceShifts: 8,
+        overtimeShifts: 0,
         coefficientTotal: 5,
         coefficientExcludedReason: "",
         bonusAmount: 500.04,
