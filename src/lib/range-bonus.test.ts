@@ -67,6 +67,7 @@ describe("calculateRangeBonusSummary", () => {
     const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
 
     expect(summary.isValidRange).toBe(true);
+    expect(summary.totalDays).toBe(61);
     expect(summary.sourceMonths).toEqual([
       { month: "2026-06", source: "settlement" },
       { month: "2026-07", source: "live" }
@@ -105,5 +106,19 @@ describe("calculateRangeBonusSummary", () => {
 
     expect(head?.coefficientTotal).toBeNull();
     expect(head?.coefficientExcludedReason).toBe("护士长绩效单独核算");
+  });
+
+  it("returns an empty invalid summary for reversed ranges", () => {
+    expect(calculateRangeBonusSummary(data(), "2026-08", "2026-07")).toMatchObject({
+      isValidRange: false,
+      rangeStart: "",
+      rangeEnd: "",
+      monthStart: "",
+      monthEnd: "",
+      totalDays: 0,
+      holidayNames: [],
+      sourceMonths: [],
+      rows: []
+    });
   });
 });

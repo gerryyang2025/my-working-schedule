@@ -1,5 +1,6 @@
 import type { AppData, MonthlyStaffSummary, MonthlySummary } from "@/types/domain";
 import { calculateRangeSummary } from "./calculation";
+import { listDateKeys } from "./date";
 
 export interface RangeSourceMonth {
   month: string;
@@ -106,7 +107,7 @@ export function calculateRangeBonusSummary(data: AppData, startMonth: string, en
     rangeEnd: range.rangeEnd,
     monthStart: range.rangeStart,
     monthEnd: range.rangeEnd,
-    totalDays: 0,
+    totalDays: listDateKeys(range.rangeStart, range.rangeEnd).length,
     holidayNames: data.holidays
       .filter((holiday) => holiday.date >= range.rangeStart && holiday.date <= range.rangeEnd)
       .sort((left, right) => left.date.localeCompare(right.date))
