@@ -108,7 +108,8 @@ const ScheduleGridStub = defineComponent({
 
 const WeeklySummaryStub = defineComponent({
   name: "WeeklySummary",
-  template: '<section data-testid="weekly-summary">周统计</section>'
+  props: ["summary"],
+  template: '<section data-testid="weekly-summary">{{ summary.weekStart }}-{{ summary.weekEnd }}</section>'
 });
 
 const EmptyStub = defineComponent({
@@ -420,6 +421,7 @@ describe("App", () => {
     await wrapper.get('[data-testid="workbench-tab-weekly"]').trigger("click");
 
     expect(wrapper.find('[data-testid="weekly-summary"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="weekly-summary"]').text()).toContain("2026-06-29-2026-07-05");
     expect(wrapper.find('[data-testid="schedule-grid"]').exists()).toBe(false);
   });
 
