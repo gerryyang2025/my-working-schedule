@@ -184,7 +184,7 @@ const monthlySettlement: MonthlySettlement = {
       staffName: "王护士",
       staffType: "nurse",
       attendanceShifts: 5,
-      overtimeShifts: 1,
+      overtimeShifts: 3,
       coefficientTotal: 5.5,
       coefficientExcludedReason: "",
       bonusAmount: 1392.41,
@@ -328,6 +328,22 @@ describe("PrintViews", () => {
     });
 
     const monthSummary = wrapper.get(".print-month-summary");
+    expect(monthSummary.findAll("thead th").map((cell) => cell.text())).toEqual([
+      "人员",
+      "人员类型",
+      "月出勤班次",
+      "累计加班班次",
+      "月总系数",
+      "备注"
+    ]);
+    expect(monthSummary.findAll("tbody tr")[0].findAll("td").map((cell) => cell.text())).toEqual([
+      "王护士",
+      "护士",
+      "5",
+      "1",
+      "5.50",
+      ""
+    ]);
     expect(monthSummary.text()).toContain("月度汇总");
     expect(monthSummary.text()).toContain("王护士");
     expect(monthSummary.text()).toContain("护士");
@@ -355,6 +371,24 @@ describe("PrintViews", () => {
     });
 
     const bonusSummary = wrapper.get(".print-bonus-summary");
+    expect(bonusSummary.findAll("thead th").map((cell) => cell.text())).toEqual([
+      "人员",
+      "人员类型",
+      "月出勤班次",
+      "累计加班班次",
+      "月总系数",
+      "分配金额",
+      "备注"
+    ]);
+    expect(bonusSummary.findAll("tbody tr")[0].findAll("td").map((cell) => cell.text())).toEqual([
+      "王护士",
+      "护士",
+      "5",
+      "3",
+      "5.50",
+      "1392.41",
+      ""
+    ]);
     expect(bonusSummary.text()).toContain("奖金分配");
     expect(bonusSummary.text()).toContain("奖金总额 2000.00");
     expect(bonusSummary.text()).toContain("月结时间 2026-06-30 18:00");

@@ -186,6 +186,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <th>人员</th>
             <th>人员类型</th>
             <th>月出勤班次</th>
+            <th>累计加班班次</th>
             <th>月总系数</th>
             <th>备注</th>
           </tr>
@@ -198,6 +199,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             </td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
+            <td>{{ row.overtimeShifts }}</td>
             <td>{{ getMonthlyCoefficientText(row) }}</td>
             <td>{{ row.coefficientExcludedReason }}</td>
           </tr>
@@ -217,6 +219,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
           <tr>
             <th>人员</th>
             <th>人员类型</th>
+            <th>月出勤班次</th>
+            <th>累计加班班次</th>
             <th>月总系数</th>
             <th>分配金额</th>
             <th>备注</th>
@@ -226,6 +230,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
           <tr v-for="row in monthlySettlement.rows" :key="row.staffId">
             <td>{{ row.staffName }}</td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
+            <td>{{ row.attendanceShifts }}</td>
+            <td>{{ row.overtimeShifts }}</td>
             <td>{{ getMonthlyCoefficientText(row) }}</td>
             <td>{{ formatMoney(row.bonusAmount) }}</td>
             <td>{{ getBonusNote(row) }}</td>
