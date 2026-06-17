@@ -153,4 +153,18 @@ describe("createMonthlySettlement", () => {
       })
     ).toThrow("奖金总额格式不正确");
   });
+
+  it.each([
+    ["Infinity", Infinity],
+    ["NaN", Number.NaN]
+  ])("throws when bonus pool is %s", (_label, bonusPool) => {
+    expect(() =>
+      createMonthlySettlement({
+        month: "2026-06",
+        monthlySummary: baseSummary,
+        bonusPool,
+        settledAt: "2026-06-30T10:00:00.000Z"
+      })
+    ).toThrow("奖金总额格式不正确");
+  });
 });
