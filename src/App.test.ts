@@ -90,6 +90,9 @@ const AppToolbarStub = defineComponent({
       <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
         jump
       </button>
+      <button data-testid="jump-same-month-date" type="button" @click="$emit('update:selectedDate', '2026-06-20')">
+        jump same month
+      </button>
       <button data-testid="print-week" type="button" @click="$emit('printWeek')">
         打印周表
       </button>
@@ -147,7 +150,9 @@ const BonusSettlementPanelStub = defineComponent({
       <span data-testid="bonus-month">{{ month }}</span>
       <span data-testid="bonus-range">{{ startMonth }}-{{ endMonth }} {{ isRangeMode ? "range" : "single" }}</span>
       <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
-      <span data-testid="bonus-summary">{{ monthlySummary.rows.map((row) => row.staffName).join(",") }}</span>
+      <span data-testid="bonus-summary">
+        {{ monthlySummary.rows.map((row) => [row.staffName, row.attendanceShifts, row.coefficientTotal === null ? "null" : row.coefficientTotal.toFixed(2)].join(":")).join("|") }}
+      </span>
       <input data-testid="bonus-draft-input" v-model="draftBonusPool" />
       <button data-testid="set-end-july" type="button" @click="$emit('update:endMonth', '2026-07')">set july</button>
       <button data-testid="confirm-settlement" type="button" @click="$emit('confirmSettlement', { month, bonusPool: 1000 })">confirm</button>
@@ -573,6 +578,22 @@ describe("App", () => {
     await wrapper.get('[data-testid="set-end-july"]').trigger("click");
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
+    expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+  });
+
+  it("resets the bonus range when the selected date changes within the same month", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="set-end-july"]').trigger("click");
+
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
+
+    await wrapper.get('[data-testid="jump-same-month-date"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-06 single");
   });
 
   it("passes selected monthly settlement into print views", async () => {

@@ -123,9 +123,9 @@ const printPreviewTitle = computed(() => {
 });
 const isSystemPrintSupported = computed(() => typeof window !== "undefined" && typeof window.print === "function");
 
-watch(selectedMonth, (month) => {
-  bonusStartMonth.value = month;
-  bonusEndMonth.value = month;
+watch(selectedDate, () => {
+  bonusStartMonth.value = selectedMonth.value;
+  bonusEndMonth.value = selectedMonth.value;
 });
 
 async function refreshData(): Promise<void> {
