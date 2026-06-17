@@ -57,6 +57,7 @@ const testData: PublicAppData = {
   ],
   holidays: [],
   scheduleEntries: [],
+  monthlySettlements: [],
   settings: {
     defaultRequiredShiftsPerWeek: 5,
     version: 1

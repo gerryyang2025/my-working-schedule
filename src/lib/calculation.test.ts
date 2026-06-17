@@ -81,6 +81,7 @@ const baseData: AppData = {
     { id: "e5", date: "2026-06-20", staffId: "staff-clerk", shiftIds: ["shift-day"], note: "" },
     { id: "e6", date: "2026-06-15", staffId: "staff-head", shiftIds: ["shift-day", "shift-night"], note: "" }
   ],
+  monthlySettlements: [],
   settings: {
     defaultRequiredShiftsPerWeek: 5,
     version: 1

@@ -100,16 +100,16 @@ function isSettings(value: unknown): value is Settings {
   return isNumber(value.defaultRequiredShiftsPerWeek) && isNumber(value.version);
 }
 
-function normalizeAppData(candidate: unknown): unknown {
-  if (!candidate || typeof candidate !== "object") {
-    return candidate;
+function normalizeAppData(candidate: unknown): { data: unknown; changed: boolean } {
+  if (!isRecord(candidate)) {
+    return { data: candidate, changed: false };
   }
 
-  const record = candidate as Partial<AppData>;
-  return {
-    ...record,
-    monthlySettlements: Array.isArray(record.monthlySettlements) ? record.monthlySettlements : []
-  };
+  if ("monthlySettlements" in candidate) {
+    return { data: candidate, changed: false };
+  }
+
+  return { data: { ...candidate, monthlySettlements: [] }, changed: true };
 }
 
 function assertAppData(value: unknown): asserts value is AppData {
@@ -147,9 +147,11 @@ export function createJsonStorage(path = DEFAULT_STORAGE_PATH): StorageAdapter {
   async function loadData() {
     try {
       const content = await readFile(path, "utf8");
-      const normalized = normalizeAppData(JSON.parse(content));
+      const { data: normalized, changed } = normalizeAppData(JSON.parse(content));
       assertAppData(normalized);
-      await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+      if (changed) {
+        await saveData(normalized);
+      }
       return normalized;
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {

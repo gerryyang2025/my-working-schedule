@@ -85,6 +85,7 @@ function createData(scheduleEntries: ScheduleEntry[]): PublicAppData {
     shifts,
     holidays: [{ id: "holiday-dragon", date: "2026-06-19", name: "端午节", affectsRequiredAttendance: true }],
     scheduleEntries,
+    monthlySettlements: [],
     settings: {
       defaultRequiredShiftsPerWeek: 5,
       version: 1

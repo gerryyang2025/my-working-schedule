@@ -54,6 +54,52 @@ describe("JSON storage", () => {
     expect(persisted.monthlySettlements).toEqual([]);
   });
 
+  it("does not rewrite current data that already has monthly settlements", async () => {
+    const path = await createTempDataPath();
+    const currentData = {
+      staff: [],
+      shifts: [],
+      holidays: [],
+      scheduleEntries: [],
+      monthlySettlements: [],
+      settings: {
+        defaultRequiredShiftsPerWeek: 5,
+        version: 1
+      }
+    };
+    const original = `${JSON.stringify(currentData)}\n`;
+    await writeFile(path, original, "utf8");
+
+    const storage = createJsonStorage(path);
+    const data = await storage.load();
+
+    expect(data.monthlySettlements).toEqual([]);
+    await expect(readFile(path, "utf8")).resolves.toBe(original);
+  });
+
+  it("throws on invalid present monthly settlements without overwriting the existing file", async () => {
+    const path = await createTempDataPath();
+    const invalidData = `${JSON.stringify(
+      {
+        staff: [],
+        shifts: [],
+        holidays: [],
+        scheduleEntries: [],
+        monthlySettlements: {},
+        settings: {
+          defaultRequiredShiftsPerWeek: 5,
+          version: 1
+        }
+      },
+      null,
+      2
+    )}\n`;
+    await writeFile(path, invalidData, "utf8");
+
+    await expect(createJsonStorage(path).load()).rejects.toThrow("数据文件结构不正确");
+    await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
+  });
+
   it("throws on malformed JSON without overwriting the existing file", async () => {
     const path = await createTempDataPath();
     const malformed = "{ not valid json";
