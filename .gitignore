@@ -4,6 +4,7 @@
 # Editor and local workspace files
 .idea/
 .vscode/
+.superpowers/
 *.swp
 *.swo
 
