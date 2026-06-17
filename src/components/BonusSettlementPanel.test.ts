@@ -238,6 +238,7 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.text()).not.toContain("临时试算，不会保存或锁定排班");
     expect(wrapper.find('[data-testid="confirm-settlement-button"]').exists()).toBe(false);
     expect(wrapper.find('[data-testid="cancel-settlement-button"]').exists()).toBe(false);
+    expect(wrapper.find(".settlement-meta").exists()).toBe(false);
     expect(wrapper.find(".bonus-table").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("李护士");
     expect(wrapper.text()).not.toContain("段护士长");

@@ -202,7 +202,7 @@ function rowNote(row: MonthlySettlementRow): string {
       </span>
     </p>
 
-    <div class="settlement-meta">
+    <div v-if="!isRangeMode || isRangeValid" class="settlement-meta">
       <div class="settlement-meta-item">
         <span>奖金总额</span>
         <strong>{{ formatMoney(displayedBonusPool) }}</strong>
