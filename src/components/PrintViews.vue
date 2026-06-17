@@ -3,7 +3,14 @@ import { computed } from "vue";
 import type { PublicAppData } from "@/api/client";
 import { listDateKeys, parseDateKey } from "@/lib/date";
 import type { CalendarDay } from "@/lib/date";
-import type { MonthlySettlement, MonthlyStaffSummary, MonthlySummary, StaffType, WeeklySummary } from "@/types/domain";
+import type {
+  MonthlySettlement,
+  MonthlySettlementRow,
+  MonthlyStaffSummary,
+  MonthlySummary,
+  StaffType,
+  WeeklySummary
+} from "@/types/domain";
 
 interface PrintShiftMarker {
   id: string;
@@ -16,6 +23,8 @@ interface PrintWeekDay {
   dayOfMonth: number;
   weekdayName: string;
 }
+
+type PrintedMonthlyRow = MonthlyStaffSummary | MonthlySettlementRow;
 
 const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const STAFF_TYPE_LABELS: Record<StaffType, string> = {
@@ -54,6 +63,9 @@ const monthHolidays = computed(() =>
   props.data.holidays
     .filter((holiday) => printedDayKeys.value.has(holiday.date))
     .sort((left, right) => left.date.localeCompare(right.date))
+);
+const printedMonthlyRows = computed<PrintedMonthlyRow[]>(
+  () => props.monthlySettlement?.rows ?? props.monthlySummary?.rows ?? []
 );
 const shiftById = computed(() => new Map(props.data.shifts.map((shift) => [shift.id, shift])));
 const weekDays = computed<PrintWeekDay[]>(() =>
@@ -100,11 +112,29 @@ function getStaffTypeLabel(staffType: StaffType): string {
   return STAFF_TYPE_LABELS[staffType];
 }
 
-function getMonthlyCoefficientText(row: MonthlyStaffSummary): string {
+function formatMoney(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatCoefficient(value: number): string {
+  return value.toFixed(2);
+}
+
+function formatSettledAt(settledAt: string): string {
+  const match = settledAt.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
+
+  return match ? `${match[1]} ${match[2]}:${match[3]}` : settledAt;
+}
+
+function getMonthlyCoefficientText(row: PrintedMonthlyRow): string {
   return row.coefficientTotal === null ? "单独核算" : row.coefficientTotal.toFixed(2);
 }
 
-function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
+function getBonusNote(row: MonthlySettlementRow): string {
+  return row.bonusExcludedReason || row.coefficientExcludedReason;
+}
+
+function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
   return staffById.value.get(row.staffId)?.enabled === false;
 }
 </script>
@@ -153,7 +183,7 @@ function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
       </tbody>
     </table>
 
-    <section v-if="monthlySummary" class="print-month-summary">
+    <section v-if="monthlySummary || monthlySettlement" class="print-month-summary">
       <h2>月度汇总</h2>
       <table class="print-table print-summary-table">
         <thead>
@@ -166,7 +196,7 @@ function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="row in monthlySummary.rows" :key="row.staffId">
+          <tr v-for="row in printedMonthlyRows" :key="row.staffId">
             <td>
               <span>{{ row.staffName }}</span>
               <span v-if="isDisabledMonthlyStaff(row)" class="historical-staff-label">停用历史</span>
@@ -175,6 +205,35 @@ function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
             <td>{{ row.attendanceShifts }}</td>
             <td>{{ getMonthlyCoefficientText(row) }}</td>
             <td>{{ row.coefficientExcludedReason }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section v-if="monthlySettlement" class="print-bonus-summary">
+      <h2>奖金分配</h2>
+      <div class="print-bonus-meta">
+        <p>奖金总额 {{ formatMoney(monthlySettlement.bonusPool) }}</p>
+        <p>普通人员总系数 {{ formatCoefficient(monthlySettlement.coefficientTotal) }}</p>
+        <p>月结时间 {{ formatSettledAt(monthlySettlement.settledAt) }}</p>
+      </div>
+      <table class="print-table print-summary-table">
+        <thead>
+          <tr>
+            <th>人员</th>
+            <th>人员类型</th>
+            <th>月总系数</th>
+            <th>分配金额</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in monthlySettlement.rows" :key="row.staffId">
+            <td>{{ row.staffName }}</td>
+            <td>{{ getStaffTypeLabel(row.staffType) }}</td>
+            <td>{{ getMonthlyCoefficientText(row) }}</td>
+            <td>{{ formatMoney(row.bonusAmount) }}</td>
+            <td>{{ getBonusNote(row) }}</td>
           </tr>
         </tbody>
       </table>
@@ -246,3 +305,54 @@ function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
     </table>
   </section>
 </template>
+
+<style scoped>
+.print-month-summary .print-table,
+.print-bonus-summary .print-table {
+  width: 100%;
+  min-width: 100%;
+  border-collapse: collapse;
+  table-layout: auto;
+}
+
+.print-month-summary .print-table th:first-child,
+.print-month-summary .print-table td:first-child,
+.print-bonus-summary .print-table th:first-child,
+.print-bonus-summary .print-table td:first-child {
+  width: auto;
+}
+
+.print-bonus-summary {
+  margin-top: 12px;
+}
+
+.print-bonus-summary h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.print-bonus-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 16px;
+  margin-bottom: 8px;
+  color: #334155;
+  font-size: 12px;
+}
+
+.print-bonus-meta p {
+  margin: 0;
+}
+
+@media print {
+  .print-bonus-summary {
+    margin: 8px 0 10px;
+  }
+
+  .print-bonus-summary h2 {
+    margin: 0 0 6px;
+    font-size: 13px;
+  }
+}
+</style>

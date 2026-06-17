@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import PrintViews from "./PrintViews.vue";
 import type { PublicAppData } from "@/api/client";
 import type { CalendarDay } from "@/lib/date";
-import type { MonthlySummary, ScheduleEntry, Shift, StaffMember, WeeklySummary } from "@/types/domain";
+import type {
+  MonthlySettlement,
+  MonthlySummary,
+  ScheduleEntry,
+  Shift,
+  StaffMember,
+  WeeklySummary
+} from "@/types/domain";
 
 const days: CalendarDay[] = [
   {
@@ -159,6 +166,39 @@ const monthlySummary: MonthlySummary = {
   ]
 };
 
+const monthlySettlement: MonthlySettlement = {
+  id: "settlement-2026-06",
+  month: "2026-06",
+  monthStart: "2026-06-01",
+  monthEnd: "2026-06-30",
+  totalDays: 30,
+  bonusPool: 2000,
+  coefficientTotal: 7.9,
+  settledAt: "2026-06-30T10:00:00.000Z",
+  rows: [
+    {
+      staffId: "staff-1",
+      staffName: "王护士",
+      staffType: "nurse",
+      attendanceShifts: 5,
+      coefficientTotal: 5.5,
+      coefficientExcludedReason: "",
+      bonusAmount: 1392.41,
+      bonusExcludedReason: ""
+    },
+    {
+      staffId: "staff-clerk",
+      staffName: "李文员",
+      staffType: "clerk",
+      attendanceShifts: 2,
+      coefficientTotal: 2.4,
+      coefficientExcludedReason: "",
+      bonusAmount: 607.59,
+      bonusExcludedReason: ""
+    }
+  ]
+};
+
 describe("PrintViews", () => {
   it("prints month schedule period and holiday details", () => {
     const monthDays: CalendarDay[] = [
@@ -296,6 +336,54 @@ describe("PrintViews", () => {
     expect(monthSummary.text()).toContain("6");
     expect(monthSummary.text()).toContain("单独核算");
     expect(monthSummary.text()).toContain("护士长绩效单独核算");
+  });
+
+  it("prints bonus settlement snapshot below the monthly summary", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary,
+        monthlySummary,
+        monthlySettlement
+      }
+    });
+
+    const bonusSummary = wrapper.get(".print-bonus-summary");
+    expect(bonusSummary.text()).toContain("奖金分配");
+    expect(bonusSummary.text()).toContain("奖金总额 2000.00");
+    expect(bonusSummary.text()).toContain("月结时间 2026-06-30 10:00");
+    expect(bonusSummary.text()).toContain("王护士");
+    expect(bonusSummary.text()).toContain("1392.41");
+    expect(bonusSummary.text()).toContain("李文员");
+    expect(bonusSummary.text()).toContain("607.59");
+  });
+
+  it("uses settled snapshot rows for printed monthly totals", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary,
+        monthlySummary,
+        monthlySettlement: {
+          ...monthlySettlement,
+          rows: [
+            {
+              ...monthlySettlement.rows[0],
+              attendanceShifts: 99,
+              coefficientTotal: 88.88,
+              bonusAmount: 2000
+            }
+          ]
+        }
+      }
+    });
+
+    const monthSummary = wrapper.get(".print-month-summary");
+    expect(monthSummary.text()).toContain("99");
+    expect(monthSummary.text()).toContain("88.88");
+    expect(monthSummary.text()).not.toContain("李文员");
   });
 
   it("hides disabled staff without entries in the printed month", () => {
