@@ -138,6 +138,44 @@ describe("optools.sh", () => {
     expect(log).not.toContain("starting npm run dev");
   });
 
+  it("fails early with install guidance when required npm packages are missing", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const fakeNodeBinDir = join(stateDir, "node-bin");
+    const fakeNpmPath = join(fakeBinDir, "npm");
+    const fakeNodePath = join(fakeBinDir, "node");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await mkdir(fakeNodeBinDir, { recursive: true });
+    await writeFile(fakeNpmPath, "#!/usr/bin/env bash\nprintf 'npm should not run\\n'\n", "utf8");
+    await writeFile(fakeNodePath, "#!/usr/bin/env bash\nexit 1\n", "utf8");
+    await chmod(fakeNpmPath, 0o755);
+    await chmod(fakeNodePath, 0o755);
+
+    for (const binary of ["concurrently", "vite", "tsx"]) {
+      const binaryPath = join(fakeNodeBinDir, binary);
+      await writeFile(binaryPath, "#!/usr/bin/env bash\nexit 0\n", "utf8");
+      await chmod(binaryPath, 0o755);
+    }
+
+    const result = await runOptools(["dev", "start"], {
+      OPTOOLS_STATE_DIR: stateDir,
+      OPTOOLS_LOG_DIR: stateDir,
+      OPTOOLS_NODE_MODULES_BIN_DIR: fakeNodeBinDir,
+      OPTOOLS_REQUIRED_NODE_PACKAGES: "html2canvas jspdf",
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("missing local npm packages");
+    expect(result.stderr).toContain("html2canvas");
+    expect(result.stderr).toContain("jspdf");
+    expect(result.stderr).toContain("npm install --include=dev");
+    expect(result.stdout).not.toContain("dev service: started");
+    const log = await readFile(join(stateDir, "dev.log"), "utf8").catch(() => "");
+    expect(log).not.toContain("starting npm run dev");
+  });
+
   it("keeps daemonized dev command alive after start returns and stops it", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");

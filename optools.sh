@@ -33,6 +33,7 @@ LOG_DIR="${OPTOOLS_LOG_DIR:-"$ROOT_DIR/logs/optools"}"
 PID_FILE="${OPTOOLS_DEV_PID_FILE:-"$STATE_DIR/dev.pid"}"
 LOG_FILE="${OPTOOLS_DEV_LOG_FILE:-"$LOG_DIR/dev.log"}"
 NODE_MODULES_BIN_DIR="${OPTOOLS_NODE_MODULES_BIN_DIR:-"$ROOT_DIR/node_modules/.bin"}"
+REQUIRED_NODE_PACKAGES="${OPTOOLS_REQUIRED_NODE_PACKAGES:-"html2canvas jspdf"}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -61,6 +62,7 @@ Environment:
   OPTOOLS_LOG_DIR             Runtime log directory (default: logs/optools)
   OPTOOLS_DEV_COMMAND         Command used by dev start (default: npm run dev)
   OPTOOLS_NODE_MODULES_BIN_DIR Local npm bin directory (default: node_modules/.bin)
+  OPTOOLS_REQUIRED_NODE_PACKAGES Runtime npm packages checked before dev start (default: html2canvas jspdf)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -136,6 +138,55 @@ join_by_comma() {
   echo "$joined"
 }
 
+check_required_node_packages() {
+  if [[ -z "${REQUIRED_NODE_PACKAGES//[[:space:]]/}" ]]; then
+    return 0
+  fi
+
+  if ! command -v node >/dev/null 2>&1; then
+    {
+      echo "dev service: cannot start"
+      echo "missing command: node"
+      echo "install Node.js before starting the dev service."
+    } >&2
+    return 1
+  fi
+
+  local missing=()
+  local package_name
+  local package_check_script
+  package_check_script='
+const { createRequire } = require("module");
+const path = require("path");
+const rootDir = process.argv[1];
+const packageName = process.argv[2];
+const requireFromRoot = createRequire(path.join(rootDir, "package.json"));
+
+try {
+  requireFromRoot.resolve(packageName);
+} catch {
+  process.exit(1);
+}
+'
+
+  for package_name in $REQUIRED_NODE_PACKAGES; do
+    if ! node -e "$package_check_script" "$ROOT_DIR" "$package_name" >/dev/null 2>&1; then
+      missing+=("$package_name")
+    fi
+  done
+
+  if ((${#missing[@]} > 0)); then
+    {
+      echo "dev service: cannot start"
+      echo "missing local npm packages: $(join_by_comma "${missing[@]}")"
+      echo "run: npm ci --include=dev"
+      echo "or: npm install --include=dev"
+      echo "hint: package.json was updated; reinstall dependencies before restarting dev service."
+    } >&2
+    return 1
+  fi
+}
+
 check_dev_start_prerequisites() {
   local command="$1"
 
@@ -170,6 +221,8 @@ check_dev_start_prerequisites() {
     } >&2
     return 1
   fi
+
+  check_required_node_packages || return 1
 }
 
 launch_dev_daemon() {
