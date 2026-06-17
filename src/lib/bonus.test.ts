@@ -132,6 +132,27 @@ describe("calculateBonusAllocation", () => {
     expect(allocation.rows.map((row) => row.bonusAmount)).toEqual([50.05, 50.04]);
   });
 
+  it("keeps small-pool tail correction from making the last participant negative", () => {
+    const allocation = calculateBonusAllocation(
+      {
+        ...baseSummary,
+        rows: [
+          { ...baseSummary.rows[1], staffId: "one", staffName: "一", coefficientTotal: 1 },
+          { ...baseSummary.rows[1], staffId: "two", staffName: "二", coefficientTotal: 1 },
+          { ...baseSummary.rows[1], staffId: "three", staffName: "三", coefficientTotal: 1 },
+          { ...baseSummary.rows[1], staffId: "four", staffName: "四", coefficientTotal: 1 }
+        ]
+      },
+      0.02
+    );
+    const bonusAmounts = allocation.rows.map((row) => row.bonusAmount);
+    const distributedTotal = bonusAmounts.reduce((total, amount) => total + amount, 0);
+
+    expect(bonusAmounts.every((amount) => amount >= 0)).toBe(true);
+    expect(distributedTotal).toBe(allocation.bonusPool);
+    expect(bonusAmounts).toEqual([0.01, 0.01, 0, 0]);
+  });
+
   it("does not allow settlement when ordinary coefficient total is zero", () => {
     const allocation = calculateBonusAllocation(
       {

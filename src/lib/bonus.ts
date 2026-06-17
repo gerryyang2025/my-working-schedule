@@ -69,6 +69,24 @@ function divideHalfUp(numerator: number, denominator: number): number {
   return Math.floor((numerator * 2 + denominator) / (2 * denominator));
 }
 
+function correctRoundedShares(roundedShares: number[], poolCents: number): number[] {
+  const correctedShares = [...roundedShares];
+  let correction = poolCents - correctedShares.reduce((total, share) => total + share, 0);
+
+  if (correction > 0) {
+    correctedShares[correctedShares.length - 1] += correction;
+    return correctedShares;
+  }
+
+  for (let index = correctedShares.length - 1; correction < 0 && index >= 0; index -= 1) {
+    const removableCents = Math.min(correctedShares[index], Math.abs(correction));
+    correctedShares[index] -= removableCents;
+    correction += removableCents;
+  }
+
+  return correctedShares;
+}
+
 function createSettlementRow(row: MonthlySummary["rows"][number], bonusAmount: number): MonthlySettlementRow {
   const isExcluded = row.coefficientTotal === null;
 
@@ -107,21 +125,17 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
     };
   }
 
-  let distributedCents = 0;
-  const lastPositiveIndex = positiveParticipantIndexes[positiveParticipantIndexes.length - 1];
+  const roundedShares = positiveParticipantIndexes.map((index) =>
+    divideHalfUp(poolCents * coefficientUnitsByRow[index], totalCoefficientUnits)
+  );
+  const correctedShares = correctRoundedShares(roundedShares, poolCents);
+  const bonusCentsByRowIndex = new Map(
+    positiveParticipantIndexes.map((rowIndex, shareIndex) => [rowIndex, correctedShares[shareIndex]])
+  );
 
   const rows = monthlySummary.rows.map((row, index) => {
-    const coefficientUnits = coefficientUnitsByRow[index];
-    let bonusAmount = 0;
-
-    if (coefficientUnits > 0) {
-      const bonusCents =
-        index === lastPositiveIndex
-          ? poolCents - distributedCents
-          : divideHalfUp(poolCents * coefficientUnits, totalCoefficientUnits);
-      distributedCents += bonusCents;
-      bonusAmount = bonusCents / 100;
-    }
+    const bonusCents = bonusCentsByRowIndex.get(index) ?? 0;
+    const bonusAmount = bonusCents / 100;
 
     return createSettlementRow(row, bonusAmount);
   });
