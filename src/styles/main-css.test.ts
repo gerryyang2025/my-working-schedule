@@ -22,10 +22,30 @@ describe("main.css schedule grid sticky column rules", () => {
     expect(stickyColumn).toContain("left: 0");
     expect(stickyHeader).toContain("z-index: 6");
     expect(personColumnRules).toHaveLength(2);
-    expect(personColumnRules[0]).toContain("width: 132px");
-    expect(personColumnRules[0]).toContain("min-width: 132px");
-    expect(personColumnRules[1]).toContain("width: 100px");
-    expect(personColumnRules[1]).toContain("min-width: 100px");
+    expect(personColumnRules[0]).toContain("width: 112px");
+    expect(personColumnRules[0]).toContain("min-width: 112px");
+    expect(personColumnRules[0]).toContain("max-width: 112px");
+    expect(personColumnRules[0]).toContain("text-align: left");
+    expect(personColumnRules[0]).toContain("padding: 0 6px");
+    expect(personColumnRules[1]).toContain("width: 88px");
+    expect(personColumnRules[1]).toContain("min-width: 88px");
+    expect(personColumnRules[1]).toContain("max-width: 88px");
+    expect(personColumnRules[1]).toContain("padding: 0 5px");
+  });
+
+  it("renders live shift marks as centered text without chip boxes", () => {
+    const shiftChipRules = ruleBlocks(".shift-chip");
+
+    expect(shiftChipRules).toHaveLength(2);
+    expect(shiftChipRules[0]).toContain("display: inline-flex");
+    expect(shiftChipRules[0]).toContain("justify-content: center");
+    expect(shiftChipRules[0]).toContain("border: 0");
+    expect(shiftChipRules[0]).toContain("padding: 0");
+    expect(shiftChipRules[0]).toContain("font-size: 15px");
+    expect(shiftChipRules[0]).toContain("font-weight: 800");
+    expect(shiftChipRules[0]).toContain("line-height: 1.2");
+    expect(shiftChipRules[0]).toContain("background: transparent");
+    expect(shiftChipRules[1]).toContain("font-size: 14px");
   });
 });
 

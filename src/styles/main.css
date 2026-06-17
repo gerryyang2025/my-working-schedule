@@ -261,11 +261,11 @@ body {
 }
 
 .schedule-grid .person-col {
-  width: 132px;
-  min-width: 132px;
-  max-width: 132px;
+  width: 112px;
+  min-width: 112px;
+  max-width: 112px;
   text-align: left;
-  padding: 0 8px;
+  padding: 0 6px;
 }
 
 .person-col strong,
@@ -313,12 +313,13 @@ body {
 
 .shift-chip {
   display: inline-flex;
-  min-width: 34px;
   justify-content: center;
-  border: 1px solid;
-  padding: 2px 4px;
-  font-weight: 700;
-  background: #ffffff;
+  border: 0;
+  padding: 0;
+  font-size: 15px;
+  font-weight: 800;
+  line-height: 1.2;
+  background: transparent;
 }
 
 .cell-editor {
@@ -741,15 +742,14 @@ body {
   }
 
   .schedule-grid .person-col {
-    width: 100px;
-    min-width: 100px;
-    max-width: 100px;
-    padding: 0 6px;
+    width: 88px;
+    min-width: 88px;
+    max-width: 88px;
+    padding: 0 5px;
   }
 
   .shift-chip {
-    min-width: 28px;
-    padding: 2px 3px;
+    font-size: 14px;
   }
 
   .weekly-summary {
