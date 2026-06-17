@@ -74,6 +74,10 @@ function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>
       monthlySummary,
       saving: false,
       settlement: null,
+      startMonth: "2026-06",
+      endMonth: "2026-06",
+      isRangeMode: false,
+      sourceMonths: [],
       ...overrides
     }
   });
@@ -200,5 +204,40 @@ describe("BonusSettlementPanel", () => {
   it("blocks cancellation for settled snapshots while saving or canceling", async () => {
     await expectCancelBlocked(mountPanel({ saving: true, settlement: settledSnapshot }));
     await expectCancelBlocked(mountPanel({ canceling: true, settlement: settledSnapshot }));
+  });
+
+  it("renders range controls and hides settlement actions in multi-month trial mode", async () => {
+    const wrapper = mountPanel({
+      startMonth: "2026-06",
+      endMonth: "2026-07",
+      isRangeMode: true,
+      sourceMonths: [
+        { month: "2026-06", source: "settlement" },
+        { month: "2026-07", source: "live" }
+      ]
+    });
+
+    expect(wrapper.text()).toContain("临时试算，不会保存或锁定排班");
+    expect(wrapper.text()).toContain("2026-06 使用月结快照");
+    expect(wrapper.text()).toContain("2026-07 使用实时排班");
+    expect(wrapper.find('[data-testid="confirm-settlement-button"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="cancel-settlement-button"]').exists()).toBe(false);
+  });
+
+  it("emits month range updates", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-start-month"]').setValue("2026-05");
+    await wrapper.get('[data-testid="bonus-end-month"]').setValue("2026-07");
+
+    expect(wrapper.emitted("update:startMonth")).toEqual([["2026-05"]]);
+    expect(wrapper.emitted("update:endMonth")).toEqual([["2026-07"]]);
+  });
+
+  it("shows cumulative overtime shifts", async () => {
+    const wrapper = mountPanel();
+
+    expect(wrapper.text()).toContain("累计加班班次");
+    expect(wrapper.text()).toContain("1");
   });
 });

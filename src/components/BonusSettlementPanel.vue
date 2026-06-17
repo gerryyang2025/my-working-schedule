@@ -3,6 +3,7 @@ import { computed, ref, watch } from "vue";
 import { calculateBonusAllocation, type BonusAllocation } from "@/lib/bonus";
 import { formatSettledAt } from "@/lib/format";
 import type { MonthlySettlement, MonthlySettlementRow, MonthlySummary, StaffType } from "@/types/domain";
+import type { RangeSourceMonth } from "@/lib/range-bonus";
 
 const INVALID_BONUS_POOL_MESSAGE = "奖金总额格式不正确";
 
@@ -19,11 +20,17 @@ const props = defineProps<{
   monthlySummary: MonthlySummary;
   saving: boolean;
   settlement: MonthlySettlement | null;
+  startMonth: string;
+  endMonth: string;
+  isRangeMode: boolean;
+  sourceMonths: RangeSourceMonth[];
 }>();
 
 const emit = defineEmits<{
   cancelSettlement: [month: string];
   confirmSettlement: [payload: { month: string; bonusPool: number }];
+  "update:startMonth": [value: string];
+  "update:endMonth": [value: string];
 }>();
 
 const bonusPoolText = ref("0");
@@ -57,13 +64,14 @@ const bonusPoolInputDescribedBy = computed(() =>
 const canConfirm = computed(
   () =>
     props.adminMode &&
+    !props.isRangeMode &&
     !isSettled.value &&
     !props.saving &&
     !props.canceling &&
     bonusPoolState.value.isValid &&
     previewAllocation.value.canSettle
 );
-const canCancel = computed(() => props.adminMode && isSettled.value && !props.saving && !props.canceling);
+const canCancel = computed(() => props.adminMode && !props.isRangeMode && isSettled.value && !props.saving && !props.canceling);
 
 watch(
   () => props.month,
@@ -107,6 +115,14 @@ function handleBonusPoolInput(event: Event): void {
   }
 
   bonusPoolText.value = event.target instanceof HTMLInputElement ? event.target.value : "";
+}
+
+function handleStartMonthInput(event: Event): void {
+  emit("update:startMonth", event.target instanceof HTMLInputElement ? event.target.value : "");
+}
+
+function handleEndMonthInput(event: Event): void {
+  emit("update:endMonth", event.target instanceof HTMLInputElement ? event.target.value : "");
 }
 
 function handleConfirm(): void {
@@ -160,6 +176,24 @@ function rowNote(row: MonthlySettlementRow): string {
       <span class="settlement-status" :class="{ settled: isSettled }">{{ statusText }}</span>
     </header>
 
+    <div class="settlement-range-controls">
+      <label>
+        <span>开始月份</span>
+        <input data-testid="bonus-start-month" type="month" :value="startMonth" @input="handleStartMonthInput" />
+      </label>
+      <label>
+        <span>结束月份</span>
+        <input data-testid="bonus-end-month" type="month" :value="endMonth" @input="handleEndMonthInput" />
+      </label>
+    </div>
+
+    <p v-if="isRangeMode" class="settlement-range-notice">
+      临时试算，不会保存或锁定排班。
+      <span v-for="item in sourceMonths" :key="item.month">
+        {{ item.month }} 使用{{ item.source === "settlement" ? "月结快照" : "实时排班" }}
+      </span>
+    </p>
+
     <div class="settlement-meta">
       <div class="settlement-meta-item">
         <span>奖金总额</span>
@@ -191,7 +225,7 @@ function rowNote(row: MonthlySettlementRow): string {
           @input="handleBonusPoolInput"
         />
       </label>
-      <div class="settlement-actions">
+      <div v-if="!isRangeMode" class="settlement-actions">
         <button
           data-testid="confirm-settlement-button"
           type="button"
@@ -221,6 +255,7 @@ function rowNote(row: MonthlySettlementRow): string {
             <th>人员</th>
             <th>类型</th>
             <th>出勤班次</th>
+            <th>累计加班班次</th>
             <th>月总系数</th>
             <th>分配金额</th>
             <th>备注</th>
@@ -231,6 +266,7 @@ function rowNote(row: MonthlySettlementRow): string {
             <td data-label="人员">{{ row.staffName }}</td>
             <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
             <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
+            <td data-label="累计加班班次">{{ row.overtimeShifts }}</td>
             <td data-label="月总系数">{{ coefficientCellText(row) }}</td>
             <td data-label="分配金额">{{ formatMoney(row.bonusAmount) }}</td>
             <td data-label="备注">{{ rowNote(row) }}</td>
@@ -284,6 +320,44 @@ function rowNote(row: MonthlySettlementRow): string {
   border-color: #bbf7d0;
   background: #f0fdf4;
   color: #166534;
+}
+
+.settlement-range-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.settlement-range-controls label {
+  display: grid;
+  gap: 4px;
+  min-width: 180px;
+}
+
+.settlement-range-controls span {
+  color: #475569;
+  font-size: 13px;
+}
+
+.settlement-range-controls input {
+  height: 32px;
+  border: 1px solid #cbd5e1;
+  padding: 4px 8px;
+  color: #0f172a;
+  font: inherit;
+}
+
+.settlement-range-notice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 10px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  color: #1e40af;
+  padding: 7px 8px;
+  font-size: 13px;
 }
 
 .settlement-meta {
@@ -424,6 +498,7 @@ function rowNote(row: MonthlySettlementRow): string {
   }
 
   .bonus-panel-header,
+  .settlement-range-controls,
   .settlement-controls {
     align-items: stretch;
     flex-direction: column;
@@ -434,6 +509,10 @@ function rowNote(row: MonthlySettlementRow): string {
   }
 
   .bonus-pool-field {
+    min-width: 0;
+  }
+
+  .settlement-range-controls label {
     min-width: 0;
   }
 

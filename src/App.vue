@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
@@ -25,6 +25,7 @@ import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/dom
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
+import { calculateRangeBonusSummary } from "@/lib/range-bonus";
 
 type PrintMode = "month" | "week";
 type WorkbenchTab = "schedule" | "weekly" | "bonus";
@@ -66,6 +67,8 @@ const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const selectedMonth = computed(() => selectedDate.value.slice(0, 7));
+const bonusStartMonth = ref(selectedMonth.value);
+const bonusEndMonth = ref(selectedMonth.value);
 const scheduleDays = computed(() => getWeekDays(selectedDate.value));
 const printMonthDays = computed(() => {
   const date = parseDateKey(selectedDate.value);
@@ -73,6 +76,15 @@ const printMonthDays = computed(() => {
 });
 const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
 const monthlySummary = computed(() => (data.value ? calculateMonthlySummary(data.value, printMonthDays.value) : null));
+const bonusRangeSummary = computed(() => {
+  if (!data.value) {
+    return null;
+  }
+
+  return calculateRangeBonusSummary(data.value, bonusStartMonth.value, bonusEndMonth.value);
+});
+const isBonusRangeMode = computed(() => bonusStartMonth.value !== bonusEndMonth.value);
+const displayedBonusSummary = computed(() => (isBonusRangeMode.value ? bonusRangeSummary.value : monthlySummary.value));
 const currentMonthlySettlement = computed<MonthlySettlement | null>(() => {
   return data.value?.monthlySettlements.find((settlement) => settlement.month === selectedMonth.value) ?? null;
 });
@@ -110,6 +122,11 @@ const printPreviewTitle = computed(() => {
   return "打印预览";
 });
 const isSystemPrintSupported = computed(() => typeof window !== "undefined" && typeof window.print === "function");
+
+watch(selectedMonth, (month) => {
+  bonusStartMonth.value = month;
+  bonusEndMonth.value = month;
+});
 
 async function refreshData(): Promise<void> {
   data.value = await loadData();
@@ -623,13 +640,17 @@ onMounted(async () => {
           </section>
           <section v-show="activeWorkbenchTab === 'bonus'" class="workbench-tab-panel" data-testid="workbench-panel-bonus">
             <BonusSettlementPanel
-              v-if="monthlySummary"
+              v-if="displayedBonusSummary"
+              v-model:start-month="bonusStartMonth"
+              v-model:end-month="bonusEndMonth"
               :admin-mode="adminMode"
               :month="selectedMonth"
-              :monthly-summary="monthlySummary"
-              :settlement="currentMonthlySettlement"
+              :monthly-summary="displayedBonusSummary"
+              :settlement="isBonusRangeMode ? null : currentMonthlySettlement"
               :saving="settlementSaving"
               :canceling="settlementCanceling"
+              :is-range-mode="isBonusRangeMode"
+              :source-months="bonusRangeSummary?.sourceMonths ?? []"
               @confirm-settlement="handleConfirmSettlement"
               @cancel-settlement="handleCancelSettlement"
             />

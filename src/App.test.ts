@@ -137,17 +137,19 @@ const PrintViewsStub = defineComponent({
 
 const BonusSettlementPanelStub = defineComponent({
   name: "BonusSettlementPanel",
-  props: ["adminMode", "monthlySummary", "month", "settlement"],
-  emits: ["confirmSettlement", "cancelSettlement"],
+  props: ["month", "monthlySummary", "settlement", "startMonth", "endMonth", "isRangeMode", "sourceMonths"],
+  emits: ["confirmSettlement", "cancelSettlement", "update:startMonth", "update:endMonth"],
   setup() {
     return { draftBonusPool: ref("") };
   },
   template: `
     <section data-testid="bonus-panel">
       <span data-testid="bonus-month">{{ month }}</span>
+      <span data-testid="bonus-range">{{ startMonth }}-{{ endMonth }} {{ isRangeMode ? "range" : "single" }}</span>
       <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
       <span data-testid="bonus-summary">{{ monthlySummary.rows.map((row) => row.staffName).join(",") }}</span>
       <input data-testid="bonus-draft-input" v-model="draftBonusPool" />
+      <button data-testid="set-end-july" type="button" @click="$emit('update:endMonth', '2026-07')">set july</button>
       <button data-testid="confirm-settlement" type="button" @click="$emit('confirmSettlement', { month, bonusPool: 1000 })">confirm</button>
       <button data-testid="cancel-settlement" type="button" @click="$emit('cancelSettlement', month)">cancel</button>
     </section>
@@ -556,6 +558,21 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士");
     vi.useRealTimers();
+  });
+
+  it("passes a custom range trial summary into the bonus panel", async () => {
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        { id: "2026-07-01__staff-nurse-001", date: "2026-07-01", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+      ]
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
+    await wrapper.get('[data-testid="set-end-july"]').trigger("click");
+
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
   });
 
   it("passes selected monthly settlement into print views", async () => {
