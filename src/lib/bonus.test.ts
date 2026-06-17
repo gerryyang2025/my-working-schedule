@@ -116,6 +116,22 @@ describe("calculateBonusAllocation", () => {
     expect(allocation.rows.map((row) => row.bonusAmount)).toEqual([33.33, 33.33, 33.34]);
   });
 
+  it("rounds non-tail half-cent shares before giving the tail to the last participant", () => {
+    const allocation = calculateBonusAllocation(
+      {
+        ...baseSummary,
+        rows: [
+          { ...baseSummary.rows[1], staffId: "one", staffName: "一", coefficientTotal: 0.41 },
+          { ...baseSummary.rows[2], staffId: "two", staffName: "二", coefficientTotal: 0.41 }
+        ]
+      },
+      100.09
+    );
+
+    expect(allocation.coefficientTotal).toBe(0.82);
+    expect(allocation.rows.map((row) => row.bonusAmount)).toEqual([50.05, 50.04]);
+  });
+
   it("does not allow settlement when ordinary coefficient total is zero", () => {
     const allocation = calculateBonusAllocation(
       {
