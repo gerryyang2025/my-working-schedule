@@ -100,6 +100,18 @@ function isSettings(value: unknown): value is Settings {
   return isNumber(value.defaultRequiredShiftsPerWeek) && isNumber(value.version);
 }
 
+function normalizeAppData(candidate: unknown): unknown {
+  if (!candidate || typeof candidate !== "object") {
+    return candidate;
+  }
+
+  const record = candidate as Partial<AppData>;
+  return {
+    ...record,
+    monthlySettlements: Array.isArray(record.monthlySettlements) ? record.monthlySettlements : []
+  };
+}
+
 function assertAppData(value: unknown): asserts value is AppData {
   if (!isRecord(value)) {
     throw new Error("数据文件结构不正确");
@@ -114,6 +126,7 @@ function assertAppData(value: unknown): asserts value is AppData {
     value.holidays.every(isHoliday) &&
     Array.isArray(value.scheduleEntries) &&
     value.scheduleEntries.every(isScheduleEntry) &&
+    Array.isArray(value.monthlySettlements) &&
     isSettings(value.settings);
 
   if (!isValid) {
@@ -134,9 +147,10 @@ export function createJsonStorage(path = DEFAULT_STORAGE_PATH): StorageAdapter {
   async function loadData() {
     try {
       const content = await readFile(path, "utf8");
-      const data: unknown = JSON.parse(content);
-      assertAppData(data);
-      return data;
+      const normalized = normalizeAppData(JSON.parse(content));
+      assertAppData(normalized);
+      await writeFile(path, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
+      return normalized;
     } catch (error) {
       if (typeof error === "object" && error !== null && "code" in error && error.code === "ENOENT") {
         const seedData = createSeedData();

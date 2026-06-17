@@ -32,6 +32,28 @@ describe("JSON storage", () => {
     expect(persisted.staff).toHaveLength(3);
   });
 
+  it("repairs older local data that does not have monthly settlements", async () => {
+    const path = await createTempDataPath();
+    const legacyData = {
+      staff: [],
+      shifts: [],
+      holidays: [],
+      scheduleEntries: [],
+      settings: {
+        defaultRequiredShiftsPerWeek: 5,
+        version: 1
+      }
+    };
+    await writeFile(path, `${JSON.stringify(legacyData, null, 2)}\n`, "utf8");
+
+    const storage = createJsonStorage(path);
+    const data = await storage.load();
+    const persisted = JSON.parse(await readFile(path, "utf8"));
+
+    expect(data.monthlySettlements).toEqual([]);
+    expect(persisted.monthlySettlements).toEqual([]);
+  });
+
   it("throws on malformed JSON without overwriting the existing file", async () => {
     const path = await createTempDataPath();
     const malformed = "{ not valid json";

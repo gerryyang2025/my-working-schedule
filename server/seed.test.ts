@@ -7,4 +7,10 @@ describe("seed data", () => {
 
     expect("adminPassword" in data.settings).toBe(false);
   });
+
+  it("starts without monthly settlement snapshots", () => {
+    const data = createSeedData();
+
+    expect(data.monthlySettlements).toEqual([]);
+  });
 });

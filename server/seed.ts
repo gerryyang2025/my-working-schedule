@@ -92,6 +92,7 @@ export function createSeedData(): AppData {
       }
     ],
     scheduleEntries: [],
+    monthlySettlements: [],
     settings: {
       defaultRequiredShiftsPerWeek: 5,
       version: 1

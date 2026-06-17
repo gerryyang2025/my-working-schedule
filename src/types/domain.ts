@@ -46,6 +46,7 @@ export interface AppData {
   shifts: Shift[];
   holidays: Holiday[];
   scheduleEntries: ScheduleEntry[];
+  monthlySettlements: MonthlySettlement[];
   settings: Settings;
 }
 
@@ -84,4 +85,27 @@ export interface MonthlySummary {
   totalDays: number;
   holidayNames: string[];
   rows: MonthlyStaffSummary[];
+}
+
+export interface MonthlySettlementRow {
+  staffId: string;
+  staffName: string;
+  staffType: StaffType;
+  attendanceShifts: number;
+  coefficientTotal: number | null;
+  coefficientExcludedReason: string;
+  bonusAmount: number;
+  bonusExcludedReason: string;
+}
+
+export interface MonthlySettlement {
+  id: string;
+  month: string;
+  monthStart: string;
+  monthEnd: string;
+  totalDays: number;
+  bonusPool: number;
+  coefficientTotal: number;
+  settledAt: string;
+  rows: MonthlySettlementRow[];
 }
