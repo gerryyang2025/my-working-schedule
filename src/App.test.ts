@@ -493,6 +493,7 @@ describe("App", () => {
     await flushPromises();
 
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
   });
 
   it("cancels monthly settlement and refreshes app data", async () => {
@@ -520,6 +521,7 @@ describe("App", () => {
     await flushPromises();
 
     expect(apiMocks.deleteMonthlySettlement).toHaveBeenCalledWith("2026-06");
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
   });
 
   it("shares a generated PDF file from the print preview when file sharing is supported", async () => {
