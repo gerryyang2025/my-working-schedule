@@ -190,6 +190,9 @@ test("locks schedule editing after monthly settlement", async ({ page, request }
       (response) => response.url().endsWith("/api/data/monthly-settlement") && response.request().method() === "PUT"
     );
     await page.getByTestId("confirm-settlement-button").click();
+    const settlementConfirmDialog = page.getByRole("dialog", { name: "确认月结" });
+    await expect(settlementConfirmDialog).toBeVisible();
+    await settlementConfirmDialog.getByRole("button", { name: "确认月结", exact: true }).click();
     const settlementResponse = await settlementResponsePromise;
     expect(settlementResponse.ok()).toBeTruthy();
     const settlementData = (await settlementResponse.json()) as PublicAppData;
