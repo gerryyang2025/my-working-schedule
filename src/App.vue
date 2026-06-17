@@ -185,8 +185,13 @@ function printWithMode(mode: PrintMode): void {
   invokeSystemPrint(mode);
 }
 
-function handlePreviewPrint(): void {
+async function handlePreviewPrint(): Promise<void> {
   if (!printPreviewMode.value) {
+    return;
+  }
+
+  if (isMobileViewport() || !isSystemPrintSupported.value) {
+    await handlePreviewPdfShare();
     return;
   }
 
@@ -460,8 +465,8 @@ onMounted(async () => {
         >
           生成/分享 PDF
         </el-button>
-        <el-button data-testid="print-preview-system-button" @click="handlePreviewPrint">
-          调用系统打印
+        <el-button data-testid="print-preview-system-button" :loading="pdfGenerating" @click="handlePreviewPrint">
+          {{ isMobileViewport() || !isSystemPrintSupported ? "生成 PDF 打印" : "调用系统打印" }}
         </el-button>
       </template>
     </el-dialog>

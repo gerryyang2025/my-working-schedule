@@ -349,10 +349,13 @@ describe("App", () => {
     }
   });
 
-  it("prints from the mobile preview with the selected print mode", async () => {
-    vi.useFakeTimers();
+  it("generates a PDF from the mobile system print button when native print is unreliable", async () => {
     const restoreMobileViewport = mockMobileViewport(true);
     const { printSpy, restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(false);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "month-schedule.pdf", { type: "application/pdf" });
+    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
 
     try {
       const wrapper = mountApp();
@@ -361,16 +364,25 @@ describe("App", () => {
       await wrapper.get('[data-testid="print-month"]').trigger("click");
       await nextTick();
       await wrapper.get('[data-testid="print-preview-system-button"]').trigger("click");
+      await flushPromises();
 
-      expect(printSpy).toHaveBeenCalledTimes(1);
-      expect(document.body.dataset.printMode).toBe("month");
+      expect(printSpy).not.toHaveBeenCalled();
+      expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
+        element: expect.any(HTMLElement),
+        filename: "month-schedule.pdf"
+      });
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
 
-      vi.runOnlyPendingTimers();
-
-      expect(document.body.dataset.printMode).toBeUndefined();
+      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
+      expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
+      expect(downloadLink.attributes("download")).toBe("month-schedule.pdf");
+      expect(wrapper.get(".print-pdf-status").text()).toContain("下载");
     } finally {
       restoreMobileViewport();
       restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
     }
   });
 
