@@ -8,7 +8,7 @@ export interface BonusAllocation {
   bonusPool: number;
   coefficientTotal: number;
   rows: MonthlySettlementRow[];
-  message?: string;
+  message: string;
 }
 
 interface CreateMonthlySettlementInput {
@@ -124,6 +124,7 @@ export function calculateBonusAllocation(monthlySummary: MonthlySummary, bonusPo
     canSettle: true,
     bonusPool: roundedPool,
     coefficientTotal,
+    message: "",
     rows
   };
 }

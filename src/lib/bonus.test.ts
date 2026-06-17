@@ -53,6 +53,7 @@ describe("calculateBonusAllocation", () => {
     const allocation = calculateBonusAllocation(baseSummary, 1500);
 
     expect(allocation.canSettle).toBe(true);
+    expect(allocation.message).toBe("");
     expect(allocation.coefficientTotal).toBe(15);
     expect(allocation.rows.map((row) => [row.staffName, row.bonusAmount, row.bonusExcludedReason])).toEqual([
       ["段护士长", 0, "护士长绩效单独核算"],
