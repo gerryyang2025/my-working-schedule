@@ -204,10 +204,18 @@ body {
   left: 0;
   z-index: 4;
   background: #ffffff;
+  box-shadow: 1px 0 0 #e2e8f0;
 }
 
-.person-col {
+.schedule-grid thead .sticky-col {
+  z-index: 6;
+  background: #f8fafc;
+}
+
+.schedule-grid .person-col {
+  width: 132px;
   min-width: 132px;
+  max-width: 132px;
   text-align: left;
   padding: 0 8px;
 }
@@ -459,8 +467,10 @@ body {
     height: 52px;
   }
 
-  .person-col {
+  .schedule-grid .person-col {
+    width: 100px;
     min-width: 100px;
+    max-width: 100px;
     padding: 0 6px;
   }
 
