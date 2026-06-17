@@ -18,6 +18,9 @@ const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
 const error = ref("");
 const adminMode = ref(false);
+const adminLoginOpen = ref(false);
+const adminPassword = ref("");
+const adminSubmitting = ref(false);
 const selectedDate = ref(today);
 const managementOpen = ref(false);
 const selectedShiftId = ref("");
@@ -44,6 +47,7 @@ const editingEntry = computed(
     data.value?.scheduleEntries.find((entry) => entry.staffId === editingStaffId.value && entry.date === editingDate.value) ??
     null
 );
+const canSubmitAdminPassword = computed(() => adminPassword.value.trim().length > 0 && !adminSubmitting.value);
 
 async function refreshData(): Promise<void> {
   data.value = await loadData();
@@ -54,17 +58,27 @@ async function handleEnterAdmin(): Promise<void> {
     return;
   }
 
-  const password = window.prompt("请输入管理密码");
-  if (!password) {
+  adminPassword.value = "";
+  adminLoginOpen.value = true;
+}
+
+async function handleSubmitAdminPassword(): Promise<void> {
+  if (!canSubmitAdminPassword.value) {
     return;
   }
 
+  adminSubmitting.value = true;
   try {
-    await enterAdminMode(password);
+    await enterAdminMode(adminPassword.value);
     adminMode.value = true;
+    adminLoginOpen.value = false;
+    adminPassword.value = "";
+    ElMessage.success("编辑模式已开启");
   } catch (caughtError) {
     adminMode.value = false;
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "管理密码验证失败");
+  } finally {
+    adminSubmitting.value = false;
   }
 }
 
@@ -232,6 +246,41 @@ onMounted(async () => {
       @print-week="printWithMode('week')"
       @fullscreen="handleFullscreen"
     />
+
+    <section v-if="adminMode" class="admin-mode-banner" role="status">
+      编辑模式已开启，可以维护排班、人员、班次和节假日。
+    </section>
+
+    <el-dialog
+      v-model="adminLoginOpen"
+      class="admin-login-dialog"
+      title="进入编辑模式"
+      width="420px"
+      :close-on-click-modal="!adminSubmitting"
+      :close-on-press-escape="!adminSubmitting"
+    >
+      <p class="admin-login-tip">请输入服务端配置的管理密码，验证通过后即可编辑排班和系统配置。</p>
+      <el-input
+        v-model="adminPassword"
+        type="password"
+        placeholder="管理密码"
+        show-password
+        :disabled="adminSubmitting"
+        @keyup.enter="handleSubmitAdminPassword"
+      />
+      <template #footer>
+        <el-button :disabled="adminSubmitting" @click="adminLoginOpen = false">取消</el-button>
+        <el-button
+          type="primary"
+          data-testid="admin-submit-button"
+          :disabled="!canSubmitAdminPassword"
+          :loading="adminSubmitting"
+          @click="handleSubmitAdminPassword"
+        >
+          进入编辑模式
+        </el-button>
+      </template>
+    </el-dialog>
 
     <section v-if="error" class="state-message">
       {{ error }}

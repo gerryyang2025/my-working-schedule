@@ -50,12 +50,17 @@ const testData: PublicAppData = {
 
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
-  props: ["selectedDate"],
-  emits: ["update:selectedDate"],
+  props: ["selectedDate", "adminMode"],
+  emits: ["update:selectedDate", "enterAdmin"],
   template: `
-    <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
-      jump
-    </button>
+    <section>
+      <button data-testid="admin-button" type="button" @click="$emit('enterAdmin')">
+        {{ adminMode ? "编辑模式" : "输入管理密码" }}
+      </button>
+      <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
+        jump
+      </button>
+    </section>
   `
 });
 
@@ -69,6 +74,26 @@ const EmptyStub = defineComponent({
   template: "<section />"
 });
 
+const ElDialogStub = defineComponent({
+  name: "ElDialog",
+  props: ["modelValue", "title"],
+  emits: ["update:modelValue"],
+  template: '<section v-if="modelValue" class="admin-login-dialog"><h2>{{ title }}</h2><slot /><slot name="footer" /></section>'
+});
+
+const ElInputStub = defineComponent({
+  name: "ElInput",
+  props: ["modelValue", "placeholder", "type", "disabled"],
+  emits: ["update:modelValue"],
+  template: '<input data-testid="admin-password-input" :type="type" :placeholder="placeholder" :value="modelValue" :disabled="disabled" @input="$emit(\'update:modelValue\', $event.target.value)" />'
+});
+
+const ElButtonStub = defineComponent({
+  name: "ElButton",
+  props: ["type", "disabled", "loading"],
+  template: '<button type="button" :disabled="disabled" v-bind="$attrs"><slot /></button>'
+});
+
 function mountApp() {
   apiMocks.loadData.mockResolvedValue(structuredClone(testData));
 
@@ -77,6 +102,9 @@ function mountApp() {
       stubs: {
         AppToolbar: AppToolbarStub,
         CellEditorDialog: EmptyStub,
+        ElButton: ElButtonStub,
+        ElDialog: ElDialogStub,
+        ElInput: ElInputStub,
         ManagementDrawer: EmptyStub,
         PrintViews: EmptyStub,
         ScheduleGrid: ScheduleGridStub,
@@ -101,6 +129,30 @@ describe("App", () => {
     expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
     expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
     expect(infoPanel.text()).toContain("护士长绩效系数单独核算");
+  });
+
+  it("uses an in-page password dialog and shows clear feedback after entering admin mode", async () => {
+    apiMocks.enterAdminMode.mockResolvedValue(undefined);
+    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("legacy-password");
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="admin-button"]').trigger("click");
+    await nextTick();
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(wrapper.get(".admin-login-dialog").text()).toContain("进入编辑模式");
+
+    await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
+    await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.enterAdminMode).toHaveBeenCalledWith("admin-password");
+    expect(wrapper.get(".admin-mode-banner").text()).toContain("编辑模式已开启");
+    expect(wrapper.get('[data-testid="admin-button"]').text()).toContain("编辑模式");
+    expect(wrapper.find(".admin-login-dialog").exists()).toBe(false);
+
+    promptSpy.mockRestore();
   });
 
   it("passes only the selected natural week to the schedule grid", async () => {
