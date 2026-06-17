@@ -130,7 +130,7 @@ describe("BonusSettlementPanel", () => {
     const wrapper = mountPanel({ settlement: settledSnapshot });
 
     expect(wrapper.text()).toContain("已月结");
-    expect(wrapper.text()).toContain("2026-06-30 10:00");
+    expect(wrapper.text()).toContain("2026-06-30 18:00");
     expect(wrapper.text()).toContain("1000.00");
 
     await wrapper.get('[data-testid="cancel-settlement-button"]').trigger("click");

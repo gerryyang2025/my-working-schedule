@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { calculateBonusAllocation, type BonusAllocation } from "@/lib/bonus";
+import { formatSettledAt } from "@/lib/format";
 import type { MonthlySettlement, MonthlySettlementRow, MonthlySummary, StaffType } from "@/types/domain";
 
 const INVALID_BONUS_POOL_MESSAGE = "奖金总额格式不正确";
@@ -146,11 +147,6 @@ function rowNote(row: MonthlySettlementRow): string {
   return row.bonusExcludedReason || row.coefficientExcludedReason;
 }
 
-function formatSettledAt(settledAt: string): string {
-  const match = settledAt.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-
-  return match ? `${match[1]} ${match[2]}:${match[3]}` : settledAt;
-}
 </script>
 
 <template>

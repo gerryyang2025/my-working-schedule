@@ -3,6 +3,7 @@ import { computed } from "vue";
 import type { PublicAppData } from "@/api/client";
 import { listDateKeys, parseDateKey } from "@/lib/date";
 import type { CalendarDay } from "@/lib/date";
+import { formatSettledAt } from "@/lib/format";
 import type {
   MonthlySettlement,
   MonthlySettlementRow,
@@ -118,12 +119,6 @@ function formatMoney(value: number): string {
 
 function formatCoefficient(value: number): string {
   return value.toFixed(2);
-}
-
-function formatSettledAt(settledAt: string): string {
-  const match = settledAt.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):(\d{2})/);
-
-  return match ? `${match[1]} ${match[2]}:${match[3]}` : settledAt;
 }
 
 function getMonthlyCoefficientText(row: PrintedMonthlyRow): string {

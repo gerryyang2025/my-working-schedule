@@ -352,7 +352,7 @@ describe("PrintViews", () => {
     const bonusSummary = wrapper.get(".print-bonus-summary");
     expect(bonusSummary.text()).toContain("奖金分配");
     expect(bonusSummary.text()).toContain("奖金总额 2000.00");
-    expect(bonusSummary.text()).toContain("月结时间 2026-06-30 10:00");
+    expect(bonusSummary.text()).toContain("月结时间 2026-06-30 18:00");
     expect(bonusSummary.text()).toContain("王护士");
     expect(bonusSummary.text()).toContain("1392.41");
     expect(bonusSummary.text()).toContain("李文员");

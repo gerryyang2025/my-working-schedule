@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ElMessage } from "element-plus";
+import { ElMessage, ElMessageBox } from "element-plus";
 import { computed, onMounted, ref } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
@@ -381,8 +381,23 @@ async function handleConfirmSettlement(payload: { month: string; bonusPool: numb
     return;
   }
 
+  settlementSaving.value = true;
   try {
-    settlementSaving.value = true;
+    await ElMessageBox.confirm(
+      `${payload.month} 月结奖金总额 ${payload.bonusPool.toFixed(2)}。确认后该月排班会被锁定，不能继续修改。`,
+      "确认月结",
+      {
+        cancelButtonText: "再检查一下",
+        confirmButtonText: "确认月结",
+        type: "warning"
+      }
+    );
+  } catch {
+    settlementSaving.value = false;
+    return;
+  }
+
+  try {
     data.value = await saveMonthlySettlement(payload.month, payload.bonusPool);
     ElMessage.success("月结已完成");
   } catch (caughtError) {

@@ -475,6 +475,22 @@ describe("API routes", () => {
     const response = await request(app).delete("/api/data/monthly-settlement/2026-06").set(headers).expect(200);
 
     expect(response.body.monthlySettlements).toEqual([]);
+
+    const saveResponse = await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-16", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(200);
+
+    expect(saveResponse.body.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          date: "2026-06-16",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"]
+        })
+      ])
+    );
   });
 
   it("rejects cancelling a month that is not settled", async () => {

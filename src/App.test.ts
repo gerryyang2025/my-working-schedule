@@ -20,7 +20,19 @@ const pdfMocks = vi.hoisted(() => ({
   createPrintPdfFile: vi.fn()
 }));
 
+const elementPlusMocks = vi.hoisted(() => ({
+  ElMessage: {
+    error: vi.fn(),
+    success: vi.fn(),
+    warning: vi.fn()
+  },
+  ElMessageBox: {
+    confirm: vi.fn()
+  }
+}));
+
 vi.mock("@/api/client", () => apiMocks);
+vi.mock("element-plus", () => elementPlusMocks);
 vi.mock("@/lib/print-pdf", () => pdfMocks);
 
 const testData: PublicAppData = {
@@ -503,7 +515,8 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="print-monthly-settlement"]').text()).toBe("月结 2026-06 1000.00");
   });
 
-  it("saves monthly settlement and refreshes app data", async () => {
+  it("confirms before saving monthly settlement and refreshes app data", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
       monthlySettlements: [
@@ -527,11 +540,33 @@ describe("App", () => {
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
     await flushPromises();
 
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
+    const [message, title] = elementPlusMocks.ElMessageBox.confirm.mock.calls[0];
+    expect(String(title)).toContain("确认月结");
+    expect(String(message)).toContain("2026-06");
+    expect(String(message)).toContain("1000.00");
+    expect(String(message)).toContain("确认后该月排班会被锁定");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
   });
 
+  it("does not save or show an error when monthly settlement confirmation is canceled", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockRejectedValue("cancel");
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
+    expect(apiMocks.saveMonthlySettlement).not.toHaveBeenCalled();
+    expect(elementPlusMocks.ElMessage.error).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
+  });
+
   it("suppresses duplicate settlement saves while a request is in flight", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     const deferred = createDeferred<PublicAppData>();
     apiMocks.saveMonthlySettlement.mockReturnValue(deferred.promise);
     const wrapper = mountApp();
@@ -541,6 +576,9 @@ describe("App", () => {
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
     await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
 
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledTimes(1);
 
     deferred.resolve({ ...testData, monthlySettlements: [] });
