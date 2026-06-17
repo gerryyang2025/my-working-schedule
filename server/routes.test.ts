@@ -399,6 +399,110 @@ describe("API routes", () => {
     expect(response.body.message).toBe("日期格式不正确");
   });
 
+  it("creates a monthly settlement snapshot", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" },
+      { id: "2026-06-16__staff-clerk-001", date: "2026-06-16", staffId: "staff-clerk-001", shiftIds: ["shift-office"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(await adminHeaders(app))
+      .send({ month: "2026-06", bonusPool: 1000 })
+      .expect(200);
+
+    expect(response.body.monthlySettlements).toHaveLength(1);
+    expect(response.body.monthlySettlements[0]).toMatchObject({
+      id: "settlement-2026-06",
+      month: "2026-06",
+      monthStart: "2026-06-01",
+      monthEnd: "2026-06-30",
+      bonusPool: 1000
+    });
+    expect(response.body.monthlySettlements[0].settledAt).toEqual(expect.any(String));
+  });
+
+  it("rejects duplicate monthly settlements", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+    const headers = await adminHeaders(app);
+
+    await request(app).put("/api/data/monthly-settlement").set(headers).send({ month: "2026-06", bonusPool: 1000 }).expect(200);
+    const response = await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(headers)
+      .send({ month: "2026-06", bonusPool: 1000 })
+      .expect(400);
+
+    expect(response.body.message).toBe("该月份已月结");
+  });
+
+  it("cancels a monthly settlement snapshot", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+    const headers = await adminHeaders(app);
+
+    await request(app).put("/api/data/monthly-settlement").set(headers).send({ month: "2026-06", bonusPool: 1000 }).expect(200);
+    const response = await request(app).delete("/api/data/monthly-settlement/2026-06").set(headers).expect(200);
+
+    expect(response.body.monthlySettlements).toEqual([]);
+  });
+
+  it("rejects cancelling a month that is not settled", async () => {
+    const app = createTestApp();
+    const response = await request(app).delete("/api/data/monthly-settlement/2026-06").set(await adminHeaders(app)).expect(404);
+
+    expect(response.body.message).toBe("该月份未月结");
+  });
+
+  it("rejects invalid monthly settlement payloads", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(await adminHeaders(app))
+      .send({ month: "2026-13", bonusPool: -1 })
+      .expect(400);
+
+    expect(response.body.message).toBe("月结信息不完整");
+  });
+
+  it("rejects monthly settlement when ordinary coefficient total is zero", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(await adminHeaders(app))
+      .send({ month: "2026-06", bonusPool: 1000 })
+      .expect(400);
+
+    expect(response.body.message).toBe("普通人员月总系数合计为 0，无法按系数分配奖金");
+  });
+
+  it("rejects schedule writes in a settled month", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+    const headers = await adminHeaders(app);
+
+    await request(app).put("/api/data/monthly-settlement").set(headers).send({ month: "2026-06", bonusPool: 1000 }).expect(200);
+    const response = await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-16", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(400);
+
+    expect(response.body.message).toBe("该月份已月结，不能修改排班");
+  });
+
   it("preserves both concurrent schedule-entry saves", async () => {
     let data = createSeedData();
     let updateQueue = Promise.resolve();

@@ -1,5 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { Router, type NextFunction, type Response } from "express";
+import { createMonthlySettlement } from "../src/lib/bonus";
+import { calculateMonthlySummary } from "../src/lib/calculation";
+import { getMonthDays } from "../src/lib/date";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
@@ -20,6 +23,7 @@ interface ScheduleEntryPayload {
 type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
 const staffTypes = new Set(["nurse", "clerk", "head_nurse"]);
+const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 class HttpResponseError extends Error {
   constructor(
@@ -176,6 +180,33 @@ function parseHolidayPayload(body: unknown, id: string): Holiday | null {
   }
 
   return { id, date, name: name.trim(), affectsRequiredAttendance };
+}
+
+function getMonthKey(date: string): string {
+  return date.slice(0, 7);
+}
+
+function isMonthSettled(data: AppData, month: string): boolean {
+  return data.monthlySettlements.some((settlement) => settlement.month === month);
+}
+
+function parseMonthlySettlementPayload(body: unknown): { month: string; bonusPool: number } {
+  if (!isRecord(body)) {
+    throw new HttpResponseError(400, "月结信息不完整");
+  }
+
+  const { month, bonusPool } = body;
+  if (!isString(month) || !MONTH_PATTERN.test(month)) {
+    throw new HttpResponseError(400, "月结信息不完整");
+  }
+  if (!isNumber(bonusPool) || bonusPool < 0) {
+    throw new HttpResponseError(400, "月结信息不完整");
+  }
+
+  return {
+    month,
+    bonusPool
+  };
 }
 
 function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPayload> {
@@ -348,6 +379,10 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
       }
 
       const nextData = await storage.update((data) => {
+        if (isMonthSettled(data, getMonthKey(date))) {
+          throw new HttpResponseError(400, "该月份已月结，不能修改排班");
+        }
+
         const staffMember = data.staff.find((staff) => staff.id === staffId);
         if (!staffMember) {
           throw new HttpResponseError(400, `人员不存在：${staffId}`);
@@ -382,6 +417,70 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
           scheduleEntries
         };
       });
+      response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.put("/data/monthly-settlement", async (request, response, next) => {
+    try {
+      const payload = parseMonthlySettlementPayload(request.body);
+      const nextData = await storage.update((data) => {
+        if (isMonthSettled(data, payload.month)) {
+          throw new HttpResponseError(400, "该月份已月结");
+        }
+
+        const [yearText, monthText] = payload.month.split("-");
+        const days = getMonthDays(Number(yearText), Number(monthText));
+        const monthlySummary = calculateMonthlySummary(data, days);
+        let settlement;
+
+        try {
+          settlement = createMonthlySettlement({
+            month: payload.month,
+            monthlySummary,
+            bonusPool: payload.bonusPool,
+            settledAt: new Date().toISOString()
+          });
+        } catch (error) {
+          if (error instanceof Error) {
+            throw new HttpResponseError(400, error.message);
+          }
+
+          throw error;
+        }
+
+        return {
+          ...data,
+          monthlySettlements: [...data.monthlySettlements, settlement]
+        };
+      });
+
+      response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.delete("/data/monthly-settlement/:month", async (request, response, next) => {
+    try {
+      const { month } = request.params;
+      if (!MONTH_PATTERN.test(month)) {
+        throw new HttpResponseError(400, "月结信息不完整");
+      }
+
+      const nextData = await storage.update((data) => {
+        if (!isMonthSettled(data, month)) {
+          throw new HttpResponseError(404, "该月份未月结");
+        }
+
+        return {
+          ...data,
+          monthlySettlements: data.monthlySettlements.filter((settlement) => settlement.month !== month)
+        };
+      });
+
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
