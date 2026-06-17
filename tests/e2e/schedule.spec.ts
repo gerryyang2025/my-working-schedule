@@ -115,6 +115,7 @@ test("loads the schedule workstation", async ({ page }) => {
 
   await expect(page.getByRole("heading", { name: "护理排班管理系统" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "班次画笔" })).toBeVisible();
+  await page.getByTestId("workbench-tab-weekly").click();
   await expect(page.getByRole("heading", { name: "周统计" })).toBeVisible();
 });
 
@@ -141,6 +142,42 @@ test("enters admin mode and quick fills a shift", async ({ page, request }) => {
 
     const targetCell = page.getByTestId(`schedule-cell-${quickFillStaffId}-${quickFillDate}`);
     await expect(targetCell).toBeEmpty();
+    await targetCell.click();
+
+    await expect(targetCell).toContainText("A1");
+  } finally {
+    await clearScheduleEntry(request, token, quickFillDate, quickFillStaffId);
+  }
+});
+
+test("switches workbench tabs while preserving quick scheduling", async ({ page, request }) => {
+  await page.clock.setFixedTime("2026-06-16T08:00:00+08:00");
+
+  const session = await request.post("/api/admin/session", {
+    data: { password: "123456" }
+  });
+  expect(session.ok()).toBeTruthy();
+  const { token } = (await session.json()) as { token: string };
+
+  await clearScheduleEntry(request, token, quickFillDate, quickFillStaffId);
+
+  try {
+    await page.goto("/");
+
+    await page.getByRole("button", { name: /输入管理密码/ }).click();
+    await page.getByPlaceholder("管理密码").fill("123456");
+    await page.getByRole("button", { name: "进入编辑模式" }).click();
+
+    await page.getByTestId("workbench-tab-weekly").click();
+    await expect(page.getByRole("heading", { name: "周统计" })).toBeVisible();
+
+    await page.getByTestId("workbench-tab-bonus").click();
+    await expect(page.getByRole("heading", { name: "2026-06" })).toBeVisible();
+
+    await page.getByTestId("workbench-tab-schedule").click();
+    await page.getByRole("button", { name: "A1", exact: true }).click();
+
+    const targetCell = page.getByTestId(`schedule-cell-${quickFillStaffId}-${quickFillDate}`);
     await targetCell.click();
 
     await expect(targetCell).toContainText("A1");
@@ -185,6 +222,7 @@ test("locks schedule editing after monthly settlement", async ({ page, request }
     await page.getByRole("button", { name: /输入管理密码/ }).click();
     await page.getByPlaceholder("管理密码").fill("123456");
     await page.getByRole("button", { name: "进入编辑模式" }).click();
+    await page.getByTestId("workbench-tab-bonus").click();
     await page.getByTestId("bonus-pool-input").fill("1000");
     const settlementResponsePromise = page.waitForResponse(
       (response) => response.url().endsWith("/api/data/monthly-settlement") && response.request().method() === "PUT"
@@ -201,6 +239,7 @@ test("locks schedule editing after monthly settlement", async ({ page, request }
     );
     await expect(page.getByText("月结已完成")).toBeVisible();
 
+    await page.getByTestId("workbench-tab-schedule").click();
     await page.getByRole("button", { name: "A1", exact: true }).click();
     const targetCell = page.getByTestId(`schedule-cell-${quickFillStaffId}-${lockData.lockedEditDate}`);
     await expect(targetCell).toBeEmpty();
