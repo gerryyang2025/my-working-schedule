@@ -100,7 +100,7 @@ const EmptyStub = defineComponent({
 
 const PrintViewsStub = defineComponent({
   name: "PrintViews",
-  props: ["monthlySummary", "previewMode"],
+  props: ["monthlySummary", "monthlySettlement", "previewMode"],
   template: `
     <section class="print-views-stub">
       <div v-if="previewMode === 'week'" class="print-preview-active">周表预览</div>
@@ -110,6 +110,9 @@ const PrintViewsStub = defineComponent({
           月度汇总 {{ monthlySummary.rows.map((row) => [row.staffName, row.attendanceShifts, row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2)].join(":")).join("|") }}
         </span>
       </div>
+      <span v-if="monthlySettlement" data-testid="print-monthly-settlement">
+        月结 {{ monthlySettlement.month }} {{ monthlySettlement.bonusPool.toFixed(2) }}
+      </span>
     </section>
   `
 });
@@ -179,6 +182,15 @@ async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
   await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
   await flushPromises();
+}
+
+function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+
+  return { promise, resolve };
 }
 
 function mockMobileViewport(matches = true): () => void {
@@ -468,6 +480,29 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
+  it("passes selected monthly settlement into print views", async () => {
+    const wrapper = mountApp({
+      ...testData,
+      monthlySettlements: [
+        {
+          id: "settlement-2026-06",
+          month: "2026-06",
+          monthStart: "2026-06-01",
+          monthEnd: "2026-06-30",
+          totalDays: 30,
+          bonusPool: 1000,
+          coefficientTotal: 1.5,
+          settledAt: "2026-06-30T10:00:00.000Z",
+          rows: []
+        }
+      ]
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="print-monthly-settlement"]').text()).toBe("月结 2026-06 1000.00");
+  });
+
   it("saves monthly settlement and refreshes app data", async () => {
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
@@ -494,6 +529,22 @@ describe("App", () => {
 
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
+  });
+
+  it("suppresses duplicate settlement saves while a request is in flight", async () => {
+    const deferred = createDeferred<PublicAppData>();
+    apiMocks.saveMonthlySettlement.mockReturnValue(deferred.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+
+    expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledTimes(1);
+
+    deferred.resolve({ ...testData, monthlySettlements: [] });
+    await flushPromises();
   });
 
   it("cancels monthly settlement and refreshes app data", async () => {

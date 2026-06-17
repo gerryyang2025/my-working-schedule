@@ -372,6 +372,10 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
 }
 
 async function handleConfirmSettlement(payload: { month: string; bonusPool: number }): Promise<void> {
+  if (settlementSaving.value || settlementCanceling.value) {
+    return;
+  }
+
   if (!adminMode.value) {
     ElMessage.warning("请先进入编辑模式");
     return;
@@ -389,6 +393,10 @@ async function handleConfirmSettlement(payload: { month: string; bonusPool: numb
 }
 
 async function handleCancelSettlement(month: string): Promise<void> {
+  if (settlementSaving.value || settlementCanceling.value) {
+    return;
+  }
+
   if (!adminMode.value) {
     ElMessage.warning("请先进入编辑模式");
     return;

@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { PublicAppData } from "@/api/client";
 import { listDateKeys, parseDateKey } from "@/lib/date";
 import type { CalendarDay } from "@/lib/date";
-import type { MonthlyStaffSummary, MonthlySummary, StaffType, WeeklySummary } from "@/types/domain";
+import type { MonthlySettlement, MonthlyStaffSummary, MonthlySummary, StaffType, WeeklySummary } from "@/types/domain";
 
 interface PrintShiftMarker {
   id: string;
@@ -28,6 +28,7 @@ const props = defineProps<{
   data: PublicAppData;
   days: CalendarDay[];
   summary: WeeklySummary;
+  monthlySettlement?: MonthlySettlement | null;
   monthlySummary?: MonthlySummary | null;
   previewMode?: "month" | "week" | null;
 }>();
