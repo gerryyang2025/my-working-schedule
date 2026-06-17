@@ -100,6 +100,32 @@ describe("JSON storage", () => {
     await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
   });
 
+  it.each([
+    { name: "string element", monthlySettlements: ["bad"] },
+    { name: "malformed object", monthlySettlements: [{ id: "settlement-1" }] }
+  ])("throws on malformed monthly settlement array contents: $name", async ({ monthlySettlements }) => {
+    const path = await createTempDataPath();
+    const invalidData = `${JSON.stringify(
+      {
+        staff: [],
+        shifts: [],
+        holidays: [],
+        scheduleEntries: [],
+        monthlySettlements,
+        settings: {
+          defaultRequiredShiftsPerWeek: 5,
+          version: 1
+        }
+      },
+      null,
+      2
+    )}\n`;
+    await writeFile(path, invalidData, "utf8");
+
+    await expect(createJsonStorage(path).load()).rejects.toThrow("数据文件结构不正确");
+    await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
+  });
+
   it("throws on malformed JSON without overwriting the existing file", async () => {
     const path = await createTempDataPath();
     const malformed = "{ not valid json";

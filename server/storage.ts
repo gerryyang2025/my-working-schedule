@@ -2,7 +2,16 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { createSeedData } from "./seed";
-import type { AppData, Holiday, ScheduleEntry, Settings, Shift, StaffMember } from "./types";
+import type {
+  AppData,
+  Holiday,
+  MonthlySettlement,
+  MonthlySettlementRow,
+  ScheduleEntry,
+  Settings,
+  Shift,
+  StaffMember
+} from "./types";
 
 export const DEFAULT_STORAGE_PATH = resolve(process.cwd(), "data/app-data.local.json");
 
@@ -100,6 +109,42 @@ function isSettings(value: unknown): value is Settings {
   return isNumber(value.defaultRequiredShiftsPerWeek) && isNumber(value.version);
 }
 
+function isMonthlySettlementRow(value: unknown): value is MonthlySettlementRow {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isString(value.staffId) &&
+    isString(value.staffName) &&
+    (value.staffType === "nurse" || value.staffType === "clerk" || value.staffType === "head_nurse") &&
+    isNumber(value.attendanceShifts) &&
+    (isNumber(value.coefficientTotal) || value.coefficientTotal === null) &&
+    isString(value.coefficientExcludedReason) &&
+    isNumber(value.bonusAmount) &&
+    isString(value.bonusExcludedReason)
+  );
+}
+
+function isMonthlySettlement(value: unknown): value is MonthlySettlement {
+  if (!isRecord(value)) {
+    return false;
+  }
+
+  return (
+    isString(value.id) &&
+    isString(value.month) &&
+    isString(value.monthStart) &&
+    isString(value.monthEnd) &&
+    isNumber(value.totalDays) &&
+    isNumber(value.bonusPool) &&
+    isNumber(value.coefficientTotal) &&
+    isString(value.settledAt) &&
+    Array.isArray(value.rows) &&
+    value.rows.every(isMonthlySettlementRow)
+  );
+}
+
 function normalizeAppData(candidate: unknown): { data: unknown; changed: boolean } {
   if (!isRecord(candidate)) {
     return { data: candidate, changed: false };
@@ -127,6 +172,7 @@ function assertAppData(value: unknown): asserts value is AppData {
     Array.isArray(value.scheduleEntries) &&
     value.scheduleEntries.every(isScheduleEntry) &&
     Array.isArray(value.monthlySettlements) &&
+    value.monthlySettlements.every(isMonthlySettlement) &&
     isSettings(value.settings);
 
   if (!isValid) {

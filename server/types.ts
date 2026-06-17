@@ -1,6 +1,8 @@
 export type {
   AppData,
   Holiday,
+  MonthlySettlement,
+  MonthlySettlementRow,
   ScheduleEntry,
   Settings,
   Shift,
