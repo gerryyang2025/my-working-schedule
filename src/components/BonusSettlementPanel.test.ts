@@ -1,0 +1,141 @@
+import { mount } from "@vue/test-utils";
+import { describe, expect, it } from "vitest";
+import BonusSettlementPanel from "./BonusSettlementPanel.vue";
+import type { MonthlySettlement, MonthlySummary } from "@/types/domain";
+
+const monthlySummary: MonthlySummary = {
+  monthStart: "2026-06-01",
+  monthEnd: "2026-06-30",
+  totalDays: 30,
+  holidayNames: [],
+  rows: [
+    {
+      staffId: "staff-head",
+      staffName: "段护士长",
+      staffType: "head_nurse",
+      attendanceShifts: 10,
+      coefficientTotal: null,
+      coefficientExcludedReason: "护士长绩效单独核算"
+    },
+    {
+      staffId: "staff-nurse",
+      staffName: "李护士",
+      staffType: "nurse",
+      attendanceShifts: 12,
+      coefficientTotal: 10,
+      coefficientExcludedReason: ""
+    }
+  ]
+};
+
+const settledSnapshot: MonthlySettlement = {
+  id: "settlement-2026-06",
+  month: "2026-06",
+  monthStart: "2026-06-01",
+  monthEnd: "2026-06-30",
+  totalDays: 30,
+  bonusPool: 1000,
+  coefficientTotal: 10,
+  settledAt: "2026-06-30T10:00:00.000Z",
+  rows: [
+    {
+      staffId: "staff-head",
+      staffName: "段护士长",
+      staffType: "head_nurse",
+      attendanceShifts: 10,
+      coefficientTotal: null,
+      coefficientExcludedReason: "护士长绩效单独核算",
+      bonusAmount: 0,
+      bonusExcludedReason: "护士长绩效单独核算"
+    },
+    {
+      staffId: "staff-nurse",
+      staffName: "李护士",
+      staffType: "nurse",
+      attendanceShifts: 12,
+      coefficientTotal: 10,
+      coefficientExcludedReason: "",
+      bonusAmount: 1000,
+      bonusExcludedReason: ""
+    }
+  ]
+};
+
+function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>["$props"]> = {}) {
+  return mount(BonusSettlementPanel, {
+    props: {
+      adminMode: true,
+      canceling: false,
+      month: "2026-06",
+      monthlySummary,
+      saving: false,
+      settlement: null,
+      ...overrides
+    }
+  });
+}
+
+describe("BonusSettlementPanel", () => {
+  it("previews an unsettled month after entering the bonus pool", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    expect(wrapper.text()).toContain("2026-06");
+    expect(wrapper.text()).toContain("未月结");
+    expect(wrapper.text()).toContain("李护士");
+    expect(wrapper.text()).toContain("1000.00");
+    expect(wrapper.text()).toContain("段护士长");
+    expect(wrapper.text()).toContain("护士长绩效单独核算");
+  });
+
+  it("emits the confirmed settlement payload", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+    await wrapper.get('[data-testid="confirm-settlement-button"]').trigger("click");
+
+    expect(wrapper.emitted("confirmSettlement")).toEqual([[{ month: "2026-06", bonusPool: 1000 }]]);
+  });
+
+  it("disables confirmation outside admin mode", async () => {
+    const wrapper = mountPanel({ adminMode: false });
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("shows a settled snapshot and emits the canceled month", async () => {
+    const wrapper = mountPanel({ settlement: settledSnapshot });
+
+    expect(wrapper.text()).toContain("已月结");
+    expect(wrapper.text()).toContain("2026-06-30 10:00");
+    expect(wrapper.text()).toContain("1000.00");
+
+    await wrapper.get('[data-testid="cancel-settlement-button"]').trigger("click");
+
+    expect(wrapper.emitted("cancelSettlement")).toEqual([["2026-06"]]);
+  });
+
+  it("blocks settlement when ordinary coefficient total is zero", async () => {
+    const wrapper = mountPanel({
+      monthlySummary: {
+        ...monthlySummary,
+        rows: monthlySummary.rows.map((row) =>
+          row.staffType === "head_nurse"
+            ? row
+            : {
+                ...row,
+                coefficientTotal: 0
+              }
+        )
+      }
+    });
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    expect(wrapper.text()).toContain("普通人员月总系数合计为 0，无法按系数分配奖金");
+    expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
+  });
+});
