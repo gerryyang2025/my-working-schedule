@@ -14,6 +14,8 @@ import type { Holiday, Shift, StaffMember } from "@/types/domain";
 import { calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 
+type PrintMode = "month" | "week";
+
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
 const error = ref("");
@@ -33,6 +35,7 @@ const holidaySaveVersion = ref(0);
 const staffSaving = ref(false);
 const shiftSaving = ref(false);
 const holidaySaving = ref(false);
+const printPreviewMode = ref<PrintMode | null>(null);
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const scheduleDays = computed(() => getWeekDays(selectedDate.value));
@@ -48,6 +51,26 @@ const editingEntry = computed(
     null
 );
 const canSubmitAdminPassword = computed(() => adminPassword.value.trim().length > 0 && !adminSubmitting.value);
+const printPreviewOpen = computed({
+  get: () => printPreviewMode.value !== null,
+  set: (isOpen: boolean) => {
+    if (!isOpen) {
+      printPreviewMode.value = null;
+    }
+  }
+});
+const printPreviewTitle = computed(() => {
+  if (printPreviewMode.value === "week") {
+    return "周表打印预览";
+  }
+
+  if (printPreviewMode.value === "month") {
+    return "月表打印预览";
+  }
+
+  return "打印预览";
+});
+const isSystemPrintSupported = computed(() => typeof window !== "undefined" && typeof window.print === "function");
 
 async function refreshData(): Promise<void> {
   data.value = await loadData();
@@ -102,12 +125,46 @@ async function handleFullscreen(): Promise<void> {
   }
 }
 
-function printWithMode(mode: "month" | "week"): void {
+function isMobileViewport(): boolean {
+  if (typeof window === "undefined") {
+    return false;
+  }
+
+  if (typeof window.matchMedia === "function") {
+    return window.matchMedia("(max-width: 768px)").matches;
+  }
+
+  return window.innerWidth <= 768;
+}
+
+function invokeSystemPrint(mode: PrintMode): void {
+  if (!isSystemPrintSupported.value) {
+    ElMessage.warning("当前浏览器不支持直接调用系统打印，请使用浏览器菜单中的打印或分享功能。");
+    return;
+  }
+
   document.body.dataset.printMode = mode;
   window.print();
   window.setTimeout(() => {
     delete document.body.dataset.printMode;
   }, 200);
+}
+
+function printWithMode(mode: PrintMode): void {
+  if (isMobileViewport() || !isSystemPrintSupported.value) {
+    printPreviewMode.value = mode;
+    return;
+  }
+
+  invokeSystemPrint(mode);
+}
+
+function handlePreviewPrint(): void {
+  if (!printPreviewMode.value) {
+    return;
+  }
+
+  invokeSystemPrint(printPreviewMode.value);
 }
 
 async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<boolean> {
@@ -278,6 +335,36 @@ onMounted(async () => {
           @click="handleSubmitAdminPassword"
         >
           进入编辑模式
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="printPreviewOpen"
+      class="print-preview-dialog"
+      :title="printPreviewTitle"
+      width="960px"
+      append-to-body
+    >
+      <p v-if="!isSystemPrintSupported" class="print-preview-warning">
+        当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
+      </p>
+      <p class="print-preview-tip">
+        预览内容确认无误后可调用系统打印；如未弹出系统打印窗口，请使用浏览器菜单中的打印或分享功能。
+      </p>
+      <section class="print-preview-content" aria-label="打印预览内容">
+        <PrintViews
+          v-if="data && weeklySummary"
+          :data="data"
+          :days="printMonthDays"
+          :summary="weeklySummary"
+          :preview-mode="printPreviewMode"
+        />
+      </section>
+      <template #footer>
+        <el-button @click="printPreviewMode = null">关闭预览</el-button>
+        <el-button type="primary" data-testid="print-preview-system-button" @click="handlePreviewPrint">
+          调用系统打印
         </el-button>
       </template>
     </el-dialog>

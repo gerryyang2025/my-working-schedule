@@ -372,6 +372,136 @@ body {
   display: none;
 }
 
+.print-preview-dialog {
+  width: min(960px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px);
+}
+
+.print-preview-warning {
+  margin: 0 0 10px;
+  border: 1px solid #fde68a;
+  padding: 8px 10px;
+  background: #fffbeb;
+  color: #92400e;
+  font-size: 13px;
+}
+
+.print-preview-tip {
+  margin: 0 0 10px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.print-preview-content {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+  border: 1px solid #dbe3ef;
+  padding: 10px;
+  background: #ffffff;
+  -webkit-overflow-scrolling: touch;
+}
+
+.print-preview-content .print-view {
+  display: none;
+}
+
+.print-preview-content .print-view.print-preview-active {
+  display: block;
+}
+
+.print-preview-content .print-view h1 {
+  margin: 0 0 10px;
+  text-align: center;
+  font-size: 18px;
+}
+
+.print-preview-content .print-view p {
+  margin: 0 0 8px;
+  color: #334155;
+  font-size: 12px;
+  text-align: center;
+}
+
+.print-preview-content .print-week-detail {
+  margin: 10px 0 12px;
+}
+
+.print-preview-content .print-week-detail h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.print-preview-content .print-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.print-preview-content .print-month .print-table,
+.print-preview-content .print-week-detail .print-table {
+  min-width: 760px;
+}
+
+.print-preview-content .print-table th,
+.print-preview-content .print-table td {
+  border: 1px solid #cbd5e1;
+  padding: 6px;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.print-preview-content .print-table th {
+  background: #f8fafc;
+}
+
+.print-preview-content .historical-staff-label {
+  display: block;
+  margin-top: 2px;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.print-preview-content .print-day-heading,
+.print-preview-content .print-cell-shifts {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.print-preview-content .print-day-heading {
+  flex-direction: column;
+  gap: 2px;
+  line-height: 1.2;
+}
+
+.print-preview-content .print-holiday-name {
+  color: #b91c1c;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.print-preview-content .print-cell-shifts {
+  gap: 3px;
+  min-height: 22px;
+}
+
+.print-preview-content .print-shift-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  min-height: 18px;
+  border: 1px solid;
+  padding: 2px 4px;
+  background: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 10px;
@@ -643,6 +773,32 @@ body {
   .management-actions .el-button {
     flex: 1 1 120px;
   }
+
+  .print-preview-dialog {
+    width: calc(100vw - 16px) !important;
+    max-width: calc(100vw - 16px);
+    margin: 8px auto !important;
+  }
+
+  .print-preview-dialog .el-dialog__header,
+  .print-preview-dialog .el-dialog__body,
+  .print-preview-dialog .el-dialog__footer {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .print-preview-content {
+    max-height: 66vh;
+    padding: 8px;
+  }
+
+  .print-preview-content .print-view h1 {
+    font-size: 16px;
+  }
+
+  .print-preview-content .print-table {
+    font-size: 10px;
+  }
 }
 
 @media print {
@@ -657,6 +813,9 @@ body {
   }
 
   .app-header,
+  .app-info-panel,
+  .admin-mode-banner,
+  .state-message,
   .toolbar,
   .workbench,
   .el-overlay,

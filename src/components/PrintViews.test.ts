@@ -244,6 +244,20 @@ describe("PrintViews", () => {
     expect(weeklyPrint.text()).toContain("5.50");
   });
 
+  it("marks only the selected print view as active in preview mode", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary,
+        previewMode: "week"
+      }
+    });
+
+    expect(wrapper.get(".print-week").classes()).toContain("print-preview-active");
+    expect(wrapper.get(".print-month").classes()).not.toContain("print-preview-active");
+  });
+
   it("prints weekly schedule details by weekday", () => {
     const wrapper = mount(PrintViews, {
       props: {

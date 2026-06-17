@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, nextTick } from "vue";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
 import type { PublicAppData } from "@/api/client";
 
@@ -51,7 +51,7 @@ const testData: PublicAppData = {
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
   props: ["selectedDate", "adminMode"],
-  emits: ["update:selectedDate", "enterAdmin"],
+  emits: ["update:selectedDate", "enterAdmin", "printMonth", "printWeek"],
   template: `
     <section>
       <button data-testid="admin-button" type="button" @click="$emit('enterAdmin')">
@@ -59,6 +59,12 @@ const AppToolbarStub = defineComponent({
       </button>
       <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
         jump
+      </button>
+      <button data-testid="print-week" type="button" @click="$emit('printWeek')">
+        打印周表
+      </button>
+      <button data-testid="print-month" type="button" @click="$emit('printMonth')">
+        打印月表
       </button>
     </section>
   `
@@ -74,11 +80,22 @@ const EmptyStub = defineComponent({
   template: "<section />"
 });
 
+const PrintViewsStub = defineComponent({
+  name: "PrintViews",
+  props: ["previewMode"],
+  template: `
+    <section class="print-views-stub">
+      <div v-if="previewMode === 'week'" class="print-preview-active">周表预览</div>
+      <div v-if="previewMode === 'month'" class="print-preview-active">月表预览</div>
+    </section>
+  `
+});
+
 const ElDialogStub = defineComponent({
   name: "ElDialog",
   props: ["modelValue", "title"],
   emits: ["update:modelValue"],
-  template: '<section v-if="modelValue" class="admin-login-dialog"><h2>{{ title }}</h2><slot /><slot name="footer" /></section>'
+  template: '<section v-if="modelValue" class="el-dialog-stub"><h2>{{ title }}</h2><slot /><slot name="footer" /></section>'
 });
 
 const ElInputStub = defineComponent({
@@ -106,7 +123,7 @@ function mountApp() {
         ElDialog: ElDialogStub,
         ElInput: ElInputStub,
         ManagementDrawer: EmptyStub,
-        PrintViews: EmptyStub,
+        PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
         ShiftPalette: EmptyStub,
         WeeklySummary: EmptyStub
@@ -115,7 +132,67 @@ function mountApp() {
   });
 }
 
+function mockMobileViewport(matches = true): () => void {
+  const originalMatchMedia = window.matchMedia;
+
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: vi.fn().mockImplementation((query: string) => ({
+      matches,
+      media: query,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn()
+    }))
+  });
+
+  return () => {
+    if (originalMatchMedia) {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        writable: true,
+        value: originalMatchMedia
+      });
+      return;
+    }
+
+    Reflect.deleteProperty(window, "matchMedia");
+  };
+}
+
+function mockSystemPrint(): { printSpy: ReturnType<typeof vi.fn>; restore: () => void } {
+  const originalPrint = window.print;
+  const printSpy = vi.fn();
+
+  Object.defineProperty(window, "print", {
+    configurable: true,
+    writable: true,
+    value: printSpy
+  });
+
+  return {
+    printSpy,
+    restore: () => {
+      Object.defineProperty(window, "print", {
+        configurable: true,
+        writable: true,
+        value: originalPrint
+      });
+    }
+  };
+}
+
 describe("App", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    delete document.body.dataset.printMode;
+  });
+
   it("renders concise usage and calculation guidance below the title", async () => {
     const wrapper = mountApp();
 
@@ -181,5 +258,51 @@ describe("App", () => {
       "2026-06-29,2026-06-30,2026-07-01,2026-07-02,2026-07-03,2026-07-04,2026-07-05"
     );
     vi.useRealTimers();
+  });
+
+  it("opens a visible week print preview on mobile instead of silently invoking system print", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { printSpy, restore: restorePrint } = mockSystemPrint();
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await nextTick();
+
+      expect(printSpy).not.toHaveBeenCalled();
+      expect(wrapper.get(".print-preview-dialog").text()).toContain("周表打印预览");
+      expect(wrapper.get(".print-preview-tip").text()).toContain("未弹出系统打印窗口");
+      expect(wrapper.get(".print-preview-active").text()).toContain("周表预览");
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+    }
+  });
+
+  it("prints from the mobile preview with the selected print mode", async () => {
+    vi.useFakeTimers();
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { printSpy, restore: restorePrint } = mockSystemPrint();
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="print-preview-system-button"]').trigger("click");
+
+      expect(printSpy).toHaveBeenCalledTimes(1);
+      expect(document.body.dataset.printMode).toBe("month");
+
+      vi.runOnlyPendingTimers();
+
+      expect(document.body.dataset.printMode).toBeUndefined();
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+    }
   });
 });

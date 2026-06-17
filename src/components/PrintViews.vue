@@ -23,6 +23,7 @@ const props = defineProps<{
   data: PublicAppData;
   days: CalendarDay[];
   summary: WeeklySummary;
+  previewMode?: "month" | "week" | null;
 }>();
 
 const printedDayKeys = computed(() => new Set(props.days.map((day) => day.key)));
@@ -82,7 +83,7 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
 </script>
 
 <template>
-  <section class="print-view print-month">
+  <section class="print-view print-month" :class="{ 'print-preview-active': previewMode === 'month' }">
     <h1>国际医学部护理排班表</h1>
     <table class="print-table">
       <thead>
@@ -120,7 +121,7 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
     </table>
   </section>
 
-  <section class="print-view print-week">
+  <section class="print-view print-week" :class="{ 'print-preview-active': previewMode === 'week' }">
     <h1>国际医学部护理周统计表</h1>
     <p>
       {{ summary.weekStart }} 至 {{ summary.weekEnd }}；满勤 {{ summary.requiredShifts }} 个班次；节假日扣减
