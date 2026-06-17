@@ -75,6 +75,7 @@ export interface MonthlyStaffSummary {
   staffName: string;
   staffType: StaffType;
   attendanceShifts: number;
+  overtimeShifts: number;
   coefficientTotal: number | null;
   coefficientExcludedReason: string;
 }
@@ -92,6 +93,7 @@ export interface MonthlySettlementRow {
   staffName: string;
   staffType: StaffType;
   attendanceShifts: number;
+  overtimeShifts: number;
   coefficientTotal: number | null;
   coefficientExcludedReason: string;
   bonusAmount: number;

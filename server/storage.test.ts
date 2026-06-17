@@ -126,6 +126,49 @@ describe("JSON storage", () => {
     await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
   });
 
+  it("defaults missing monthly settlement overtime shifts for legacy rows", async () => {
+    const path = await createTempDataPath();
+    await writeFile(
+      path,
+      JSON.stringify({
+        staff: [],
+        shifts: [],
+        holidays: [],
+        scheduleEntries: [],
+        settings: { defaultRequiredShiftsPerWeek: 5, version: 1 },
+        monthlySettlements: [
+          {
+            id: "settlement-2026-06",
+            month: "2026-06",
+            monthStart: "2026-06-01",
+            monthEnd: "2026-06-30",
+            totalDays: 30,
+            bonusPool: 1000,
+            coefficientTotal: 1.5,
+            settledAt: "2026-06-30T10:00:00.000Z",
+            rows: [
+              {
+                staffId: "staff-nurse-001",
+                staffName: "李护士",
+                staffType: "nurse",
+                attendanceShifts: 6,
+                coefficientTotal: 1.5,
+                coefficientExcludedReason: "",
+                bonusAmount: 1000,
+                bonusExcludedReason: ""
+              }
+            ]
+          }
+        ]
+      })
+    );
+
+    const storage = createJsonStorage(path);
+    const data = await storage.load();
+
+    expect(data.monthlySettlements[0].rows[0].overtimeShifts).toBe(0);
+  });
+
   it("throws on malformed JSON without overwriting the existing file", async () => {
     const path = await createTempDataPath();
     const malformed = "{ not valid json";

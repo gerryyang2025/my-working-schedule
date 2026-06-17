@@ -119,11 +119,43 @@ function isMonthlySettlementRow(value: unknown): value is MonthlySettlementRow {
     isString(value.staffName) &&
     (value.staffType === "nurse" || value.staffType === "clerk" || value.staffType === "head_nurse") &&
     isNumber(value.attendanceShifts) &&
+    isNumber(value.overtimeShifts) &&
     (isNumber(value.coefficientTotal) || value.coefficientTotal === null) &&
     isString(value.coefficientExcludedReason) &&
     isNumber(value.bonusAmount) &&
     isString(value.bonusExcludedReason)
   );
+}
+
+function normalizeMonthlySettlementRow(row: unknown): MonthlySettlementRow | null {
+  if (!isRecord(row)) {
+    return null;
+  }
+
+  const candidate = {
+    ...row,
+    overtimeShifts: "overtimeShifts" in row ? row.overtimeShifts : 0
+  };
+
+  return isMonthlySettlementRow(candidate) ? candidate : null;
+}
+
+function normalizeMonthlySettlement(settlement: unknown): MonthlySettlement | null {
+  if (!isRecord(settlement) || !Array.isArray(settlement.rows)) {
+    return null;
+  }
+
+  const rows = settlement.rows.map(normalizeMonthlySettlementRow);
+  if (rows.some((row) => row === null)) {
+    return null;
+  }
+
+  const candidate = {
+    ...settlement,
+    rows
+  };
+
+  return isMonthlySettlement(candidate) ? candidate : null;
 }
 
 function isMonthlySettlement(value: unknown): value is MonthlySettlement {
@@ -150,11 +182,23 @@ function normalizeAppData(candidate: unknown): { data: unknown; changed: boolean
     return { data: candidate, changed: false };
   }
 
-  if ("monthlySettlements" in candidate) {
+  if (!("monthlySettlements" in candidate)) {
+    return { data: { ...candidate, monthlySettlements: [] }, changed: true };
+  }
+
+  if (!Array.isArray(candidate.monthlySettlements)) {
     return { data: candidate, changed: false };
   }
 
-  return { data: { ...candidate, monthlySettlements: [] }, changed: true };
+  const monthlySettlements = candidate.monthlySettlements.map(normalizeMonthlySettlement);
+  if (monthlySettlements.some((settlement) => settlement === null)) {
+    return { data: candidate, changed: false };
+  }
+
+  return {
+    data: { ...candidate, monthlySettlements },
+    changed: JSON.stringify(monthlySettlements) !== JSON.stringify(candidate.monthlySettlements)
+  };
 }
 
 function assertAppData(value: unknown): asserts value is AppData {
