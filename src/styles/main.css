@@ -393,6 +393,29 @@ body {
   line-height: 1.5;
 }
 
+.print-pdf-status {
+  margin: 10px 0 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.print-pdf-download {
+  margin: 8px 0 0;
+}
+
+.print-pdf-download a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #2563eb;
+  padding: 7px 12px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
 .print-preview-content {
   max-height: min(70vh, 720px);
   overflow: auto;
@@ -798,6 +821,21 @@ body {
 
   .print-preview-content .print-table {
     font-size: 10px;
+  }
+
+  .print-preview-dialog .el-dialog__footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .print-preview-dialog .el-dialog__footer .el-button {
+    flex: 1 1 112px;
+    margin-left: 0;
+  }
+
+  .print-pdf-download a {
+    width: 100%;
   }
 }
 

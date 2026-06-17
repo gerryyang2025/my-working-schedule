@@ -14,7 +14,12 @@ const apiMocks = vi.hoisted(() => ({
   saveStaff: vi.fn()
 }));
 
+const pdfMocks = vi.hoisted(() => ({
+  createPrintPdfFile: vi.fn()
+}));
+
 vi.mock("@/api/client", () => apiMocks);
+vi.mock("@/lib/print-pdf", () => pdfMocks);
 
 const testData: PublicAppData = {
   staff: [
@@ -185,6 +190,68 @@ function mockSystemPrint(): { printSpy: ReturnType<typeof vi.fn>; restore: () =>
   };
 }
 
+function mockNavigatorFileShare(canShareResult: boolean): {
+  canShareSpy: ReturnType<typeof vi.fn>;
+  restore: () => void;
+  shareSpy: ReturnType<typeof vi.fn>;
+} {
+  const originalCanShare = "canShare" in navigator ? navigator.canShare : undefined;
+  const originalShare = "share" in navigator ? navigator.share : undefined;
+  const canShareSpy = vi.fn(() => canShareResult);
+  const shareSpy = vi.fn().mockResolvedValue(undefined);
+
+  Object.defineProperty(navigator, "canShare", {
+    configurable: true,
+    value: canShareSpy
+  });
+  Object.defineProperty(navigator, "share", {
+    configurable: true,
+    value: shareSpy
+  });
+
+  return {
+    canShareSpy,
+    restore: () => {
+      if (originalCanShare) {
+        Object.defineProperty(navigator, "canShare", { configurable: true, value: originalCanShare });
+      } else {
+        Reflect.deleteProperty(navigator, "canShare");
+      }
+
+      if (originalShare) {
+        Object.defineProperty(navigator, "share", { configurable: true, value: originalShare });
+      } else {
+        Reflect.deleteProperty(navigator, "share");
+      }
+    },
+    shareSpy
+  };
+}
+
+function mockPdfDownloadUrl(): { createObjectUrlSpy: ReturnType<typeof vi.fn>; restore: () => void } {
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  const createObjectUrlSpy = vi.fn(() => "blob:print-pdf");
+  const revokeObjectUrlSpy = vi.fn();
+
+  Object.defineProperty(URL, "createObjectURL", {
+    configurable: true,
+    value: createObjectUrlSpy
+  });
+  Object.defineProperty(URL, "revokeObjectURL", {
+    configurable: true,
+    value: revokeObjectUrlSpy
+  });
+
+  return {
+    createObjectUrlSpy,
+    restore: () => {
+      Object.defineProperty(URL, "createObjectURL", { configurable: true, value: originalCreateObjectURL });
+      Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: originalRevokeObjectURL });
+    }
+  };
+}
+
 describe("App", () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -273,7 +340,8 @@ describe("App", () => {
 
       expect(printSpy).not.toHaveBeenCalled();
       expect(wrapper.get(".print-preview-dialog").text()).toContain("周表打印预览");
-      expect(wrapper.get(".print-preview-tip").text()).toContain("未弹出系统打印窗口");
+      expect(wrapper.get(".print-preview-tip").text()).toContain("生成 PDF");
+      expect(wrapper.get('[data-testid="print-preview-pdf-button"]').text()).toContain("生成/分享 PDF");
       expect(wrapper.get(".print-preview-active").text()).toContain("周表预览");
     } finally {
       restoreMobileViewport();
@@ -303,6 +371,111 @@ describe("App", () => {
     } finally {
       restoreMobileViewport();
       restorePrint();
+    }
+  });
+
+  it("shares a generated PDF file from the print preview when file sharing is supported", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { canShareSpy, restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await flushPromises();
+
+      expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
+        element: expect.any(HTMLElement),
+        filename: "week-schedule.pdf"
+      });
+      expect(canShareSpy).toHaveBeenCalledWith({ files: [pdfFile] });
+      expect(shareSpy).toHaveBeenCalledWith({
+        files: [pdfFile],
+        title: "周表打印预览"
+      });
+      expect(wrapper.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+    }
+  });
+
+  it("falls back to a PDF download link when file sharing is not supported", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(false);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "month-schedule.pdf", { type: "application/pdf" });
+    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await flushPromises();
+
+      expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
+        element: expect.any(HTMLElement),
+        filename: "month-schedule.pdf"
+      });
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
+
+      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
+      expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
+      expect(downloadLink.attributes("download")).toBe("month-schedule.pdf");
+      expect(downloadLink.text()).toContain("下载 PDF");
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
+    }
+  });
+
+  it("keeps a PDF download link when system sharing rejects after PDF generation", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
+    shareSpy.mockRejectedValue(new DOMException("Must be handling a user gesture", "NotAllowedError"));
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await flushPromises();
+
+      expect(shareSpy).toHaveBeenCalledWith({
+        files: [pdfFile],
+        title: "周表打印预览"
+      });
+      expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
+
+      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
+      expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
+      expect(downloadLink.attributes("download")).toBe("week-schedule.pdf");
+      expect(wrapper.get(".print-pdf-status").text()).toContain("下载 PDF");
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
     }
   });
 });

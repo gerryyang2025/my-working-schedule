@@ -17,6 +17,8 @@
     "@vitejs/plugin-vue": "^5.2.4",
     "element-plus": "^2.9.11",
     "express": "^4.21.2",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^4.2.1",
     "lucide-vue-next": "^0.468.0",
     "vue": "^3.5.13"
   },

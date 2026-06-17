@@ -13,6 +13,7 @@ import type { PublicAppData } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 import { calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
+import { createPrintPdfFile } from "@/lib/print-pdf";
 
 type PrintMode = "month" | "week";
 
@@ -36,6 +37,11 @@ const staffSaving = ref(false);
 const shiftSaving = ref(false);
 const holidaySaving = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
+const printPreviewContentRef = ref<HTMLElement | null>(null);
+const pdfGenerating = ref(false);
+const pdfDownloadUrl = ref("");
+const pdfDownloadName = ref("");
+const printPdfStatus = ref("");
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const scheduleDays = computed(() => getWeekDays(selectedDate.value));
@@ -55,7 +61,7 @@ const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
   set: (isOpen: boolean) => {
     if (!isOpen) {
-      printPreviewMode.value = null;
+      closePrintPreview();
     }
   }
 });
@@ -150,9 +156,29 @@ function invokeSystemPrint(mode: PrintMode): void {
   }, 200);
 }
 
+function revokePdfDownloadUrl(): void {
+  if (pdfDownloadUrl.value) {
+    URL.revokeObjectURL(pdfDownloadUrl.value);
+  }
+
+  pdfDownloadUrl.value = "";
+  pdfDownloadName.value = "";
+  printPdfStatus.value = "";
+}
+
+function openPrintPreview(mode: PrintMode): void {
+  revokePdfDownloadUrl();
+  printPreviewMode.value = mode;
+}
+
+function closePrintPreview(): void {
+  printPreviewMode.value = null;
+  revokePdfDownloadUrl();
+}
+
 function printWithMode(mode: PrintMode): void {
   if (isMobileViewport() || !isSystemPrintSupported.value) {
-    printPreviewMode.value = mode;
+    openPrintPreview(mode);
     return;
   }
 
@@ -165,6 +191,65 @@ function handlePreviewPrint(): void {
   }
 
   invokeSystemPrint(printPreviewMode.value);
+}
+
+function getPrintPdfFilename(mode: PrintMode): string {
+  return mode === "week" ? "week-schedule.pdf" : "month-schedule.pdf";
+}
+
+function canSharePdfFile(file: File): boolean {
+  return (
+    typeof navigator !== "undefined" &&
+    typeof navigator.canShare === "function" &&
+    typeof navigator.share === "function" &&
+    navigator.canShare({ files: [file] })
+  );
+}
+
+function preparePdfDownload(file: File, message: string): void {
+  pdfDownloadName.value = file.name;
+  pdfDownloadUrl.value = URL.createObjectURL(file);
+  printPdfStatus.value = message;
+}
+
+async function handlePreviewPdfShare(): Promise<void> {
+  if (!printPreviewMode.value || pdfGenerating.value) {
+    return;
+  }
+
+  const activePrintView = printPreviewContentRef.value?.querySelector(".print-preview-active");
+  if (!(activePrintView instanceof HTMLElement)) {
+    ElMessage.error("打印内容不可用");
+    return;
+  }
+
+  pdfGenerating.value = true;
+  revokePdfDownloadUrl();
+
+  try {
+    const filename = getPrintPdfFilename(printPreviewMode.value);
+    const pdfFile = await createPrintPdfFile({ element: activePrintView, filename });
+
+    if (canSharePdfFile(pdfFile)) {
+      try {
+        await navigator.share({
+          files: [pdfFile],
+          title: printPreviewTitle.value
+        });
+        ElMessage.success("PDF 已发送到系统分享");
+      } catch (shareError) {
+        preparePdfDownload(pdfFile, "系统分享未完成，请点击下方链接下载 PDF。");
+        ElMessage.warning(shareError instanceof Error ? shareError.message : "系统分享未完成");
+      }
+      return;
+    }
+
+    preparePdfDownload(pdfFile, "当前浏览器不支持直接分享 PDF，请点击下方链接下载。");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "PDF 生成失败");
+  } finally {
+    pdfGenerating.value = false;
+  }
 }
 
 async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<boolean> {
@@ -350,9 +435,9 @@ onMounted(async () => {
         当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
       </p>
       <p class="print-preview-tip">
-        预览内容确认无误后可调用系统打印；如未弹出系统打印窗口，请使用浏览器菜单中的打印或分享功能。
+        预览内容确认无误后可生成 PDF；手机端优先使用系统分享，不支持时可下载 PDF 后打印。
       </p>
-      <section class="print-preview-content" aria-label="打印预览内容">
+      <section ref="printPreviewContentRef" class="print-preview-content" aria-label="打印预览内容">
         <PrintViews
           v-if="data && weeklySummary"
           :data="data"
@@ -361,9 +446,21 @@ onMounted(async () => {
           :preview-mode="printPreviewMode"
         />
       </section>
+      <p v-if="printPdfStatus" class="print-pdf-status">{{ printPdfStatus }}</p>
+      <p v-if="pdfDownloadUrl" class="print-pdf-download">
+        <a data-testid="print-pdf-download-link" :href="pdfDownloadUrl" :download="pdfDownloadName">下载 PDF</a>
+      </p>
       <template #footer>
-        <el-button @click="printPreviewMode = null">关闭预览</el-button>
-        <el-button type="primary" data-testid="print-preview-system-button" @click="handlePreviewPrint">
+        <el-button @click="closePrintPreview">关闭预览</el-button>
+        <el-button
+          type="primary"
+          data-testid="print-preview-pdf-button"
+          :loading="pdfGenerating"
+          @click="handlePreviewPdfShare"
+        >
+          生成/分享 PDF
+        </el-button>
+        <el-button data-testid="print-preview-system-button" @click="handlePreviewPrint">
           调用系统打印
         </el-button>
       </template>
