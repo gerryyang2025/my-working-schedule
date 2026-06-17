@@ -336,21 +336,26 @@ body {
   width: 100%;
 }
 
-.weekly-summary {
-  grid-column: 1 / -1;
+.stats-panel {
   border: 1px solid #dbe3ef;
   background: #ffffff;
   padding: 12px;
 }
 
-.weekly-summary h2 {
+.stats-panel-header h2 {
   margin: 0 0 4px;
+  color: #0f172a;
   font-size: 16px;
 }
 
-.weekly-summary p {
+.stats-panel-header p {
   margin: 0 0 4px;
   color: #475569;
+  font-size: 13px;
+}
+
+.weekly-summary {
+  grid-column: 1 / -1;
 }
 
 .summary-note {
@@ -754,7 +759,6 @@ body {
 
   .weekly-summary {
     margin-top: 10px;
-    padding: 10px;
   }
 
   .summary-table {

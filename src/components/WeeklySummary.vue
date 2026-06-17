@@ -27,8 +27,8 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
 </script>
 
 <template>
-  <section class="weekly-summary">
-    <header>
+  <section class="weekly-summary stats-panel">
+    <header class="stats-panel-header">
       <h2>周统计</h2>
       <p>
         {{ summary.weekStart }} 至 {{ summary.weekEnd }} · 满勤 {{ summary.requiredShifts }} 个班次 · 节假日扣减

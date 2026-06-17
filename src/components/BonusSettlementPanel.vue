@@ -189,8 +189,8 @@ function rowNote(row: MonthlySettlementRow): string {
 </script>
 
 <template>
-  <section class="bonus-settlement-panel" aria-labelledby="bonus-settlement-title">
-    <header class="bonus-panel-header">
+  <section class="bonus-settlement-panel stats-panel" aria-labelledby="bonus-settlement-title">
+    <header class="bonus-panel-header stats-panel-header">
       <div>
         <p class="bonus-panel-eyebrow">月结与奖金</p>
         <h2 id="bonus-settlement-title">{{ panelTitle }}</h2>
@@ -306,9 +306,6 @@ function rowNote(row: MonthlySettlementRow): string {
 <style scoped>
 .bonus-settlement-panel {
   grid-column: 1 / -1;
-  border: 1px solid #dbe3ef;
-  background: #ffffff;
-  padding: 12px;
 }
 
 .bonus-panel-header {
@@ -324,12 +321,6 @@ function rowNote(row: MonthlySettlementRow): string {
   color: #2563eb;
   font-size: 13px;
   font-weight: 600;
-}
-
-.bonus-panel-header h2 {
-  margin: 0;
-  color: #0f172a;
-  font-size: 16px;
 }
 
 .settlement-status {
@@ -520,7 +511,6 @@ function rowNote(row: MonthlySettlementRow): string {
 @media (max-width: 768px) {
   .bonus-settlement-panel {
     margin-top: 10px;
-    padding: 10px;
   }
 
   .bonus-panel-header,

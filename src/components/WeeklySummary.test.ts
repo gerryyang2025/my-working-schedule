@@ -34,6 +34,15 @@ const summary: WeeklySummaryModel = {
 };
 
 describe("WeeklySummary", () => {
+  it("uses shared stats panel classes", () => {
+    const wrapper = mount(WeeklySummary, {
+      props: { summary }
+    });
+
+    expect(wrapper.get(".weekly-summary").classes()).toContain("stats-panel");
+    expect(wrapper.get("header").classes()).toContain("stats-panel-header");
+  });
+
   it("renders one compact mobile row per staff member", () => {
     const wrapper = mount(WeeklySummary, {
       props: { summary }

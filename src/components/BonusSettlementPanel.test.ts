@@ -105,6 +105,12 @@ async function expectCancelBlocked(wrapper: ReturnType<typeof mountPanel>): Prom
 }
 
 describe("BonusSettlementPanel", () => {
+  it("uses the shared stats panel class", () => {
+    const wrapper = mountPanel();
+
+    expect(wrapper.get(".bonus-settlement-panel").classes()).toContain("stats-panel");
+  });
+
   it("previews an unsettled month after entering the bonus pool", async () => {
     const wrapper = mountPanel();
 
