@@ -419,9 +419,30 @@ describe("API routes", () => {
       month: "2026-06",
       monthStart: "2026-06-01",
       monthEnd: "2026-06-30",
-      bonusPool: 1000
+      bonusPool: 1000,
+      coefficientTotal: 2.7
     });
     expect(response.body.monthlySettlements[0].settledAt).toEqual(expect.any(String));
+    expect(response.body.monthlySettlements[0].rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          staffId: "staff-nurse-001",
+          staffName: "李护士",
+          staffType: "nurse",
+          attendanceShifts: 1,
+          coefficientTotal: 1.5,
+          bonusAmount: 555.56
+        }),
+        expect.objectContaining({
+          staffId: "staff-clerk-001",
+          staffName: "王文员",
+          staffType: "clerk",
+          attendanceShifts: 1,
+          coefficientTotal: 1.2,
+          bonusAmount: 444.44
+        })
+      ])
+    );
   });
 
   it("rejects duplicate monthly settlements", async () => {
@@ -498,6 +519,24 @@ describe("API routes", () => {
       .put("/api/data/schedule-entry")
       .set(headers)
       .send({ date: "2026-06-16", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(400);
+
+    expect(response.body.message).toBe("该月份已月结，不能修改排班");
+  });
+
+  it("rejects clearing schedule entries in a settled month", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+    const headers = await adminHeaders(app);
+
+    await request(app).put("/api/data/monthly-settlement").set(headers).send({ month: "2026-06", bonusPool: 1000 }).expect(200);
+    const response = await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: [], note: "" })
       .expect(400);
 
     expect(response.body.message).toBe("该月份已月结，不能修改排班");
