@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
-const quickFillDate = "2026-06-01";
+const quickFillDate = "2026-06-15";
 const quickFillStaffId = "staff-nurse-001";
 
 test("loads the schedule workstation", async ({ page }) => {
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "护理排班管理系统" })).toBeVisible();
-  await expect(page.getByText("班次画笔")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "班次画笔" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "周统计" })).toBeVisible();
 });
 
@@ -30,13 +30,12 @@ test("enters admin mode and quick fills a shift", async ({ page, request }) => {
   });
 
   await page.goto("/");
-  page.on("dialog", async (dialog) => {
-    expect(dialog.message()).toBe("请输入管理密码");
-    await dialog.accept("123456");
-  });
 
   await page.getByRole("button", { name: /输入管理密码/ }).click();
-  await expect(page.getByRole("button", { name: /编辑模式/ })).toBeVisible();
+  await page.getByPlaceholder("管理密码").fill("123456");
+  await page.getByRole("button", { name: "进入编辑模式" }).click();
+  await expect(page.getByRole("button", { name: "编辑模式", exact: true })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "进入编辑模式" })).toBeHidden();
   await page.getByRole("button", { name: /A1/ }).click();
 
   const targetCell = page.getByTestId(`schedule-cell-${quickFillStaffId}-${quickFillDate}`);

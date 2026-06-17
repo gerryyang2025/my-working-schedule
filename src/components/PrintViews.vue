@@ -3,7 +3,7 @@ import { computed } from "vue";
 import type { PublicAppData } from "@/api/client";
 import { listDateKeys, parseDateKey } from "@/lib/date";
 import type { CalendarDay } from "@/lib/date";
-import type { WeeklySummary } from "@/types/domain";
+import type { MonthlyStaffSummary, MonthlySummary, StaffType, WeeklySummary } from "@/types/domain";
 
 interface PrintShiftMarker {
   id: string;
@@ -18,11 +18,17 @@ interface PrintWeekDay {
 }
 
 const WEEKDAY_NAMES = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+const STAFF_TYPE_LABELS: Record<StaffType, string> = {
+  nurse: "护士",
+  clerk: "文员",
+  head_nurse: "护士长"
+};
 
 const props = defineProps<{
   data: PublicAppData;
   days: CalendarDay[];
   summary: WeeklySummary;
+  monthlySummary?: MonthlySummary | null;
   previewMode?: "month" | "week" | null;
 }>();
 
@@ -40,6 +46,7 @@ const printedStaff = computed(() =>
 );
 
 const holidayByDate = computed(() => new Map(props.data.holidays.map((holiday) => [holiday.date, holiday])));
+const staffById = computed(() => new Map(props.data.staff.map((staff) => [staff.id, staff])));
 const monthStart = computed(() => props.days[0]?.key ?? "");
 const monthEnd = computed(() => props.days[props.days.length - 1]?.key ?? "");
 const monthHolidays = computed(() =>
@@ -87,6 +94,18 @@ function getHolidayName(date: string): string {
 function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
   return entryShiftsByCell.value.get(`${staffId}:${date}`) ?? [];
 }
+
+function getStaffTypeLabel(staffType: StaffType): string {
+  return STAFF_TYPE_LABELS[staffType];
+}
+
+function getMonthlyCoefficientText(row: MonthlyStaffSummary): string {
+  return row.coefficientTotal === null ? "单独核算" : row.coefficientTotal.toFixed(2);
+}
+
+function isDisabledMonthlyStaff(row: MonthlyStaffSummary): boolean {
+  return staffById.value.get(row.staffId)?.enabled === false;
+}
 </script>
 
 <template>
@@ -98,7 +117,7 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
     <p v-if="monthHolidays.length">
       节假日：{{ monthHolidays.map((holiday) => `${holiday.date} ${holiday.name}`).join("、") }}
     </p>
-    <table class="print-table">
+    <table class="print-table print-month-detail-table">
       <thead>
         <tr>
           <th>人员</th>
@@ -132,6 +151,33 @@ function getCellShifts(staffId: string, date: string): PrintShiftMarker[] {
         </tr>
       </tbody>
     </table>
+
+    <section v-if="monthlySummary" class="print-month-summary">
+      <h2>月度汇总</h2>
+      <table class="print-table print-summary-table">
+        <thead>
+          <tr>
+            <th>人员</th>
+            <th>人员类型</th>
+            <th>月出勤班次</th>
+            <th>月总系数</th>
+            <th>备注</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="row in monthlySummary.rows" :key="row.staffId">
+            <td>
+              <span>{{ row.staffName }}</span>
+              <span v-if="isDisabledMonthlyStaff(row)" class="historical-staff-label">停用历史</span>
+            </td>
+            <td>{{ getStaffTypeLabel(row.staffType) }}</td>
+            <td>{{ row.attendanceShifts }}</td>
+            <td>{{ getMonthlyCoefficientText(row) }}</td>
+            <td>{{ row.coefficientExcludedReason }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </section>
 
   <section class="print-view print-week" :class="{ 'print-preview-active': previewMode === 'week' }">

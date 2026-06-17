@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import PrintViews from "./PrintViews.vue";
 import type { PublicAppData } from "@/api/client";
 import type { CalendarDay } from "@/lib/date";
-import type { ScheduleEntry, Shift, StaffMember, WeeklySummary } from "@/types/domain";
+import type { MonthlySummary, ScheduleEntry, Shift, StaffMember, WeeklySummary } from "@/types/domain";
 
 const days: CalendarDay[] = [
   {
@@ -125,6 +125,39 @@ const summary: WeeklySummary = {
   ]
 };
 
+const monthlySummary: MonthlySummary = {
+  monthStart: "2026-06-01",
+  monthEnd: "2026-06-30",
+  totalDays: 30,
+  holidayNames: ["端午节"],
+  rows: [
+    {
+      staffId: "staff-1",
+      staffName: "王护士",
+      staffType: "nurse",
+      attendanceShifts: 5,
+      coefficientTotal: 5.5,
+      coefficientExcludedReason: ""
+    },
+    {
+      staffId: "staff-clerk",
+      staffName: "李文员",
+      staffType: "clerk",
+      attendanceShifts: 2,
+      coefficientTotal: 2.4,
+      coefficientExcludedReason: ""
+    },
+    {
+      staffId: "staff-head",
+      staffName: "段护士长",
+      staffType: "head_nurse",
+      attendanceShifts: 6,
+      coefficientTotal: null,
+      coefficientExcludedReason: "护士长绩效单独核算"
+    }
+  ]
+};
+
 describe("PrintViews", () => {
   it("prints month schedule period and holiday details", () => {
     const monthDays: CalendarDay[] = [
@@ -236,6 +269,32 @@ describe("PrintViews", () => {
     expect(monthRows.map((row) => row.text())).toEqual(expect.arrayContaining([expect.stringContaining("停用护士")]));
     expect(wrapper.get(".print-month tbody").text()).toContain("停用历史");
     expect(wrapper.get(".print-month tbody").text()).toContain("白");
+  });
+
+  it("prints monthly attendance and coefficient summary below the month schedule", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary,
+        monthlySummary
+      }
+    });
+
+    const monthSummary = wrapper.get(".print-month-summary");
+    expect(monthSummary.text()).toContain("月度汇总");
+    expect(monthSummary.text()).toContain("王护士");
+    expect(monthSummary.text()).toContain("护士");
+    expect(monthSummary.text()).toContain("5");
+    expect(monthSummary.text()).toContain("5.50");
+    expect(monthSummary.text()).toContain("李文员");
+    expect(monthSummary.text()).toContain("文员");
+    expect(monthSummary.text()).toContain("2.40");
+    expect(monthSummary.text()).toContain("段护士长");
+    expect(monthSummary.text()).toContain("护士长");
+    expect(monthSummary.text()).toContain("6");
+    expect(monthSummary.text()).toContain("单独核算");
+    expect(monthSummary.text()).toContain("护士长绩效单独核算");
   });
 
   it("hides disabled staff without entries in the printed month", () => {

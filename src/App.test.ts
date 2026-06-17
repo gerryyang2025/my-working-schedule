@@ -97,11 +97,16 @@ const EmptyStub = defineComponent({
 
 const PrintViewsStub = defineComponent({
   name: "PrintViews",
-  props: ["previewMode"],
+  props: ["monthlySummary", "previewMode"],
   template: `
     <section class="print-views-stub">
       <div v-if="previewMode === 'week'" class="print-preview-active">周表预览</div>
-      <div v-if="previewMode === 'month'" class="print-preview-active">月表预览</div>
+      <div v-if="previewMode === 'month'" class="print-preview-active">
+        月表预览
+        <span v-if="monthlySummary">
+          月度汇总 {{ monthlySummary.rows.map((row) => [row.staffName, row.attendanceShifts, row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2)].join(":")).join("|") }}
+        </span>
+      </div>
     </section>
   `
 });
@@ -126,8 +131,8 @@ const ElButtonStub = defineComponent({
   template: '<button type="button" :disabled="disabled" v-bind="$attrs"><slot /></button>'
 });
 
-function mountApp() {
-  apiMocks.loadData.mockResolvedValue(structuredClone(testData));
+function mountApp(appData: PublicAppData = testData) {
+  apiMocks.loadData.mockResolvedValue(structuredClone(appData));
 
   return mount(App, {
     global: {
@@ -376,6 +381,45 @@ describe("App", () => {
       expect(printSpy).not.toHaveBeenCalled();
       expect(wrapper.get('[data-testid="print-preview-pdf-button"]').text()).toContain("生成/分享 PDF");
       expect(wrapper.find('[data-testid="print-preview-system-button"]').exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+    }
+  });
+
+  it("passes a monthly summary into the month print preview", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { printSpy, restore: restorePrint } = mockSystemPrint();
+    const data: PublicAppData = {
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "entry-current-month",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: ""
+        },
+        {
+          id: "entry-next-month",
+          date: "2026-07-01",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: ""
+        }
+      ]
+    };
+
+    try {
+      const wrapper = mountApp(data);
+
+      await flushPromises();
+      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await nextTick();
+
+      expect(printSpy).not.toHaveBeenCalled();
+      expect(wrapper.get(".print-preview-active").text()).toContain("月度汇总");
+      expect(wrapper.get(".print-preview-active").text()).toContain("李护士:1:1.50");
     } finally {
       restoreMobileViewport();
       restorePrint();

@@ -68,3 +68,20 @@ export interface WeeklySummary {
   holidayNames: string[];
   rows: WeeklyStaffSummary[];
 }
+
+export interface MonthlyStaffSummary {
+  staffId: string;
+  staffName: string;
+  staffType: StaffType;
+  attendanceShifts: number;
+  coefficientTotal: number | null;
+  coefficientExcludedReason: string;
+}
+
+export interface MonthlySummary {
+  monthStart: string;
+  monthEnd: string;
+  totalDays: number;
+  holidayNames: string[];
+  rows: MonthlyStaffSummary[];
+}

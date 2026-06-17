@@ -561,6 +561,24 @@ body {
   font-size: 9px;
 }
 
+.print-preview-content .print-month-summary {
+  margin-top: 12px;
+}
+
+.print-preview-content .print-month-summary h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.print-preview-content .print-month-summary .print-table {
+  table-layout: auto;
+}
+
+.print-preview-content .print-month-summary .print-table th:first-child,
+.print-preview-content .print-month-summary .print-table td:first-child {
+  width: auto;
+}
+
 @media (max-width: 768px) {
   .app-shell {
     padding: 10px;
@@ -912,11 +930,13 @@ body {
     font-size: 18px;
   }
 
-  .print-week-detail {
+  .print-week-detail,
+  .print-month-summary {
     margin: 8px 0 10px;
   }
 
-  .print-week-detail h2 {
+  .print-week-detail h2,
+  .print-month-summary h2 {
     margin: 0 0 6px;
     font-size: 13px;
   }

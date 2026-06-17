@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { AppData, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
-import { calculateWeeklySummary } from "./calculation";
+import type { AppData, MonthlyStaffSummary, MonthlySummary, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
+import { getMonthDays } from "./date";
+import { calculateMonthlySummary, calculateWeeklySummary } from "./calculation";
 
 const baseData: AppData = {
   staff: [
@@ -90,6 +91,12 @@ function getRow(summary: WeeklySummary, staffId: string): WeeklyStaffSummary {
   const row = summary.rows.find((candidate) => candidate.staffId === staffId);
   expect(row).toBeDefined();
   return row as WeeklyStaffSummary;
+}
+
+function getMonthlyRow(summary: MonthlySummary, staffId: string): MonthlyStaffSummary {
+  const row = summary.rows.find((candidate) => candidate.staffId === staffId);
+  expect(row).toBeDefined();
+  return row as MonthlyStaffSummary;
 }
 
 describe("calculateWeeklySummary", () => {
@@ -246,5 +253,130 @@ describe("calculateWeeklySummary", () => {
     const summary = calculateWeeklySummary(data, "2026-06-17");
     expect(summary.holidayDeduction).toBe(3);
     expect(summary.requiredShifts).toBe(0);
+  });
+});
+
+describe("calculateMonthlySummary", () => {
+  const monthDays = getMonthDays(2026, 6);
+
+  it("calculates monthly attendance and coefficients by shift count", () => {
+    const summary = calculateMonthlySummary(baseData, monthDays);
+    const nurse = getMonthlyRow(summary, "staff-nurse");
+    const clerk = getMonthlyRow(summary, "staff-clerk");
+
+    expect(summary.monthStart).toBe("2026-06-01");
+    expect(summary.monthEnd).toBe("2026-06-30");
+    expect(summary.totalDays).toBe(30);
+    expect(summary.holidayNames).toEqual(["端午节"]);
+    expect(nurse.attendanceShifts).toBe(5);
+    expect(nurse.coefficientTotal).toBe(6.7);
+    expect(clerk.attendanceShifts).toBe(1);
+    expect(clerk.coefficientTotal).toBe(1.3);
+  });
+
+  it("counts head nurse monthly attendance but excludes coefficient", () => {
+    const summary = calculateMonthlySummary(baseData, monthDays);
+    const head = getMonthlyRow(summary, "staff-head");
+
+    expect(head.attendanceShifts).toBe(2);
+    expect(head.coefficientTotal).toBeNull();
+    expect(head.coefficientExcludedReason).toBe("护士长绩效单独核算");
+  });
+
+  it("ignores entries outside the printed month days", () => {
+    const data: AppData = {
+      ...baseData,
+      scheduleEntries: [
+        { id: "previous-month", date: "2026-05-31", staffId: "staff-nurse", shiftIds: ["shift-day"], note: "" },
+        { id: "current-month", date: "2026-06-17", staffId: "staff-nurse", shiftIds: ["shift-day"], note: "" },
+        { id: "next-month", date: "2026-07-01", staffId: "staff-nurse", shiftIds: ["shift-night"], note: "" }
+      ]
+    };
+
+    const nurse = getMonthlyRow(calculateMonthlySummary(data, monthDays), "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(1);
+    expect(nurse.coefficientTotal).toBe(1.3);
+  });
+
+  it("skips missing and disabled shift IDs in monthly totals", () => {
+    const data: AppData = {
+      ...baseData,
+      shifts: [
+        ...baseData.shifts,
+        {
+          id: "shift-disabled",
+          name: "停用班",
+          shortName: "停",
+          color: "#94A3B8",
+          countsAttendance: true,
+          coefficient: 9,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        {
+          id: "invalid-month-shifts",
+          date: "2026-06-17",
+          staffId: "staff-nurse",
+          shiftIds: ["shift-missing", "shift-disabled"],
+          note: ""
+        }
+      ]
+    };
+
+    const nurse = getMonthlyRow(calculateMonthlySummary(data, monthDays), "staff-nurse");
+    expect(nurse.attendanceShifts).toBe(0);
+    expect(nurse.coefficientTotal).toBe(0);
+  });
+
+  it("includes disabled staff with historical entries in the printed month", () => {
+    const data: AppData = {
+      ...baseData,
+      staff: [
+        ...baseData.staff,
+        {
+          id: "staff-disabled",
+          jobId: "100088",
+          name: "停用护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        { id: "historical-entry", date: "2026-06-17", staffId: "staff-disabled", shiftIds: ["shift-day"], note: "" }
+      ]
+    };
+
+    const disabled = getMonthlyRow(calculateMonthlySummary(data, monthDays), "staff-disabled");
+    expect(disabled.staffName).toBe("停用护士");
+    expect(disabled.attendanceShifts).toBe(1);
+    expect(disabled.coefficientTotal).toBe(1.3);
+  });
+
+  it("hides disabled staff without entries in the printed month", () => {
+    const data: AppData = {
+      ...baseData,
+      staff: [
+        ...baseData.staff,
+        {
+          id: "staff-disabled",
+          jobId: "100088",
+          name: "停用护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: false,
+          sortOrder: 4
+        }
+      ],
+      scheduleEntries: [
+        { id: "historical-entry", date: "2026-07-01", staffId: "staff-disabled", shiftIds: ["shift-day"], note: "" }
+      ]
+    };
+
+    const summary = calculateMonthlySummary(data, monthDays);
+    expect(summary.rows.map((row) => row.staffId)).not.toContain("staff-disabled");
   });
 });

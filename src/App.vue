@@ -11,7 +11,7 @@ import WeeklySummary from "@/components/WeeklySummary.vue";
 import { deleteHoliday, enterAdminMode, loadData, saveHoliday, saveScheduleEntry, saveShift, saveStaff } from "@/api/client";
 import type { PublicAppData } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
-import { calculateWeeklySummary } from "@/lib/calculation";
+import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
 
@@ -50,6 +50,7 @@ const printMonthDays = computed(() => {
   return getMonthDays(date.getFullYear(), date.getMonth() + 1);
 });
 const weeklySummary = computed(() => (data.value ? calculateWeeklySummary(data.value, selectedDate.value) : null));
+const monthlySummary = computed(() => (data.value ? calculateMonthlySummary(data.value, printMonthDays.value) : null));
 const editingStaff = computed(() => data.value?.staff.find((staff) => staff.id === editingStaffId.value) ?? null);
 const editingEntry = computed(
   () =>
@@ -450,6 +451,7 @@ onMounted(async () => {
           v-if="data && weeklySummary"
           :data="data"
           :days="printMonthDays"
+          :monthly-summary="monthlySummary"
           :summary="weeklySummary"
           :preview-mode="printPreviewMode"
         />
@@ -522,7 +524,13 @@ onMounted(async () => {
           @save="handleEditorSave"
         />
       </section>
-      <PrintViews v-if="weeklySummary" :data="data" :days="printMonthDays" :summary="weeklySummary" />
+      <PrintViews
+        v-if="weeklySummary"
+        :data="data"
+        :days="printMonthDays"
+        :monthly-summary="monthlySummary"
+        :summary="weeklySummary"
+      />
     </template>
   </main>
 </template>
