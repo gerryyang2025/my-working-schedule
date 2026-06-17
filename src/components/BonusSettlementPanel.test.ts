@@ -75,6 +75,26 @@ function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>
   });
 }
 
+async function expectConfirmBlocked(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
+  const confirmButton = wrapper.get('[data-testid="confirm-settlement-button"]');
+
+  expect((confirmButton.element as HTMLButtonElement).disabled).toBe(true);
+
+  await confirmButton.trigger("click");
+
+  expect(wrapper.emitted("confirmSettlement")).toBeUndefined();
+}
+
+async function expectCancelBlocked(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
+  const cancelButton = wrapper.get('[data-testid="cancel-settlement-button"]');
+
+  expect((cancelButton.element as HTMLButtonElement).disabled).toBe(true);
+
+  await cancelButton.trigger("click");
+
+  expect(wrapper.emitted("cancelSettlement")).toBeUndefined();
+}
+
 describe("BonusSettlementPanel", () => {
   it("previews an unsettled month after entering the bonus pool", async () => {
     const wrapper = mountPanel();
@@ -118,6 +138,19 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.emitted("cancelSettlement")).toEqual([["2026-06"]]);
   });
 
+  it("hides stale bonus pool errors when a settled snapshot is shown", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("-1");
+
+    expect(wrapper.text()).toContain("奖金总额格式不正确");
+
+    await wrapper.setProps({ settlement: settledSnapshot });
+
+    expect(wrapper.text()).toContain("已月结");
+    expect(wrapper.text()).not.toContain("奖金总额格式不正确");
+  });
+
   it("blocks settlement when ordinary coefficient total is zero", async () => {
     const wrapper = mountPanel({
       monthlySummary: {
@@ -137,5 +170,31 @@ describe("BonusSettlementPanel", () => {
 
     expect(wrapper.text()).toContain("普通人员月总系数合计为 0，无法按系数分配奖金");
     expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("blocks confirmation for invalid bonus pools and busy or settled states", async () => {
+    const invalidBonusPool = mountPanel();
+
+    await invalidBonusPool.get('[data-testid="bonus-pool-input"]').setValue("-1");
+    await expectConfirmBlocked(invalidBonusPool);
+
+    const saving = mountPanel();
+
+    await saving.get('[data-testid="bonus-pool-input"]').setValue("1000");
+    await saving.setProps({ saving: true });
+    await expectConfirmBlocked(saving);
+
+    const canceling = mountPanel();
+
+    await canceling.get('[data-testid="bonus-pool-input"]').setValue("1000");
+    await canceling.setProps({ canceling: true });
+    await expectConfirmBlocked(canceling);
+
+    await expectConfirmBlocked(mountPanel({ settlement: settledSnapshot }));
+  });
+
+  it("blocks cancellation for settled snapshots while saving or canceling", async () => {
+    await expectCancelBlocked(mountPanel({ saving: true, settlement: settledSnapshot }));
+    await expectCancelBlocked(mountPanel({ canceling: true, settlement: settledSnapshot }));
   });
 });

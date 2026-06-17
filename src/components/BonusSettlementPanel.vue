@@ -31,6 +31,7 @@ const isSettled = computed(() => props.settlement !== null);
 const statusText = computed(() => (props.settlement ? "已月结" : "未月结"));
 const bonusPoolInputValue = computed(() => (props.settlement ? formatMoney(props.settlement.bonusPool) : bonusPoolText.value));
 const bonusPoolState = computed(() => parseBonusPool(bonusPoolText.value));
+const settlementWarningId = computed(() => `bonus-settlement-warning-${props.month}`);
 const previewAllocation = computed<BonusAllocation>(() => {
   if (!bonusPoolState.value.isValid) {
     return {
@@ -47,8 +48,11 @@ const previewAllocation = computed<BonusAllocation>(() => {
 const displayedRows = computed(() => props.settlement?.rows ?? previewAllocation.value.rows);
 const displayedBonusPool = computed(() => props.settlement?.bonusPool ?? previewAllocation.value.bonusPool);
 const displayedCoefficientTotal = computed(() => props.settlement?.coefficientTotal ?? previewAllocation.value.coefficientTotal);
-const bonusPoolError = computed(() => (bonusPoolState.value.isValid ? "" : INVALID_BONUS_POOL_MESSAGE));
+const bonusPoolError = computed(() => (isSettled.value || bonusPoolState.value.isValid ? "" : INVALID_BONUS_POOL_MESSAGE));
 const allocationMessage = computed(() => (isSettled.value || bonusPoolError.value ? "" : previewAllocation.value.message));
+const bonusPoolInputDescribedBy = computed(() =>
+  bonusPoolError.value || allocationMessage.value ? settlementWarningId.value : undefined
+);
 const canConfirm = computed(
   () =>
     props.adminMode &&
@@ -185,6 +189,8 @@ function formatSettledAt(settledAt: string): string {
           min="0"
           step="0.01"
           :disabled="isSettled || saving || canceling"
+          :aria-describedby="bonusPoolInputDescribedBy"
+          :aria-invalid="Boolean(bonusPoolError)"
           @input="handleBonusPoolInput"
         />
       </label>
@@ -204,8 +210,12 @@ function formatSettledAt(settledAt: string): string {
       </div>
     </div>
 
-    <p v-if="bonusPoolError" class="settlement-warning">{{ bonusPoolError }}</p>
-    <p v-if="allocationMessage" class="settlement-warning">{{ allocationMessage }}</p>
+    <p v-if="bonusPoolError" :id="settlementWarningId" class="settlement-warning" role="alert">
+      {{ bonusPoolError }}
+    </p>
+    <p v-if="allocationMessage" :id="settlementWarningId" class="settlement-warning" role="alert">
+      {{ allocationMessage }}
+    </p>
 
     <div class="bonus-table-wrap">
       <table class="bonus-table">
@@ -281,7 +291,7 @@ function formatSettledAt(settledAt: string): string {
 
 .settlement-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 8px;
   margin-bottom: 10px;
 }
