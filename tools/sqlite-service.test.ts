@@ -330,7 +330,7 @@ describe("tools/sqlite-service.sh", () => {
   });
 
   it("rejects unsafe relative paths for direct data restore", async () => {
-    for (const backupFile of ["nested/backup.db", "../escape.db"]) {
+    for (const backupFile of ["nested/backup.db", "../escape.db", "nested\\backup.db"]) {
       const dir = await createTempDir();
       const sqliteDir = join(dir, "sqlite");
       const backupDir = join(dir, "backups");

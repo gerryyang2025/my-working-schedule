@@ -1,4 +1,4 @@
-import { resolve } from "node:path";
+import { isAbsolute, resolve, win32 } from "node:path";
 import { resolveServerConfig } from "./config";
 import { DEFAULT_STORAGE_PATH } from "./storage";
 import {
@@ -19,11 +19,11 @@ const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=y
 const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
 
 function resolveRestoreBackupFile(backupFile: string): string | null {
-  if (backupFile.startsWith("/")) {
+  if (isAbsolute(backupFile) || win32.isAbsolute(backupFile)) {
     return backupFile;
   }
 
-  if (backupFile.includes("/") || backupFile.includes("..")) {
+  if (backupFile.includes("/") || backupFile.includes("\\") || backupFile.includes("..")) {
     return null;
   }
 
