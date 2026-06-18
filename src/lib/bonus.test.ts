@@ -11,6 +11,7 @@ const baseSummary: MonthlySummary = {
     {
       staffId: "staff-head",
       staffName: "段护士长",
+      staffJobId: "000228",
       staffType: "head_nurse",
       attendanceShifts: 10,
       overtimeShifts: 0,
@@ -20,6 +21,7 @@ const baseSummary: MonthlySummary = {
     {
       staffId: "staff-nurse",
       staffName: "李护士",
+      staffJobId: "100001",
       staffType: "nurse",
       attendanceShifts: 12,
       overtimeShifts: 2,
@@ -29,6 +31,7 @@ const baseSummary: MonthlySummary = {
     {
       staffId: "staff-clerk",
       staffName: "王文员",
+      staffJobId: "200001",
       staffType: "clerk",
       attendanceShifts: 8,
       overtimeShifts: 0,
@@ -70,6 +73,16 @@ describe("calculateBonusAllocation", () => {
     const nurse = allocation.rows.find((row) => row.staffId === "staff-nurse");
 
     expect(nurse?.overtimeShifts).toBe(baseSummary.rows.find((row) => row.staffId === "staff-nurse")?.overtimeShifts);
+  });
+
+  it("copies staff job IDs into allocation rows", () => {
+    const allocation = calculateBonusAllocation(baseSummary, 1500);
+
+    expect(allocation.rows.map((row) => [row.staffName, row.staffJobId])).toEqual([
+      ["段护士长", "000228"],
+      ["李护士", "100001"],
+      ["王文员", "200001"]
+    ]);
   });
 
   it("keeps zero-coefficient ordinary staff in the result with zero bonus", () => {
@@ -208,6 +221,7 @@ describe("createMonthlySettlement", () => {
       {
         staffId: "staff-head",
         staffName: "段护士长",
+        staffJobId: "000228",
         staffType: "head_nurse",
         attendanceShifts: 10,
         overtimeShifts: 0,
@@ -219,6 +233,7 @@ describe("createMonthlySettlement", () => {
       {
         staffId: "staff-nurse",
         staffName: "李护士",
+        staffJobId: "100001",
         staffType: "nurse",
         attendanceShifts: 12,
         overtimeShifts: 2,
@@ -230,6 +245,7 @@ describe("createMonthlySettlement", () => {
       {
         staffId: "staff-clerk",
         staffName: "王文员",
+        staffJobId: "200001",
         staffType: "clerk",
         attendanceShifts: 8,
         overtimeShifts: 0,

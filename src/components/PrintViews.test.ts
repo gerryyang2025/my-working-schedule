@@ -113,6 +113,12 @@ function disabledStaff(overrides: Partial<StaffMember> = {}): StaffMember {
   };
 }
 
+function expectPersonCellText(text: string, name: string, jobId: string): void {
+  const normalizedText = text.replace(/\s+/g, "");
+
+  expect(normalizedText).toContain(`${name}${jobId}`);
+}
+
 const summary: WeeklySummary = {
   weekStart: "2026-06-15",
   weekEnd: "2026-06-21",
@@ -123,6 +129,7 @@ const summary: WeeklySummary = {
     {
       staffId: "staff-1",
       staffName: "王护士",
+      staffJobId: "N001",
       staffType: "nurse",
       attendanceShifts: 5,
       requiredShifts: 4,
@@ -142,6 +149,7 @@ const monthlySummary: MonthlySummary = {
     {
       staffId: "staff-1",
       staffName: "王护士",
+      staffJobId: "N001",
       staffType: "nurse",
       attendanceShifts: 5,
       overtimeShifts: 1,
@@ -151,6 +159,7 @@ const monthlySummary: MonthlySummary = {
     {
       staffId: "staff-clerk",
       staffName: "李文员",
+      staffJobId: "C001",
       staffType: "clerk",
       attendanceShifts: 2,
       overtimeShifts: 0,
@@ -160,6 +169,7 @@ const monthlySummary: MonthlySummary = {
     {
       staffId: "staff-head",
       staffName: "段护士长",
+      staffJobId: "H001",
       staffType: "head_nurse",
       attendanceShifts: 6,
       overtimeShifts: 0,
@@ -182,6 +192,7 @@ const monthlySettlement: MonthlySettlement = {
     {
       staffId: "staff-1",
       staffName: "王护士",
+      staffJobId: "N001",
       staffType: "nurse",
       attendanceShifts: 5,
       overtimeShifts: 3,
@@ -193,6 +204,7 @@ const monthlySettlement: MonthlySettlement = {
     {
       staffId: "staff-clerk",
       staffName: "李文员",
+      staffJobId: "C001",
       staffType: "clerk",
       attendanceShifts: 2,
       overtimeShifts: 0,
@@ -317,6 +329,20 @@ describe("PrintViews", () => {
     expect(wrapper.get(".print-month tbody").text()).toContain("白");
   });
 
+  it("prints staff job IDs in month schedule detail personnel cells", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary
+      }
+    });
+
+    const personnelHeader = wrapper.get(".print-month tbody th");
+
+    expectPersonCellText(personnelHeader.text(), "王护士", "N001");
+  });
+
   it("prints monthly attendance and coefficient summary below the month schedule", () => {
     const wrapper = mount(PrintViews, {
       props: {
@@ -336,14 +362,18 @@ describe("PrintViews", () => {
       "月总系数",
       "备注"
     ]);
-    expect(monthSummary.findAll("tbody tr")[0].findAll("td").map((cell) => cell.text())).toEqual([
-      "王护士",
+    const monthSummaryRows = monthSummary.findAll("tbody tr");
+    const firstMonthSummaryRowCells = monthSummaryRows[0].findAll("td");
+    expectPersonCellText(firstMonthSummaryRowCells[0].text(), "王护士", "N001");
+    expect(firstMonthSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
       "1",
       "5.50",
       ""
     ]);
+    expectPersonCellText(monthSummaryRows[1].findAll("td")[0].text(), "李文员", "C001");
+    expectPersonCellText(monthSummaryRows[2].findAll("td")[0].text(), "段护士长", "H001");
     expect(monthSummary.text()).toContain("月度汇总");
     expect(monthSummary.text()).toContain("王护士");
     expect(monthSummary.text()).toContain("护士");
@@ -380,8 +410,10 @@ describe("PrintViews", () => {
       "分配金额",
       "备注"
     ]);
-    expect(bonusSummary.findAll("tbody tr")[0].findAll("td").map((cell) => cell.text())).toEqual([
-      "王护士",
+    const bonusSummaryRows = bonusSummary.findAll("tbody tr");
+    const firstBonusSummaryRowCells = bonusSummaryRows[0].findAll("td");
+    expectPersonCellText(firstBonusSummaryRowCells[0].text(), "王护士", "N001");
+    expect(firstBonusSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
       "3",
@@ -389,6 +421,7 @@ describe("PrintViews", () => {
       "1392.41",
       ""
     ]);
+    expectPersonCellText(bonusSummaryRows[1].findAll("td")[0].text(), "李文员", "C001");
     expect(bonusSummary.text()).toContain("奖金分配");
     expect(bonusSummary.text()).toContain("奖金总额 2000.00");
     expect(bonusSummary.text()).toContain("月结时间 2026-06-30 18:00");
@@ -463,6 +496,7 @@ describe("PrintViews", () => {
     expect(weeklyPrint.text()).toContain("节假日：端午节");
     expect(weeklyPrint.text()).toContain("王护士");
     expect(weeklyPrint.text()).toContain("5.50");
+    expectPersonCellText(weeklyPrint.text(), "王护士", "N001");
   });
 
   it("marks only the selected print view as active in preview mode", () => {
@@ -498,5 +532,36 @@ describe("PrintViews", () => {
     expect(detailTable.text()).toContain("王护士");
     expect(detailTable.text()).toContain("白");
     expect(detailTable.text()).toContain("夜");
+    const personnelHeader = detailTable.get("tbody th");
+    expectPersonCellText(personnelHeader.text(), "王护士", "N001");
+  });
+
+  it("prints staff job IDs in weekly summary rows", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary
+      }
+    });
+
+    const weeklySummaryRow = wrapper.get(".print-week > .print-table tbody tr");
+
+    expectPersonCellText(weeklySummaryRow.findAll("td")[0].text(), "王护士", "N001");
+  });
+
+  it("prints shift markers as plain text elements", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([createEntry(["shift-day"])]),
+        days,
+        summary
+      }
+    });
+
+    const marker = wrapper.get(".print-month tbody td .print-shift-chip");
+
+    expect(marker.text()).toBe("白");
+    expect(marker.classes()).toContain("print-shift-chip");
   });
 });

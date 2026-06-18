@@ -18,18 +18,17 @@ const enabledShifts = computed(() =>
 
 <template>
   <aside class="shift-palette">
-    <h2>班次画笔</h2>
+    <h2>画笔</h2>
     <div class="shift-list">
       <button
         v-for="shift in enabledShifts"
         :key="shift.id"
         class="shift-button"
         :class="{ active: selectedShiftId === shift.id }"
-        :style="{ borderColor: shift.color, color: shift.color }"
+        :style="{ color: shift.color }"
         type="button"
         @click="emit('select', shift.id)"
       >
-        <span class="shift-dot" :style="{ background: shift.color }"></span>
         {{ shift.shortName }}
       </button>
     </div>

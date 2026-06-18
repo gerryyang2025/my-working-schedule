@@ -50,7 +50,7 @@ const shifts: Shift[] = [
 
 const holidays: Holiday[] = [];
 
-function mountGrid(entries: ScheduleEntry[]) {
+function mountGrid(entries: ScheduleEntry[], overrides: Partial<InstanceType<typeof ScheduleGrid>["$props"]> = {}) {
   return mount(ScheduleGrid, {
     props: {
       staff,
@@ -59,7 +59,8 @@ function mountGrid(entries: ScheduleEntry[]) {
       shifts,
       entries,
       selectedShiftId: "shift-day",
-      adminMode: true
+      adminMode: true,
+      ...overrides
     }
   });
 }
@@ -107,6 +108,36 @@ describe("ScheduleGrid", () => {
     const wrapper = mountGrid([]);
 
     expect(wrapper.find('[data-testid="schedule-cell-staff-enabled-2026-06-19"]').exists()).toBe(true);
+  });
+
+  it("sizes the person column from the longest visible staff name", () => {
+    const wrapper = mountGrid([], {
+      staff: [
+        {
+          id: "staff-short",
+          jobId: "N001",
+          name: "王丽",
+          type: "nurse",
+          isAdmin: false,
+          enabled: true,
+          sortOrder: 1
+        },
+        {
+          id: "staff-long",
+          jobId: "N002",
+          name: "段护士长",
+          type: "head_nurse",
+          isAdmin: true,
+          enabled: true,
+          sortOrder: 2
+        }
+      ]
+    });
+
+    const tableStyle = (wrapper.get(".schedule-grid").element as HTMLElement).style;
+
+    expect(tableStyle.getPropertyValue("--person-col-width")).toBe("88px");
+    expect(tableStyle.getPropertyValue("--person-col-mobile-width")).toBe("80px");
   });
 
   it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {

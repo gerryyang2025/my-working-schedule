@@ -74,6 +74,7 @@ function summarizeStaff(
   return {
     staffId: staff.id,
     staffName: staff.name,
+    staffJobId: staff.jobId,
     staffType: staff.type,
     attendanceShifts: totals.attendanceShifts,
     requiredShifts,
@@ -125,6 +126,7 @@ function summarizeMonthlyStaff(
   return {
     staffId: staff.id,
     staffName: staff.name,
+    staffJobId: staff.jobId,
     staffType: staff.type,
     attendanceShifts: totals.attendanceShifts,
     overtimeShifts: 0,

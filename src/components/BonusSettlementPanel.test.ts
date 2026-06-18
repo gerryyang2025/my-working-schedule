@@ -12,6 +12,7 @@ const monthlySummary: MonthlySummary = {
     {
       staffId: "staff-head",
       staffName: "段护士长",
+      staffJobId: "000228",
       staffType: "head_nurse",
       attendanceShifts: 10,
       overtimeShifts: 0,
@@ -21,6 +22,7 @@ const monthlySummary: MonthlySummary = {
     {
       staffId: "staff-nurse",
       staffName: "李护士",
+      staffJobId: "100001",
       staffType: "nurse",
       attendanceShifts: 12,
       overtimeShifts: 2,
@@ -43,6 +45,7 @@ const settledSnapshot: MonthlySettlement = {
     {
       staffId: "staff-head",
       staffName: "段护士长",
+      staffJobId: "000228",
       staffType: "head_nurse",
       attendanceShifts: 10,
       overtimeShifts: 0,
@@ -54,6 +57,7 @@ const settledSnapshot: MonthlySettlement = {
     {
       staffId: "staff-nurse",
       staffName: "李护士",
+      staffJobId: "100001",
       staffType: "nurse",
       attendanceShifts: 12,
       overtimeShifts: 2,
@@ -122,6 +126,19 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.text()).toContain("1000.00");
     expect(wrapper.text()).toContain("段护士长");
     expect(wrapper.text()).toContain("护士长绩效单独核算");
+  });
+
+  it("renders staff job IDs in the bonus person column", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    const personCells = wrapper.findAll('tbody td[data-label="人员"]');
+
+    expect(personCells[0].text()).toContain("段护士长");
+    expect(personCells[0].text()).toContain("000228");
+    expect(personCells[1].text()).toContain("李护士");
+    expect(personCells[1].text()).toContain("100001");
   });
 
   it("emits the confirmed settlement payload", async () => {

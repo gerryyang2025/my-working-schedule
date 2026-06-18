@@ -88,6 +88,7 @@ function settlementRowsToSummaryRows(rows: AppData["monthlySettlements"][number]
   return rows.map((row) => ({
     staffId: row.staffId,
     staffName: row.staffName,
+    staffJobId: row.staffJobId,
     staffType: row.staffType,
     attendanceShifts: row.attendanceShifts,
     overtimeShifts: row.overtimeShifts,

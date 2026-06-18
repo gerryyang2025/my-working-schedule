@@ -148,6 +148,7 @@ describe("calculateWeeklySummary", () => {
   it("calculates attendance by shift count instead of natural day", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
     const nurse = getRow(summary, "staff-nurse");
+    expect(nurse).toMatchObject({ staffJobId: "100001" });
     expect(nurse.attendanceShifts).toBe(5);
     expect(nurse.overtimeShifts).toBe(1);
     expect(nurse.coefficientTotal).toBe(6.7);
@@ -306,6 +307,7 @@ describe("calculateMonthlySummary", () => {
     expect(summary.monthEnd).toBe("2026-06-30");
     expect(summary.totalDays).toBe(30);
     expect(summary.holidayNames).toEqual(["端午节"]);
+    expect(nurse).toMatchObject({ staffJobId: "100001" });
     expect(nurse.attendanceShifts).toBe(5);
     expect(nurse.coefficientTotal).toBe(6.7);
     expect(clerk.attendanceShifts).toBe(1);

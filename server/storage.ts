@@ -117,6 +117,7 @@ function isMonthlySettlementRow(value: unknown): value is MonthlySettlementRow {
   return (
     isString(value.staffId) &&
     isString(value.staffName) &&
+    isString(value.staffJobId) &&
     (value.staffType === "nurse" || value.staffType === "clerk" || value.staffType === "head_nurse") &&
     isNumber(value.attendanceShifts) &&
     isNumber(value.overtimeShifts) &&
@@ -134,6 +135,7 @@ function normalizeMonthlySettlementRow(row: unknown): MonthlySettlementRow | nul
 
   const candidate = {
     ...row,
+    staffJobId: "staffJobId" in row ? row.staffJobId : "",
     overtimeShifts: "overtimeShifts" in row ? row.overtimeShifts : 0
   };
 

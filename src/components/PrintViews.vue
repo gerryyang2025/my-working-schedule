@@ -159,7 +159,10 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
       <tbody>
         <tr v-for="staff in printedStaff" :key="staff.id" :class="{ 'disabled-historical-row': !staff.enabled }">
           <th>
-            <span>{{ staff.name }}</span>
+            <span class="print-person">
+              <strong>{{ staff.name }}</strong>
+              <small>{{ staff.jobId }}</small>
+            </span>
             <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
           </th>
           <td v-for="day in days" :key="`${staff.id}-${day.key}`">
@@ -194,7 +197,10 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         <tbody>
           <tr v-for="row in printedMonthlyRows" :key="row.staffId">
             <td>
-              <span>{{ row.staffName }}</span>
+              <span class="print-person">
+                <strong>{{ row.staffName }}</strong>
+                <small>{{ row.staffJobId }}</small>
+              </span>
               <span v-if="isDisabledMonthlyStaff(row)" class="historical-staff-label">停用历史</span>
             </td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
@@ -228,7 +234,12 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         </thead>
         <tbody>
           <tr v-for="row in monthlySettlement.rows" :key="row.staffId">
-            <td>{{ row.staffName }}</td>
+            <td>
+              <span class="print-person">
+                <strong>{{ row.staffName }}</strong>
+                <small>{{ row.staffJobId }}</small>
+              </span>
+            </td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
             <td>{{ row.overtimeShifts }}</td>
@@ -266,7 +277,12 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         </thead>
         <tbody>
           <tr v-for="row in summary.rows" :key="row.staffId">
-            <th>{{ row.staffName }}</th>
+            <th>
+              <span class="print-person">
+                <strong>{{ row.staffName }}</strong>
+                <small>{{ row.staffJobId }}</small>
+              </span>
+            </th>
             <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`">
               <span class="print-cell-shifts">
                 <span
@@ -296,7 +312,12 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
       </thead>
       <tbody>
         <tr v-for="row in summary.rows" :key="row.staffId">
-          <td>{{ row.staffName }}</td>
+          <td>
+            <span class="print-person">
+              <strong>{{ row.staffName }}</strong>
+              <small>{{ row.staffJobId }}</small>
+            </span>
+          </td>
           <td>{{ row.attendanceShifts }}</td>
           <td>{{ row.requiredShifts }}</td>
           <td>{{ row.overtimeShifts }}</td>

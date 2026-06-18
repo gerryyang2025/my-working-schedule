@@ -30,10 +30,28 @@ const sortedStaff = computed(() =>
     .filter((item) => item.enabled || staffWithVisibleEntries.value.has(item.id))
     .sort((left, right) => left.sortOrder - right.sortOrder)
 );
+const personColumnStyle = computed(() => {
+  const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
+
+  return {
+    "--person-col-width": `${clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104)}px`,
+    "--person-col-mobile-width": `${clamp(Math.ceil(longestNameUnits * 12 + 32), 56, 88)}px`
+  };
+});
 const clickTimers = new Map<string, number>();
 
 function cellKey(staffId: string, date: string): string {
   return `${staffId}__${date}`;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function measureDisplayUnits(text: string): number {
+  return [...text.trim()].reduce((total, character) => {
+    return total + (/^[\u0000-\u00ff]$/.test(character) ? 0.55 : 1);
+  }, 0);
 }
 
 function clearClickTimer(key: string): void {
@@ -95,7 +113,7 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="schedule-grid-wrap">
-    <table class="schedule-grid">
+    <table class="schedule-grid" :style="personColumnStyle">
       <thead>
         <tr>
           <th class="sticky-col person-col">人员</th>

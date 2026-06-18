@@ -126,7 +126,7 @@ describe("JSON storage", () => {
     await expect(readFile(path, "utf8")).resolves.toBe(invalidData);
   });
 
-  it("defaults missing monthly settlement overtime shifts for legacy rows", async () => {
+  it("defaults missing monthly settlement overtime shifts and job IDs for legacy rows", async () => {
     const path = await createTempDataPath();
     await writeFile(
       path,
@@ -168,7 +168,9 @@ describe("JSON storage", () => {
     const persisted = JSON.parse(await readFile(path, "utf8"));
 
     expect(data.monthlySettlements[0].rows[0].overtimeShifts).toBe(0);
+    expect(data.monthlySettlements[0].rows[0].staffJobId).toBe("");
     expect(persisted.monthlySettlements[0].rows[0].overtimeShifts).toBe(0);
+    expect(persisted.monthlySettlements[0].rows[0].staffJobId).toBe("");
   });
 
   it("throws when monthly settlement overtime shifts are present but malformed", async () => {

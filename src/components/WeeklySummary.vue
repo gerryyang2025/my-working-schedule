@@ -1,9 +1,29 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import type { StaffType, WeeklyStaffSummary, WeeklySummary } from "@/types/domain";
 
-defineProps<{
+const props = defineProps<{
   summary: WeeklySummary;
 }>();
+
+const personColumnStyle = computed(() => {
+  const longestNameUnits = Math.max(2, ...props.summary.rows.map((row) => measureDisplayUnits(row.staffName)));
+  const desktopWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 112);
+  const mobileWidth = clamp(Math.ceil(longestNameUnits * 12 + 34), 56, 92);
+
+  return {
+    "--summary-person-col-width": `${desktopWidth}px`,
+    "--summary-person-col-mobile-width": `${mobileWidth}px`
+  };
+});
+
+function measureDisplayUnits(text: string): number {
+  return [...text].reduce((total, char) => total + (char.charCodeAt(0) <= 0x7f ? 0.55 : 1), 0);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
 
 function staffTypeLabel(type: StaffType): string {
   if (type === "head_nurse") {
@@ -27,7 +47,7 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
 </script>
 
 <template>
-  <section class="weekly-summary stats-panel">
+  <section class="weekly-summary stats-panel" :style="personColumnStyle">
     <header class="stats-panel-header">
       <h2>周统计</h2>
       <p>
@@ -51,7 +71,12 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
       </thead>
       <tbody>
         <tr v-for="row in summary.rows" :key="row.staffId">
-          <td data-label="人员">{{ row.staffName }}</td>
+          <td data-label="人员">
+            <span class="summary-person">
+              <strong>{{ row.staffName }}</strong>
+              <small>{{ row.staffJobId }}</small>
+            </span>
+          </td>
           <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
           <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
           <td data-label="满勤标准">{{ row.requiredShifts }}</td>
@@ -64,8 +89,11 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
     <div class="summary-compact-list">
       <div v-for="row in summary.rows" :key="`${row.staffId}-compact`" class="summary-compact-row">
         <div class="summary-compact-person">
-          <strong>{{ row.staffName }}</strong>
-          <span>{{ staffTypeLabel(row.staffType) }}</span>
+          <span class="summary-person">
+            <strong>{{ row.staffName }}</strong>
+            <small>{{ row.staffJobId }}</small>
+          </span>
+          <span class="summary-person-type">{{ staffTypeLabel(row.staffType) }}</span>
         </div>
         <div class="summary-compact-metrics">
           <span>出勤 {{ row.attendanceShifts }}/{{ row.requiredShifts }}</span>

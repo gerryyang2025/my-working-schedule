@@ -16,6 +16,7 @@ function settlement(month: string, overrides: Partial<MonthlySettlement> = {}): 
       {
         staffId: "staff-nurse-001",
         staffName: "李护士",
+        staffJobId: "100001",
         staffType: "nurse",
         attendanceShifts: 4,
         overtimeShifts: 1,
@@ -84,6 +85,7 @@ describe("calculateRangeBonusSummary", () => {
     expect(nurse?.attendanceShifts).toBe(5);
     expect(nurse?.overtimeShifts).toBe(1);
     expect(nurse?.coefficientTotal).toBe(3.5);
+    expect(nurse?.staffJobId).toBe("100001");
   });
 
   it("keeps head nurses excluded when merging range rows", () => {
@@ -95,6 +97,7 @@ describe("calculateRangeBonusSummary", () => {
               {
                 staffId: "staff-head-001",
                 staffName: "段鸿露",
+                staffJobId: "000228",
                 staffType: "head_nurse",
                 attendanceShifts: 2,
                 overtimeShifts: 0,

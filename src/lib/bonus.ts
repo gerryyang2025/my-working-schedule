@@ -93,6 +93,7 @@ function createSettlementRow(row: MonthlySummary["rows"][number], bonusAmount: n
   return {
     staffId: row.staffId,
     staffName: row.staffName,
+    staffJobId: row.staffJobId,
     staffType: row.staffType,
     attendanceShifts: row.attendanceShifts,
     overtimeShifts: row.overtimeShifts,

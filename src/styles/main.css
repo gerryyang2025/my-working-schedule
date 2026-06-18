@@ -177,42 +177,50 @@ body {
 }
 
 .shift-palette {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   position: sticky;
   top: 12px;
   border: 1px solid #dbe3ef;
   background: #ffffff;
-  padding: 10px;
+  padding: 8px 10px;
 }
 
 .shift-palette h2 {
-  margin: 0 0 8px;
-  font-size: 15px;
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+  white-space: nowrap;
 }
 
 .shift-list {
-  display: grid;
-  gap: 8px;
+  display: flex;
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .shift-button {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 34px;
-  border: 1px solid;
-  background: #ffffff;
-  font-weight: 700;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 44px;
+  height: 30px;
+  border: 0;
+  border-bottom: 2px solid currentColor;
+  background: transparent;
+  padding: 0 8px;
+  font-weight: 800;
   cursor: pointer;
 }
 
 .shift-button.active {
   background: #eff6ff;
-}
-
-.shift-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 999px;
 }
 
 .schedule-grid-wrap {
@@ -261,9 +269,9 @@ body {
 }
 
 .schedule-grid .person-col {
-  width: 112px;
-  min-width: 112px;
-  max-width: 112px;
+  width: var(--person-col-width, 88px);
+  min-width: var(--person-col-width, 88px);
+  max-width: var(--person-col-width, 88px);
   text-align: left;
   padding: 0 6px;
 }
@@ -274,6 +282,13 @@ body {
 .schedule-grid thead small,
 .schedule-grid thead em {
   display: block;
+}
+
+.person-col strong,
+.person-col small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .historical-staff-label {
@@ -375,8 +390,35 @@ body {
   text-align: center;
 }
 
+.summary-table th:first-child,
+.summary-table td[data-label="人员"] {
+  width: var(--summary-person-col-width, 88px);
+  min-width: var(--summary-person-col-width, 88px);
+  max-width: var(--summary-person-col-width, 88px);
+}
+
 .summary-table th {
   background: #f8fafc;
+}
+
+.summary-person {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+.summary-person strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.summary-person small {
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .summary-compact-list {
@@ -512,9 +554,9 @@ body {
   word-break: keep-all;
 }
 
-.print-preview-content .print-month .print-table th:first-child,
-.print-preview-content .print-month .print-table td:first-child {
-  width: 58px;
+.print-preview-content .print-month .print-month-detail-table th:first-child,
+.print-preview-content .print-month .print-month-detail-table td:first-child {
+  width: 68px;
 }
 
 .print-preview-content .print-table th,
@@ -535,6 +577,35 @@ body {
   color: #64748b;
   font-size: 10px;
   font-weight: 700;
+}
+
+.print-preview-content .print-person {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  line-height: 1.15;
+}
+
+.print-preview-content .print-person strong {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #0f172a;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.print-preview-content .print-person small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .print-preview-content .print-day-heading,
@@ -565,14 +636,14 @@ body {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 20px;
-  min-height: 18px;
-  border: 1px solid;
-  padding: 2px 4px;
-  background: #ffffff;
-  font-size: 10px;
-  font-weight: 700;
-  line-height: 1;
+  min-width: 0;
+  min-height: 0;
+  border: 0;
+  padding: 0 2px;
+  background: transparent;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.1;
 }
 
 .print-preview-content .print-month .print-day-heading {
@@ -589,9 +660,8 @@ body {
 }
 
 .print-preview-content .print-month .print-shift-chip {
-  min-width: 18px;
-  padding: 1px 2px;
-  font-size: 9px;
+  padding: 0 1px;
+  font-size: 11px;
 }
 
 .print-preview-content .print-month-summary {
@@ -710,23 +780,21 @@ body {
     top: 0;
     z-index: 5;
     margin-bottom: 10px;
-    padding: 8px;
+    padding: 7px 8px;
   }
 
   .shift-palette h2 {
-    margin-bottom: 6px;
+    font-size: 12px;
   }
 
   .shift-list {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 2px;
+    gap: 6px;
   }
 
   .shift-button {
-    flex: 0 0 auto;
-    min-width: 64px;
+    min-width: 42px;
+    height: 28px;
+    padding: 0 7px;
   }
 
   .schedule-grid-wrap {
@@ -747,9 +815,9 @@ body {
   }
 
   .schedule-grid .person-col {
-    width: 88px;
-    min-width: 88px;
-    max-width: 88px;
+    width: var(--person-col-mobile-width, 72px);
+    min-width: var(--person-col-mobile-width, 72px);
+    max-width: var(--person-col-mobile-width, 72px);
     padding: 0 5px;
   }
 
@@ -784,17 +852,17 @@ body {
 
   .summary-compact-person {
     display: flex;
-    flex: 0 0 auto;
+    flex: 0 0 var(--summary-person-col-mobile-width, 72px);
     align-items: baseline;
     gap: 6px;
-    min-width: 96px;
+    min-width: var(--summary-person-col-mobile-width, 72px);
   }
 
-  .summary-compact-person strong {
-    font-size: 13px;
+  .summary-compact-person .summary-person {
+    justify-items: start;
   }
 
-  .summary-compact-person span,
+  .summary-person-type,
   .summary-compact-metrics {
     color: #64748b;
     font-size: 12px;
@@ -999,12 +1067,46 @@ body {
     vertical-align: middle;
   }
 
+  .print-month-detail-table th:first-child,
+  .print-month-detail-table td:first-child {
+    width: 68px;
+  }
+
   .print-table .historical-staff-label {
     display: block;
     margin-top: 1px;
     color: #4b5563;
     font-size: 8px;
     font-weight: 700;
+  }
+
+  .print-person {
+    display: grid;
+    justify-items: center;
+    gap: 1px;
+    line-height: 1.12;
+  }
+
+  .print-person strong {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #111827;
+    font-size: 10px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+
+  .print-person small {
+    display: block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    color: #4b5563;
+    font-size: 8px;
+    font-weight: 600;
+    white-space: nowrap;
   }
 
   .print-day-heading,
@@ -1035,14 +1137,14 @@ body {
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 18px;
-    min-height: 16px;
-    border: 1px solid;
-    padding: 1px 3px;
-    background: #ffffff;
-    font-size: 9px;
-    font-weight: 700;
-    line-height: 1;
+    min-width: 0;
+    min-height: 0;
+    border: 0;
+    padding: 0 2px;
+    background: transparent;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 1.1;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }

@@ -69,6 +69,14 @@ const previewAllocation = computed<BonusAllocation>(() => {
   return calculateBonusAllocation(props.monthlySummary, bonusPoolState.value.value);
 });
 const displayedRows = computed(() => props.settlement?.rows ?? previewAllocation.value.rows);
+const personColumnStyle = computed(() => {
+  const longestNameUnits = Math.max(2, ...displayedRows.value.map((row) => measureDisplayUnits(row.staffName)));
+  const desktopWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 112);
+
+  return {
+    "--bonus-person-col-width": `${desktopWidth}px`
+  };
+});
 const displayedBonusPool = computed(() => props.settlement?.bonusPool ?? previewAllocation.value.bonusPool);
 const displayedCoefficientTotal = computed(() => props.settlement?.coefficientTotal ?? previewAllocation.value.coefficientTotal);
 const bonusPoolError = computed(() =>
@@ -117,10 +125,19 @@ function parseBonusPool(text: string): { isValid: boolean; value: number } {
   };
 }
 
+function measureDisplayUnits(text: string): number {
+  return [...text].reduce((total, char) => total + (char.charCodeAt(0) <= 0x7f ? 0.55 : 1), 0);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
 function createZeroBonusRows(): MonthlySettlementRow[] {
   return props.monthlySummary.rows.map((row) => ({
     staffId: row.staffId,
     staffName: row.staffName,
+    staffJobId: row.staffJobId,
     staffType: row.staffType,
     attendanceShifts: row.attendanceShifts,
     overtimeShifts: row.overtimeShifts,
@@ -189,7 +206,7 @@ function rowNote(row: MonthlySettlementRow): string {
 </script>
 
 <template>
-  <section class="bonus-settlement-panel stats-panel" aria-labelledby="bonus-settlement-title">
+  <section class="bonus-settlement-panel stats-panel" :style="personColumnStyle" aria-labelledby="bonus-settlement-title">
     <header class="bonus-panel-header stats-panel-header">
       <div>
         <p class="bonus-panel-eyebrow">月结与奖金</p>
@@ -289,7 +306,12 @@ function rowNote(row: MonthlySettlementRow): string {
         </thead>
         <tbody>
           <tr v-for="row in displayedRows" :key="row.staffId">
-            <td data-label="人员">{{ row.staffName }}</td>
+            <td data-label="人员">
+              <span class="bonus-person">
+                <strong>{{ row.staffName }}</strong>
+                <small>{{ row.staffJobId }}</small>
+              </span>
+            </td>
             <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
             <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
             <td data-label="累计加班班次">{{ row.overtimeShifts }}</td>
@@ -498,10 +520,35 @@ function rowNote(row: MonthlySettlementRow): string {
   white-space: nowrap;
 }
 
+.bonus-table th:first-child,
+.bonus-table td[data-label="人员"] {
+  width: var(--bonus-person-col-width, 88px);
+  min-width: var(--bonus-person-col-width, 88px);
+  max-width: var(--bonus-person-col-width, 88px);
+}
+
 .bonus-table th {
   background: #f8fafc;
   color: #0f172a;
   font-weight: 700;
+}
+
+.bonus-person {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  line-height: 1.15;
+}
+
+.bonus-person strong {
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.bonus-person small {
+  color: #64748b;
+  font-size: 11px;
 }
 
 .bonus-table td:last-child {

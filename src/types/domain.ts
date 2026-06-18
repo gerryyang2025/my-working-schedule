@@ -53,6 +53,7 @@ export interface AppData {
 export interface WeeklyStaffSummary {
   staffId: string;
   staffName: string;
+  staffJobId: string;
   staffType: StaffType;
   attendanceShifts: number;
   requiredShifts: number;
@@ -73,6 +74,7 @@ export interface WeeklySummary {
 export interface MonthlyStaffSummary {
   staffId: string;
   staffName: string;
+  staffJobId: string;
   staffType: StaffType;
   attendanceShifts: number;
   overtimeShifts: number;
@@ -91,6 +93,7 @@ export interface MonthlySummary {
 export interface MonthlySettlementRow {
   staffId: string;
   staffName: string;
+  staffJobId: string;
   staffType: StaffType;
   attendanceShifts: number;
   overtimeShifts: number;
