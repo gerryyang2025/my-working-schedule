@@ -281,11 +281,13 @@ describe("SQLite maintenance", () => {
     await rm(sqlitePath, { force: true });
     await writeFile(`${sqlitePath}-wal`, "stale wal", "utf8");
     await writeFile(`${sqlitePath}-shm`, "stale shm", "utf8");
+    await writeFile(`${sqlitePath}-journal`, "stale journal", "utf8");
 
     await restoreSqliteBackup({ sqlitePath, backupPath: restoreBackupPath, backupFile: replacementBackupFile, confirm: true });
 
     expect(existsSync(`${sqlitePath}-wal`)).toBe(false);
     expect(existsSync(`${sqlitePath}-shm`)).toBe(false);
+    expect(existsSync(`${sqlitePath}-journal`)).toBe(false);
     expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(replacement.scheduleEntries);
   });
 
