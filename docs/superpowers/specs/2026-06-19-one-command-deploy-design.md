@@ -21,20 +21,20 @@
 ```bash
 cd /root/github/my-working-schedule
 git pull
-OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh deploy
+./optools.sh deploy
 ```
 
-如果 npm 已经在系统 PATH 中可被服务用户执行，也可以直接：
+`deploy` 会自动寻找 systemd 服务用户可执行的 npm。只有在自动识别失败、且服务器存在特殊 Node.js 安装路径时，才需要使用高级覆盖参数：
 
 ```bash
-./optools.sh deploy
+OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy
 ```
 
 ## 命令行为
 
 `./optools.sh deploy` 按顺序执行：
 
-1. 检查 npm 可执行文件，并确认 systemd 服务用户可运行该 npm。
+1. 自动解析 npm 可执行文件，并确认 systemd 服务用户可运行该 npm。
 2. 执行 `app init`，初始化用户、目录、systemd service，并写入正确的 `ExecStart` 与 `Environment=PATH=...`。
 3. 执行 `build`，构建前端并安装生产运行文件到 `/opt/my-working-schedule`。
 4. 使用 `npm --prefix "$INSTALL_DIR" ci --include=dev` 在生产运行目录安装依赖，不切换 shell 工作目录。
@@ -49,7 +49,7 @@ OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh deploy
 
 关键错误提示需要明确给出下一步：
 
-- npm 不可执行或服务用户无法执行：提示使用 `/opt/node-v22.22.0/bin/npm` 这类服务用户可访问路径，并重新运行 `OPTOOLS_NPM_BIN=... ./optools.sh deploy`。
+- npm 不可执行或服务用户无法执行：提示把 Node.js 安装或复制到 `/opt/node-v22.22.0`、`/opt/node`、`/usr/local/bin` 这类服务用户可访问路径，然后重新运行 `./optools.sh deploy`。
 - `/opt/my-working-schedule/package.json` 缺失：由 `build` 负责修复；`app doctor` 会提前检查并报错。
 - 依赖安装失败：提示保留在源码目录，重新执行 `./optools.sh deploy`，不要求手动进入 `/opt`。
 - Nginx 不存在或配置目录缺失：提示先执行 `./optools.sh nginx install`，或后续使用显式参数扩展自动安装能力。
@@ -63,6 +63,18 @@ OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh deploy
 - 不默认执行 `nginx install` 或 `nginx reload`，避免在已有 Nginx 配置的服务器上产生非预期变更。
 - 不引入 HTTPS 证书申请。
 
+## npm 自动识别策略
+
+`resolve_npm_bin` 调整为“自动优先，手工兜底”：
+
+1. 如果用户显式设置 `OPTOOLS_NPM_BIN`，优先使用该路径，并验证它存在、可执行、服务用户可运行。
+2. 检查 `command -v npm` 返回的 npm；如果服务用户可运行，则使用它。
+3. 检查常见服务可访问路径，例如 `/opt/node-v22.22.0/bin/npm`、`/opt/node/bin/npm`、`/usr/local/bin/npm`、`/usr/bin/npm`。
+4. 如果检测到的 npm 位于 `/root/.nvm` 且服务用户不可执行，不直接失败；继续搜索 `/opt` 和系统路径。
+5. 如果全部失败，输出明确修复建议：把 Node.js 复制或安装到 `/opt/node-v22.22.0`，修正权限后重新执行 `./optools.sh deploy`。
+
+该策略也应用于 `./optools.sh app init`，避免一键部署和单独初始化的行为不一致。
+
 ## 文档更新
 
 README 和正式部署运行手册需要把推荐流程改成：
@@ -70,10 +82,10 @@ README 和正式部署运行手册需要把推荐流程改成：
 ```bash
 cd /root/github/my-working-schedule
 git pull
-OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh deploy
+./optools.sh deploy
 ```
 
-手册中保留分步骤命令作为排障参考，但主流程应以 `deploy` 为准。
+手册中保留 `OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy` 作为特殊路径排障参考，但主流程应以无需额外环境变量的 `./optools.sh deploy` 为准。
 
 ## 测试计划
 
@@ -82,6 +94,7 @@ OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh deploy
 - `help` 输出包含 `./optools.sh deploy`。
 - `deploy` 会按预期顺序调用 app init、build、依赖安装、data status/check、nginx test、app restart、app doctor、app health。
 - 依赖安装使用 `npm --prefix "$INSTALL_DIR" ci --include=dev`，不需要切换目录。
+- npm 自动识别会跳过服务用户不可执行的 `/root/.nvm` 路径，并选择 `/opt/node-v22.22.0/bin/npm` 这类可执行候选。
 - 当依赖安装失败时，`deploy` 返回非零并停止后续重启服务。
 
 更新文档测试：
