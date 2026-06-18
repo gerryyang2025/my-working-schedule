@@ -330,20 +330,22 @@ describe("tools/sqlite-service.sh", () => {
   });
 
   it("rejects unsafe relative paths for direct data restore", async () => {
-    const dir = await createTempDir();
-    const sqliteDir = join(dir, "sqlite");
-    const backupDir = join(dir, "backups");
+    for (const backupFile of ["nested/backup.db", "../escape.db"]) {
+      const dir = await createTempDir();
+      const sqliteDir = join(dir, "sqlite");
+      const backupDir = join(dir, "backups");
 
-    const result = await runDataCli(["restore", "nested/backup.db"], {
-      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
-      SCHEDULE_BACKUP_PATH: backupDir,
-      CONFIRM_RESTORE: "yes"
-    });
+      const result = await runDataCli(["restore", backupFile], {
+        SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+        SCHEDULE_BACKUP_PATH: backupDir,
+        CONFIRM_RESTORE: "yes"
+      });
 
-    expect(result.code).toBe(1);
-    expect(result.stderr).toContain(invalidRestoreFilenameMessage);
-    expect(existsSync(sqliteDir)).toBe(false);
-    expect(existsSync(backupDir)).toBe(false);
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+      expect(existsSync(sqliteDir)).toBe(false);
+      expect(existsSync(backupDir)).toBe(false);
+    }
   });
 
   it("resolves bare filenames under the backup path for direct data restore", async () => {
@@ -354,6 +356,24 @@ describe("tools/sqlite-service.sh", () => {
     await createValidSqliteBackup(join(backupPath, backupFilename));
 
     const result = await runDataCli(["restore", backupFilename], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain(sqlitePath);
+    expect(existsSync(sqlitePath)).toBe(true);
+  });
+
+  it("passes absolute backup paths through for direct data restore", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+    const backupFile = join(dir, "absolute backup.db");
+    await createValidSqliteBackup(backupFile);
+
+    const result = await runDataCli(["restore", backupFile], {
       SCHEDULE_SQLITE_PATH: sqlitePath,
       SCHEDULE_BACKUP_PATH: backupPath,
       CONFIRM_RESTORE: "yes"
