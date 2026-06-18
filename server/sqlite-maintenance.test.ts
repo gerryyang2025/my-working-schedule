@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
+import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSeedData } from "./seed";
 import {
@@ -19,6 +20,25 @@ async function createTempDir() {
   const dir = await mkdtemp(join(tmpdir(), "schedule-sqlite-maintenance-"));
   tempDirs.push(dir);
   return dir;
+}
+
+async function writeAppData(path: string, data = createSeedData()) {
+  const content = `${JSON.stringify(data, null, 2)}\n`;
+  await writeFile(path, content, "utf8");
+  return content;
+}
+
+async function exportSqliteData(sqlitePath: string, dir: string) {
+  const exportPath = join(dir, `export-${Date.now()}-${Math.random().toString(16).slice(2)}.json`);
+  await exportSqliteToJson({ sqlitePath, exportPath });
+  return JSON.parse(await readFile(exportPath, "utf8"));
+}
+
+async function listDbBackups(backupPath: string) {
+  if (!existsSync(backupPath)) {
+    return [];
+  }
+  return (await readdir(backupPath)).filter((file) => file.endsWith(".db")).sort();
 }
 
 afterEach(async () => {
@@ -45,8 +65,7 @@ describe("SQLite maintenance", () => {
     seed.scheduleEntries = [
       { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
     ];
-    const jsonContent = `${JSON.stringify(seed, null, 2)}\n`;
-    await writeFile(jsonPath, jsonContent, "utf8");
+    const jsonContent = await writeAppData(jsonPath, seed);
 
     const report = await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
     const backupRelativePath = relative(backupPath, report.sourceJsonBackupPath);
@@ -66,7 +85,7 @@ describe("SQLite maintenance", () => {
     const jsonPath = join(dir, "app-data.local.json");
     const sqlitePath = join(dir, "schedule.db");
     const exportPath = join(dir, "exports", "app-data.json");
-    await writeFile(jsonPath, `${JSON.stringify(createSeedData(), null, 2)}\n`, "utf8");
+    await writeAppData(jsonPath);
     await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath: join(dir, "backups") });
 
     await exportSqliteToJson({ sqlitePath, exportPath });
@@ -81,7 +100,7 @@ describe("SQLite maintenance", () => {
     const jsonPath = join(dir, "app-data.local.json");
     const sqlitePath = join(dir, "schedule.db");
     const backupPath = join(dir, "backups");
-    await writeFile(jsonPath, `${JSON.stringify(createSeedData(), null, 2)}\n`, "utf8");
+    await writeAppData(jsonPath);
     await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
 
     const backupFile = await backupSqliteDatabase({ sqlitePath, backupPath });
@@ -91,5 +110,176 @@ describe("SQLite maintenance", () => {
 
     expect(existsSync(sqlitePath)).toBe(true);
     expect(check.ok).toBe(true);
+  });
+
+  it("refuses to migrate over an existing SQLite database without touching it", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "app-data.local.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const current = createSeedData();
+    current.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "current"
+      }
+    ];
+    await writeAppData(jsonPath, current);
+    await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
+    const before = await readFile(sqlitePath);
+
+    const next = createSeedData();
+    next.scheduleEntries = [
+      {
+        id: "2026-06-16__staff-nurse-001",
+        date: "2026-06-16",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "next"
+      }
+    ];
+    await writeAppData(jsonPath, next);
+
+    await expect(migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath })).rejects.toThrow(/already exists/i);
+
+    expect(await readFile(sqlitePath)).toEqual(before);
+    expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(current.scheduleEntries);
+  });
+
+  it("cleans up a failed migration without leaving a final SQLite database", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "app-data.local.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const invalid = createSeedData();
+    invalid.scheduleEntries = [
+      {
+        id: "2026-06-15__missing-staff",
+        date: "2026-06-15",
+        staffId: "missing-staff",
+        shiftIds: ["shift-a1"],
+        note: "invalid foreign key"
+      }
+    ];
+    await writeAppData(jsonPath, invalid);
+
+    await expect(migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath })).rejects.toThrow(/constraint|foreign key/i);
+
+    expect(existsSync(sqlitePath)).toBe(false);
+    expect((await readdir(dir)).filter((file) => file.includes("schedule.db.tmp"))).toEqual([]);
+  });
+
+  it("rejects restore when confirmation is false", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "app-data.local.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    await writeAppData(jsonPath);
+    await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
+    const backupFile = await backupSqliteDatabase({ sqlitePath, backupPath });
+    const before = await readFile(sqlitePath);
+
+    await expect(restoreSqliteBackup({ sqlitePath, backupPath, backupFile, confirm: false })).rejects.toThrow(/confirm/i);
+
+    expect(await readFile(sqlitePath)).toEqual(before);
+  });
+
+  it("backs up the current SQLite database before restoring another backup", async () => {
+    const dir = await createTempDir();
+    const currentJsonPath = join(dir, "current.json");
+    const replacementJsonPath = join(dir, "replacement.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const replacementSqlitePath = join(dir, "replacement.db");
+    const migrationBackups = join(dir, "migration-backups");
+    const replacementBackupPath = join(dir, "replacement-backups");
+    const restoreBackupPath = join(dir, "restore-backups");
+    const current = createSeedData();
+    current.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "current"
+      }
+    ];
+    const replacement = createSeedData();
+    replacement.scheduleEntries = [
+      {
+        id: "2026-06-16__staff-nurse-001",
+        date: "2026-06-16",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "replacement"
+      }
+    ];
+    await writeAppData(currentJsonPath, current);
+    await writeAppData(replacementJsonPath, replacement);
+    await migrateJsonToSqlite({ jsonPath: currentJsonPath, sqlitePath, backupPath: migrationBackups });
+    await migrateJsonToSqlite({ jsonPath: replacementJsonPath, sqlitePath: replacementSqlitePath, backupPath: migrationBackups });
+    const replacementBackupFile = await backupSqliteDatabase({
+      sqlitePath: replacementSqlitePath,
+      backupPath: replacementBackupPath
+    });
+
+    await restoreSqliteBackup({ sqlitePath, backupPath: restoreBackupPath, backupFile: replacementBackupFile, confirm: true });
+    const currentBackupFiles = await listDbBackups(restoreBackupPath);
+
+    expect(currentBackupFiles).toHaveLength(1);
+    expect((await exportSqliteData(join(restoreBackupPath, currentBackupFiles[0]), dir)).scheduleEntries).toEqual(
+      current.scheduleEntries
+    );
+    expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(replacement.scheduleEntries);
+  });
+
+  it("rejects a corrupt restore backup before touching the current database", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "app-data.local.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "restore-backups");
+    const migrationBackups = join(dir, "migration-backups");
+    const corruptBackupFile = join(dir, "corrupt.db");
+    const current = createSeedData();
+    current.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "current"
+      }
+    ];
+    await writeAppData(jsonPath, current);
+    await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath: migrationBackups });
+    const before = await readFile(sqlitePath);
+    await writeFile(corruptBackupFile, "not a sqlite database", "utf8");
+
+    await expect(
+      restoreSqliteBackup({ sqlitePath, backupPath, backupFile: corruptBackupFile, confirm: true })
+    ).rejects.toThrow();
+
+    expect(await readFile(sqlitePath)).toEqual(before);
+    expect(await listDbBackups(backupPath)).toEqual([]);
+    expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(current.scheduleEntries);
+  });
+
+  it("returns not ok when checking a SQLite database with missing tables", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const db = new Database(sqlitePath);
+    try {
+      db.exec("create table staff (id text primary key)");
+    } finally {
+      db.close();
+    }
+
+    const check = await checkSqliteDatabase({ sqlitePath });
+
+    expect(check.ok).toBe(false);
+    expect(check.integrity).toBe("ok");
+    expect(check.missingTables).toContain("app_settings");
   });
 });

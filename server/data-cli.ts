@@ -50,6 +50,12 @@ async function main() {
     return;
   }
 
+  if (command === "restore") {
+    console.error("Restore is not supported by this CLI yet; it is deferred to Task 6.");
+    process.exitCode = 1;
+    return;
+  }
+
   console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|check>");
   process.exitCode = 1;
 }

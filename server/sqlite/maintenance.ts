@@ -1,5 +1,6 @@
+import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir } from "node:fs/promises";
+import { copyFile, mkdir, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import { readJsonAppData, writeJsonAppData } from "../app-data";
@@ -49,6 +50,16 @@ export interface CheckOptions {
 
 function timestamp(): string {
   return new Date().toISOString().replace(/[-:.]/g, "");
+}
+
+function createTempSqlitePath(sqlitePath: string): string {
+  return `${sqlitePath}.tmp-${process.pid}-${timestamp()}-${randomUUID()}`;
+}
+
+async function cleanupSqliteFile(path: string): Promise<void> {
+  await Promise.all(
+    [path, `${path}-journal`, `${path}-shm`, `${path}-wal`].map((candidate) => rm(candidate, { force: true }))
+  );
 }
 
 function ensureDefaultSettings(db: Database.Database): void {
@@ -105,6 +116,34 @@ function countsAreOk(counts: Record<string, MigrationCount>): boolean {
   return Object.values(counts).every((count) => count.expected === count.actual);
 }
 
+function checkOpenSqliteDatabase(db: Database.Database): { ok: boolean; integrity: string; missingTables: string[] } {
+  const integrity = checkSqliteIntegrity(db);
+  const missingTables = listMissingCoreTables(db);
+  return {
+    ok: integrity === "ok" && missingTables.length === 0,
+    integrity,
+    missingTables
+  };
+}
+
+function assertValidOpenSqliteDatabase(db: Database.Database, label: string): void {
+  const check = checkOpenSqliteDatabase(db);
+  if (!check.ok) {
+    throw new Error(
+      `${label} is not a valid SQLite database: integrity=${check.integrity}; missingTables=${check.missingTables.join(",")}`
+    );
+  }
+}
+
+function validateSqliteFile(path: string, label: string): void {
+  const db = new Database(path, { fileMustExist: true });
+  try {
+    assertValidOpenSqliteDatabase(db, label);
+  } finally {
+    db.close();
+  }
+}
+
 export async function initSqliteDatabase(options: CheckOptions): Promise<string> {
   await mkdir(dirname(options.sqlitePath), { recursive: true });
   const db = new Database(options.sqlitePath);
@@ -128,19 +167,34 @@ export async function migrateJsonToSqlite(options: MigrationOptions): Promise<Mi
   await copyFile(options.jsonPath, sourceJsonBackupPath);
   await mkdir(dirname(options.sqlitePath), { recursive: true });
 
-  const db = new Database(options.sqlitePath);
+  const tempSqlitePath = createTempSqlitePath(options.sqlitePath);
+  let db: Database.Database | undefined;
   try {
+    db = new Database(tempSqlitePath);
     initializeSqliteSchema(db);
     replaceAppDataInSqlite(db, data);
     const counts = buildMigrationCounts(data, db);
-    return {
+    assertValidOpenSqliteDatabase(db, "Migrated SQLite database");
+    const report = {
       ok: countsAreOk(counts),
       counts,
       sourceJsonBackupPath,
       sqlitePath: options.sqlitePath
     };
-  } finally {
+
+    if (!report.ok) {
+      throw new Error("SQLite migration count verification failed.");
+    }
+
     db.close();
+    db = undefined;
+    await rename(tempSqlitePath, options.sqlitePath);
+    return report;
+  } finally {
+    if (db) {
+      db.close();
+    }
+    await cleanupSqliteFile(tempSqlitePath);
   }
 }
 
@@ -157,7 +211,7 @@ export async function exportSqliteToJson(options: ExportOptions): Promise<string
 
 export async function backupSqliteDatabase(options: BackupOptions): Promise<string> {
   await mkdir(options.backupPath, { recursive: true });
-  const backupFile = join(options.backupPath, `schedule-${timestamp()}.db`);
+  const backupFile = join(options.backupPath, `schedule-${timestamp()}-${randomUUID()}.db`);
   const db = new Database(options.sqlitePath, { fileMustExist: true });
   try {
     await db.backup(backupFile);
@@ -172,13 +226,22 @@ export async function restoreSqliteBackup(options: RestoreOptions): Promise<stri
     throw new Error("Restore requires confirm to be true.");
   }
 
+  validateSqliteFile(options.backupFile, "Selected SQLite backup");
+
   if (existsSync(options.sqlitePath)) {
     await backupSqliteDatabase({ sqlitePath: options.sqlitePath, backupPath: options.backupPath });
   }
 
   await mkdir(dirname(options.sqlitePath), { recursive: true });
-  await copyFile(options.backupFile, options.sqlitePath);
-  return options.sqlitePath;
+  const tempSqlitePath = createTempSqlitePath(options.sqlitePath);
+  try {
+    await copyFile(options.backupFile, tempSqlitePath);
+    validateSqliteFile(tempSqlitePath, "Copied SQLite backup");
+    await rename(tempSqlitePath, options.sqlitePath);
+    return options.sqlitePath;
+  } finally {
+    await cleanupSqliteFile(tempSqlitePath);
+  }
 }
 
 export async function checkSqliteDatabase(
@@ -186,13 +249,7 @@ export async function checkSqliteDatabase(
 ): Promise<{ ok: boolean; integrity: string; missingTables: string[] }> {
   const db = new Database(options.sqlitePath, { fileMustExist: true });
   try {
-    const integrity = checkSqliteIntegrity(db);
-    const missingTables = listMissingCoreTables(db);
-    return {
-      ok: integrity === "ok" && missingTables.length === 0,
-      integrity,
-      missingTables
-    };
+    return checkOpenSqliteDatabase(db);
   } finally {
     db.close();
   }
