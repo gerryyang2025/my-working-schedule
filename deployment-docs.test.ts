@@ -13,7 +13,7 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("SCHEDULE_STORAGE_DRIVER=sqlite");
     expect(runbook).toContain("SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db");
     expect(runbook).toContain("SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule");
-    expect(runbook).toContain("npm run build");
+    expect(runbook).toContain("./optools.sh deploy");
     expect(runbook).toContain("./optools.sh build");
     expect(runbook).toContain("npm run start:api");
     expect(runbook).toContain("./optools.sh app init");
@@ -26,6 +26,8 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("./optools.sh data check");
     expect(runbook).toContain("./optools.sh app status");
     expect(runbook).toContain("./optools.sh doctor");
+    expect(runbook).toContain("EADDRINUSE");
+    expect(runbook).toContain("ss -ltnp | grep ':3001'");
     expect(runbook).toContain("/api/health");
   });
 

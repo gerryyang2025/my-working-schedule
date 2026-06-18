@@ -48,6 +48,7 @@ BACKUP_DIR="${OPTOOLS_BACKUP_DIR:-/var/backups/my-working-schedule}"
 SYSTEMD_SOURCE_FILE="${OPTOOLS_SYSTEMD_SOURCE_FILE:-"$ROOT_DIR/deploy/systemd/my-working-schedule.service.example"}"
 SYSTEMD_SERVICE_FILE="${OPTOOLS_SYSTEMD_SERVICE_FILE:-"/etc/systemd/system/${APP_SERVICE_NAME}.service"}"
 NPM_BIN="${OPTOOLS_NPM_BIN:-}"
+NPM_CANDIDATES="${OPTOOLS_NPM_CANDIDATES:-"/opt/node-v22.22.0/bin/npm /opt/node/bin/npm /usr/local/bin/npm /usr/bin/npm"}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -70,6 +71,7 @@ Usage:
   ./optools.sh dev logs       Show recent daemon logs
   ./optools.sh dev logs -f    Follow daemon logs
   ./optools.sh build          Build frontend assets and install production runtime files
+  ./optools.sh deploy         Build, install dependencies, check services, and restart production app
   ./optools.sh nginx install  Install/configure nginx and reload
   ./optools.sh nginx configure [--no-reload]
   ./optools.sh nginx test     Run nginx -t through the helper
@@ -111,6 +113,7 @@ Environment:
   OPTOOLS_SYSTEMD_SOURCE_FILE systemd source file (default: deploy/systemd/my-working-schedule.service.example)
   OPTOOLS_SYSTEMD_SERVICE_FILE systemd target file (default: /etc/systemd/system/OPTOOLS_APP_SERVICE_NAME.service)
   OPTOOLS_NPM_BIN             npm executable for systemd ExecStart (default: detected with command -v npm)
+  OPTOOLS_NPM_CANDIDATES      Fallback npm candidates for app init/deploy (default: /opt/node-v22.22.0/bin/npm /opt/node/bin/npm /usr/local/bin/npm /usr/bin/npm)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -511,6 +514,13 @@ install_runtime_files() {
   echo "installed runtime: $INSTALL_DIR"
 }
 
+install_production_dependencies() {
+  local npm_bin="$1"
+
+  echo "deploy: installing dependencies in $INSTALL_DIR"
+  "$npm_bin" --prefix "$INSTALL_DIR" ci --include=dev
+}
+
 run_nginx_helper() {
   local command="${1:-help}"
   shift || true
@@ -638,23 +648,66 @@ systemd_target_dir() {
 }
 
 resolve_npm_bin() {
-  local npm_bin="$NPM_BIN"
+  local npm_bin
+  local candidate
+  local path_npm
 
-  if [[ -z "$npm_bin" ]]; then
-    npm_bin="$(command -v npm 2>/dev/null || true)"
-  fi
+  if [[ -n "$NPM_BIN" ]]; then
+    if [[ ! -x "$NPM_BIN" ]]; then
+      echo "npm executable is not executable: $NPM_BIN" >&2
+      return 1
+    fi
 
-  if [[ -z "$npm_bin" ]]; then
-    echo "npm executable not found; install Node.js/npm or set OPTOOLS_NPM_BIN" >&2
+    if npm_is_runnable_by_app_user "$NPM_BIN"; then
+      printf '%s\n' "$NPM_BIN"
+      return 0
+    fi
+
+    print_npm_not_runnable_error "$NPM_BIN"
     return 1
   fi
 
-  if [[ ! -x "$npm_bin" ]]; then
-    echo "npm executable is not executable: $npm_bin" >&2
-    return 1
+  path_npm="$(command -v npm 2>/dev/null || true)"
+  for candidate in "$path_npm" $NPM_CANDIDATES; do
+    if [[ -z "$candidate" || ! -x "$candidate" ]]; then
+      continue
+    fi
+
+    if npm_is_runnable_by_app_user "$candidate"; then
+      printf '%s\n' "$candidate"
+      return 0
+    fi
+  done
+
+  {
+    echo "npm executable not found for service user: $APP_USER"
+    echo "searched candidates:"
+    if [[ -n "$path_npm" ]]; then
+      echo "  $path_npm"
+    fi
+    for npm_bin in $NPM_CANDIDATES; do
+      echo "  $npm_bin"
+    done
+    echo "hint: install or copy Node.js to a service-user accessible path, such as /opt/node-v22.22.0."
+    echo "hint: then rerun: ./optools.sh deploy"
+    echo "hint: for a custom path, use: OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy"
+  } >&2
+  return 1
+}
+
+npm_is_runnable_by_app_user() {
+  local npm_bin="$1"
+  local service_path
+  local runuser_bin
+  service_path="$(service_default_path "$npm_bin")"
+  runuser_bin="$(command -v runuser 2>/dev/null || true)"
+
+  if [[ -n "$runuser_bin" ]]; then
+    env PATH="$service_path" "$runuser_bin" -u "$APP_USER" -- "$npm_bin" --version >/dev/null 2>&1
+    return
   fi
 
-  printf '%s\n' "$npm_bin"
+  [[ -x "$npm_bin" ]]
 }
 
 service_default_path() {
@@ -664,30 +717,18 @@ service_default_path() {
   printf '%s\n' "$npm_dir:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 }
 
-ensure_npm_runnable_by_app_user() {
+print_npm_not_runnable_error() {
   local npm_bin="$1"
-  local service_path
-  service_path="$(service_default_path "$npm_bin")"
 
-  if command -v runuser >/dev/null 2>&1; then
-    if env PATH="$service_path" runuser -u "$APP_USER" -- "$npm_bin" --version >/dev/null 2>&1; then
-      return 0
-    fi
-
-    {
-      echo "npm executable cannot be run by service user: $APP_USER"
-      echo "npm executable: $npm_bin"
-      echo "hint: do not use npm under /root/.nvm for a non-root systemd service."
-      echo "hint: install/copy Node.js to a service-user accessible path, then rerun:"
-      echo "      OPTOOLS_NPM_BIN=/opt/node/bin/npm ./optools.sh app init"
-    } >&2
-    return 1
-  fi
-
-  if [[ ! -x "$npm_bin" ]]; then
-    echo "npm executable is not executable: $npm_bin" >&2
-    return 1
-  fi
+  {
+    echo "npm executable cannot be run by service user: $APP_USER"
+    echo "npm executable: $npm_bin"
+    echo "hint: do not use npm under /root/.nvm for a non-root systemd service."
+    echo "hint: install/copy Node.js to a service-user accessible path, then rerun:"
+    echo "      ./optools.sh deploy"
+    echo "hint: for a custom path, use OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy"
+  } >&2
+  return 1
 }
 
 install_systemd_service_file() {
@@ -754,7 +795,9 @@ systemd_exec_start_is_executable() {
   fi
 
   if command -v runuser >/dev/null 2>&1; then
-    env PATH="$service_path" runuser -u "$APP_USER" -- "$executable" --version >/dev/null 2>&1
+    local runuser_bin
+    runuser_bin="$(command -v runuser)"
+    env PATH="$service_path" "$runuser_bin" -u "$APP_USER" -- "$executable" --version >/dev/null 2>&1
     return
   fi
 
@@ -769,11 +812,10 @@ run_app_init() {
     return 1
   fi
 
-  npm_bin="$(resolve_npm_bin)"
   ensure_systemctl
   ensure_app_group
   ensure_app_user
-  ensure_npm_runnable_by_app_user "$npm_bin"
+  npm_bin="$(resolve_npm_bin)"
 
   mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
   chown -R "$APP_USER:$APP_GROUP" "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
@@ -851,6 +893,66 @@ run_app_helper() {
   esac
 }
 
+list_port_listeners() {
+  local port="$1"
+
+  if command -v ss >/dev/null 2>&1; then
+    ss -ltnp "sport = :$port" 2>/dev/null | awk 'NR > 1 { print }'
+    return 0
+  fi
+
+  if command -v lsof >/dev/null 2>&1; then
+    lsof -nP -iTCP:"$port" -sTCP:LISTEN 2>/dev/null || true
+    return 0
+  fi
+
+  if command -v netstat >/dev/null 2>&1; then
+    netstat -ltnp 2>/dev/null | awk -v port=":$port" '$4 ~ port "$" { print }'
+    return 0
+  fi
+
+  echo "port listener check skipped: ss, lsof, and netstat are unavailable" >&2
+  return 0
+}
+
+ensure_api_port_available() {
+  local listeners
+  listeners="$(list_port_listeners "$API_PORT" || true)"
+
+  if [[ -z "${listeners//[[:space:]]/}" ]]; then
+    echo "deploy: API port ${API_PORT} is available"
+    return 0
+  fi
+
+  {
+    echo "API port is already in use: ${API_PORT}"
+    echo "$listeners"
+    echo "hint: run: ss -ltnp | grep ':${API_PORT}'"
+    echo "hint: or: lsof -nP -iTCP:${API_PORT} -sTCP:LISTEN"
+    echo "hint: stop the conflicting dev/manual API process, then rerun: ./optools.sh deploy"
+  } >&2
+  return 1
+}
+
+run_deploy() {
+  local npm_bin
+
+  echo "deploy: starting"
+  run_app_init
+  build_static_assets
+  npm_bin="$(resolve_npm_bin)"
+  install_production_dependencies "$npm_bin"
+  run_data_helper status
+  run_data_helper check
+  run_nginx_helper test
+  run_app_systemctl stop
+  ensure_api_port_available
+  run_app_systemctl start
+  run_app_doctor
+  health_check "api health" "$API_HEALTH_URL"
+  echo "deploy: completed"
+}
+
 doctor_check() {
   local label="$1"
   shift
@@ -915,6 +1017,9 @@ main() {
       ;;
     build)
       build_static_assets
+      ;;
+    deploy)
+      run_deploy
       ;;
     nginx)
       shift || true

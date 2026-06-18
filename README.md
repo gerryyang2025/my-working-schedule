@@ -161,6 +161,7 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 
 单机正式部署建议使用：
 
+- `./optools.sh deploy` 一键完成初始化、构建、依赖安装、SQLite/Nginx 检查、生产服务重启和健康检查。
 - `./optools.sh build` 构建前端静态资源，并把 API 运行文件安装到 `/opt/my-working-schedule`。
 - `npm run start:api` 启动 Express API。
 - `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。
@@ -172,9 +173,19 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 - `./optools.sh doctor` 聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
-如果 systemd 日志出现 `status=203/EXEC`，通常是 service 中的 `ExecStart` 指向了不存在或服务用户不可执行的 npm。不要把 `/root/.nvm/.../npm` 直接配置给非 root 服务用户；推荐把 Node.js 放到 `/opt/node-v22.22.0` 这类可访问路径，再执行 `OPTOOLS_NPM_BIN=/opt/node-v22.22.0/bin/npm ./optools.sh app init`。`app init` 会同步写入 `Environment=PATH=...`，`app doctor` 会检查 `systemd exec start`。
+推荐部署命令：
 
-如果 systemd 日志出现 `ENOENT: no such file or directory, open '/opt/my-working-schedule/package.json'`，说明生产工作目录尚未安装 API 运行文件。请在源码目录执行 `./optools.sh build`，再进入 `/opt/my-working-schedule` 执行 `npm ci --include=dev`。
+```bash
+cd /root/github/my-working-schedule
+git pull
+./optools.sh deploy
+```
+
+如果 systemd 日志出现 `status=203/EXEC`，通常是 service 中的 `ExecStart` 指向了不存在或服务用户不可执行的 npm。不要把 `/root/.nvm/.../npm` 直接配置给非 root 服务用户；推荐把 Node.js 放到 `/opt/node-v22.22.0` 这类可访问路径。`deploy` 会自动寻找服务用户可执行的 npm；特殊路径可用 `OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy` 覆盖。
+
+如果 systemd 日志出现 `ENOENT: no such file or directory, open '/opt/my-working-schedule/package.json'`，说明生产工作目录尚未安装 API 运行文件。请在源码目录执行 `./optools.sh deploy`。
+
+如果 systemd 日志出现 `EADDRINUSE: address already in use 127.0.0.1:3001`，说明 API 端口被其他进程占用。先执行 `ss -ltnp | grep ':3001'` 或 `lsof -nP -iTCP:3001 -sTCP:LISTEN` 找到占用者，停止开发 daemon 或手工启动的 API 后，再重新执行 `./optools.sh deploy`。
 
 完整步骤见 [正式部署运行手册.md](docs/正式部署运行手册.md)。
 
