@@ -130,6 +130,22 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stdout).toContain(`backup path: ${join(dir, "backups")}`);
   });
 
+  it("reports modified time when the sqlite file exists", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    await createValidSqliteBackup(sqlitePath);
+
+    const result = await runTool(["status"], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("sqlite exists: yes");
+    expect(result.stdout).toContain("sqlite size:");
+    expect(result.stdout).toMatch(/^sqlite modified time: .+$/m);
+  });
+
   it("prints install guidance when sqlite3 is missing", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");

@@ -50,12 +50,24 @@ ensure_dirs() {
   mkdir -p "$(dirname "$SQLITE_PATH")" "$BACKUP_PATH"
 }
 
+sqlite_modified_time() {
+  case "$(uname -s)" in
+    Darwin)
+      stat -f '%Sm' -t '%Y-%m-%d %H:%M:%S %z' "$SQLITE_PATH"
+      ;;
+    *)
+      stat -c '%y' "$SQLITE_PATH"
+      ;;
+  esac
+}
+
 status() {
   printf 'sqlite path: %s\n' "$SQLITE_PATH"
   printf 'backup path: %s\n' "$BACKUP_PATH"
   printf 'json data path: %s\n' "$DATA_PATH"
   if [ -f "$SQLITE_PATH" ]; then
     printf 'sqlite exists: yes\n'
+    printf 'sqlite modified time: %s\n' "$(sqlite_modified_time)"
     printf 'sqlite size: %s bytes\n' "$(wc -c < "$SQLITE_PATH" | tr -d ' ')"
   else
     printf 'sqlite exists: no\n'
