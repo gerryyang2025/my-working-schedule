@@ -172,6 +172,8 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 - `./optools.sh doctor` 聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
+如果 systemd 日志出现 `status=203/EXEC`，通常是 service 中的 `ExecStart` 指向了不存在的 npm。重新执行 `./optools.sh app init` 会用当前服务器检测到的 npm 绝对路径重写 service；必要时可用 `OPTOOLS_NPM_BIN=/usr/local/bin/npm ./optools.sh app init` 显式指定。
+
 完整步骤见 [正式部署运行手册.md](docs/正式部署运行手册.md)。
 
 ## 本地启停

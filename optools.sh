@@ -47,6 +47,7 @@ DATA_DIR="${OPTOOLS_DATA_DIR:-/var/lib/my-working-schedule}"
 BACKUP_DIR="${OPTOOLS_BACKUP_DIR:-/var/backups/my-working-schedule}"
 SYSTEMD_SOURCE_FILE="${OPTOOLS_SYSTEMD_SOURCE_FILE:-"$ROOT_DIR/deploy/systemd/my-working-schedule.service.example"}"
 SYSTEMD_SERVICE_FILE="${OPTOOLS_SYSTEMD_SERVICE_FILE:-"/etc/systemd/system/${APP_SERVICE_NAME}.service"}"
+NPM_BIN="${OPTOOLS_NPM_BIN:-}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -109,6 +110,7 @@ Environment:
   OPTOOLS_BACKUP_DIR          SQLite backup directory (default: /var/backups/my-working-schedule)
   OPTOOLS_SYSTEMD_SOURCE_FILE systemd source file (default: deploy/systemd/my-working-schedule.service.example)
   OPTOOLS_SYSTEMD_SERVICE_FILE systemd target file (default: /etc/systemd/system/OPTOOLS_APP_SERVICE_NAME.service)
+  OPTOOLS_NPM_BIN             npm executable for systemd ExecStart (default: detected with command -v npm)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -600,12 +602,73 @@ systemd_target_dir() {
   esac
 }
 
+resolve_npm_bin() {
+  local npm_bin="$NPM_BIN"
+
+  if [[ -z "$npm_bin" ]]; then
+    npm_bin="$(command -v npm 2>/dev/null || true)"
+  fi
+
+  if [[ -z "$npm_bin" ]]; then
+    echo "npm executable not found; install Node.js/npm or set OPTOOLS_NPM_BIN" >&2
+    return 1
+  fi
+
+  if [[ ! -x "$npm_bin" ]]; then
+    echo "npm executable is not executable: $npm_bin" >&2
+    return 1
+  fi
+
+  printf '%s\n' "$npm_bin"
+}
+
+install_systemd_service_file() {
+  local npm_bin="$1"
+
+  awk -v npm_bin="$npm_bin" '
+    BEGIN {
+      replaced = 0
+    }
+    /^ExecStart=/ {
+      print "ExecStart=" npm_bin " run start:api"
+      replaced = 1
+      next
+    }
+    {
+      print
+    }
+    END {
+      if (replaced == 0) {
+        print "ExecStart=" npm_bin " run start:api"
+      }
+    }
+  ' "$SYSTEMD_SOURCE_FILE" > "$SYSTEMD_SERVICE_FILE"
+}
+
+systemd_exec_start_is_executable() {
+  if [[ ! -f "$SYSTEMD_SERVICE_FILE" ]]; then
+    return 1
+  fi
+
+  local line
+  local executable
+  line="$(grep -E '^ExecStart=' "$SYSTEMD_SERVICE_FILE" | tail -n 1 || true)"
+  line="${line#ExecStart=}"
+  line="${line#"${line%%[![:space:]]*}"}"
+  executable="${line%%[[:space:]]*}"
+
+  [[ -n "$executable" && -x "$executable" ]]
+}
+
 run_app_init() {
+  local npm_bin
+
   if [[ ! -f "$SYSTEMD_SOURCE_FILE" ]]; then
     echo "systemd source file not found: $SYSTEMD_SOURCE_FILE" >&2
     return 1
   fi
 
+  npm_bin="$(resolve_npm_bin)"
   ensure_systemctl
   ensure_app_group
   ensure_app_user
@@ -614,7 +677,7 @@ run_app_init() {
   chown -R "$APP_USER:$APP_GROUP" "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
 
   mkdir -p "$(systemd_target_dir "$SYSTEMD_SERVICE_FILE")"
-  cp "$SYSTEMD_SOURCE_FILE" "$SYSTEMD_SERVICE_FILE"
+  install_systemd_service_file "$npm_bin"
   systemctl daemon-reload
   systemctl enable "$APP_SERVICE_NAME"
 
@@ -625,6 +688,7 @@ run_app_init() {
   echo "install dir: $INSTALL_DIR"
   echo "data dir: $DATA_DIR"
   echo "backup dir: $BACKUP_DIR"
+  echo "npm executable: $npm_bin"
   echo "systemd service file: $SYSTEMD_SERVICE_FILE"
 }
 
@@ -639,6 +703,7 @@ run_app_doctor() {
   doctor_check "app data dir" test -d "$DATA_DIR" || failed=1
   doctor_check "app backup dir" test -d "$BACKUP_DIR" || failed=1
   doctor_check "systemd service file" test -f "$SYSTEMD_SERVICE_FILE" || failed=1
+  doctor_check "systemd exec start" systemd_exec_start_is_executable || failed=1
   doctor_check "app service status" run_app_systemctl status || failed=1
 
   if [[ "$failed" == "0" ]]; then

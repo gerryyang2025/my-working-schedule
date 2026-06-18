@@ -267,10 +267,12 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
     const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
     const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
     const sourceFile = join(stateDir, "source.service");
+    const fakeNpmPath = join(fakeBinDir, "npm");
 
     await mkdir(fakeBinDir, { recursive: true });
     await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
     await writeFile(sourceFile, "[Service]\nExecStart=/usr/bin/npm run start:api\n", "utf8");
+    await createExecutable(fakeNpmPath, "exit 0\n");
     await createExecutable(join(fakeBinDir, "getent"), `printf 'getent %s\\n' "$*" >> "$INIT_LOG"\nexit 2\n`);
     await createExecutable(join(fakeBinDir, "groupadd"), `printf 'groupadd %s\\n' "$*" >> "$INIT_LOG"\n`);
     await createExecutable(join(fakeBinDir, "useradd"), `printf 'useradd %s\\n' "$*" >> "$INIT_LOG"\n`);
@@ -292,7 +294,7 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
 
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout).toContain("app init: completed");
-    expect(await readFile(systemdFile, "utf8")).toBe("[Service]\nExecStart=/usr/bin/npm run start:api\n");
+    expect(await readFile(systemdFile, "utf8")).toBe(`[Service]\nExecStart=${fakeNpmPath} run start:api\n`);
     expect(await readFile(logPath, "utf8")).toBe(
       [
         "getent group schedule-group",
@@ -345,6 +347,36 @@ exit 2
     expect(result.stdout).toContain("[ok] app group");
     expect(result.stdout).toContain("[fail] app user");
     expect(result.stdout).toContain("[ok] app install dir");
+    expect(result.stdout).toContain("app doctor: failed");
+  });
+
+  it("reports app doctor failures when systemd ExecStart is not executable", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
+
+    await mkdir(installDir, { recursive: true });
+    await mkdir(dataDir, { recursive: true });
+    await mkdir(backupDir, { recursive: true });
+    await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
+    await writeFile(systemdFile, "[Service]\nExecStart=/missing/npm run start:api\n", "utf8");
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(join(fakeBinDir, "getent"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "systemctl"), "exit 0\n");
+
+    const result = await runOptools(["app", "doctor"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("[fail] systemd exec start");
     expect(result.stdout).toContain("app doctor: failed");
   });
 
