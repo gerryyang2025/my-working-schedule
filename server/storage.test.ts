@@ -2,6 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { normalizeAppData } from "./app-data";
 import { DEFAULT_STORAGE_PATH, createJsonStorage } from "./storage";
 
 const tempDirs: string[] = [];
@@ -14,6 +15,28 @@ async function createTempDataPath() {
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+});
+
+describe("app data normalization", () => {
+  it("normalizes legacy data without monthly settlements", () => {
+    const legacyData = {
+      staff: [],
+      shifts: [],
+      holidays: [],
+      scheduleEntries: [],
+      settings: {
+        defaultRequiredShiftsPerWeek: 5,
+        version: 1
+      }
+    };
+
+    const result = normalizeAppData(legacyData);
+
+    expect(result.changed).toBe(true);
+    expect(result.data).toMatchObject({
+      monthlySettlements: []
+    });
+  });
 });
 
 describe("JSON storage", () => {
