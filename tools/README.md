@@ -14,7 +14,7 @@ SQLite is an embedded file database. This project does not run a separate SQLite
 ./tools/sqlite-service.sh check
 ```
 
-`install` is a preflight check that verifies `sqlite3`, `node`, and `npm` are available and prints install guidance. It does not install packages, run `sudo`, or create app directories.
+`install` is a non-mutating preflight check that verifies `sqlite3`, `node`, `npm`, and the local npm toolchain used by `npm run data:*` are available. In the current dev-mode flow that means `node_modules/.bin/tsx` must exist and be executable; if it is missing, run `npm ci --include=dev` in the repo first. It does not install packages, run `sudo`, or create app directories.
 
 `check` delegates to the app-level SQLite integrity check and does not require the system `sqlite3` command.
 

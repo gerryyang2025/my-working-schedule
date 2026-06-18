@@ -152,7 +152,7 @@ tools/
 
 | 命令 | 职责 |
 | --- | --- |
-| `install` | 执行非写入式预检，检查 `sqlite3`、`node` 和 `npm` 可用性；如缺失则给出 Ubuntu/Debian 安装提示，并输出状态 |
+| `install` | 执行非写入式预检，检查 `sqlite3`、`node`、`npm` 以及当前 `npm run data:*` 所需的本地 npm 依赖（至少 `node_modules/.bin/tsx`）可用性；如缺失则给出安装提示，并输出状态 |
 | `init` | 初始化 SQLite 数据库文件和基础表结构；不从 JSON 隐式迁移数据 |
 | `migrate` | 调用 JSON 到 SQLite 迁移能力，并输出迁移校验报告 |
 | `backup` | 调用 SQLite 备份能力，生成带时间戳的备份文件 |

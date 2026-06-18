@@ -1,6 +1,6 @@
 import { execFile, type ExecFileException } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -13,6 +13,7 @@ interface CommandResult {
 }
 
 const tempDirs: string[] = [];
+const tempFiles: string[] = [];
 const bashPath = "/bin/bash";
 const scriptPath = resolve(process.cwd(), "tools/sqlite-service.sh");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
@@ -96,6 +97,17 @@ exit 0
   return fakeBin;
 }
 
+async function createFakeLocalTsx(rootDir: string) {
+  const tsxPath = join(rootDir, "node_modules", ".bin", "tsx");
+  if (existsSync(tsxPath)) {
+    return tsxPath;
+  }
+  await mkdir(dirname(tsxPath), { recursive: true });
+  await createFakeExecutable(tsxPath, "exit 0\n");
+  tempFiles.push(tsxPath);
+  return tsxPath;
+}
+
 async function readLog(path: string) {
   return readFile(path, "utf8");
 }
@@ -107,6 +119,7 @@ async function createValidSqliteBackup(path: string) {
 
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
+  await Promise.all(tempFiles.splice(0).map((file) => rm(file, { force: true })));
 });
 
 describe("tools/sqlite-service.sh", () => {
@@ -204,6 +217,7 @@ describe("tools/sqlite-service.sh", () => {
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
     await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
     await createFakeExecutable(join(fakeBin, "npm"), "exit 0\n");
+    await createFakeLocalTsx(process.cwd());
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -215,6 +229,41 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stdout).toContain(`sqlite path: ${join(sqliteDir, "schedule.db")}`);
     expect(existsSync(sqliteDir)).toBe(false);
     expect(existsSync(backupDir)).toBe(false);
+  });
+
+  it("prints install guidance when local tsx dependencies are missing", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "npm"), "exit 0\n");
+
+    const tsxPath = join(process.cwd(), "node_modules", ".bin", "tsx");
+    const tsxBackupPath = join(dir, "tsx-backup");
+    const hadRealTsx = existsSync(tsxPath);
+    if (hadRealTsx) {
+      await mkdir(dirname(tsxBackupPath), { recursive: true });
+      await rm(tsxBackupPath, { force: true, recursive: true });
+      await rename(tsxPath, tsxBackupPath);
+    }
+
+    try {
+      const result = await runTool(["install"], {
+        PATH: fakeBin,
+        SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+        SCHEDULE_BACKUP_PATH: join(dir, "backups")
+      });
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain("Local npm dependency 'tsx' is missing");
+      expect(result.stderr).toContain("npm ci --include=dev");
+    } finally {
+      if (hadRealTsx) {
+        await mkdir(dirname(tsxPath), { recursive: true });
+        await rename(tsxBackupPath, tsxPath);
+      }
+    }
   });
 
   it("delegates maintenance commands to npm with configured env", async () => {
