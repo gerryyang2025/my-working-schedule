@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createSeedData } from "./seed";
 import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./sqlite/mapper";
 import { initializeSqliteSchema } from "./sqlite/schema";
+import { createSqliteStorage } from "./sqlite/storage";
 import type { AppData, MonthlySettlement } from "./types";
 
 const tempDirs: string[] = [];
@@ -422,5 +423,60 @@ describe("SQLite schema and mapper", () => {
     } finally {
       db.close();
     }
+  });
+
+  it("rejects a missing SQLite database file", async () => {
+    const path = await createTempDbPath();
+    await rm(path, { force: true });
+    const storage = createSqliteStorage(path);
+
+    await expect(storage.load()).rejects.toThrow("SQLite 数据库文件不存在，请先执行迁移或初始化命令");
+  });
+
+  it("loads explicit SQLite data without creating seed data implicitly", async () => {
+    const path = await createTempDbPath();
+    const db = new Database(path);
+    initializeSqliteSchema(db);
+    replaceAppDataInSqlite(db, createSeedData());
+    db.close();
+
+    const storage = createSqliteStorage(path);
+
+    const data = await storage.load();
+
+    expect(data.staff).toHaveLength(3);
+    expect(data.shifts).toHaveLength(5);
+  });
+
+  it("serializes concurrent SQLite updates", async () => {
+    const path = await createTempDbPath();
+    const db = new Database(path);
+    initializeSqliteSchema(db);
+    replaceAppDataInSqlite(db, createSeedData());
+    db.close();
+    const storage = createSqliteStorage(path);
+
+    await Promise.all([
+      storage.update((data) => ({
+        ...data,
+        scheduleEntries: [
+          ...data.scheduleEntries,
+          { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+        ]
+      })),
+      storage.update((data) => ({
+        ...data,
+        scheduleEntries: [
+          ...data.scheduleEntries,
+          { id: "2026-06-16__staff-clerk-001", date: "2026-06-16", staffId: "staff-clerk-001", shiftIds: ["shift-office"], note: "" }
+        ]
+      }))
+    ]);
+
+    const loaded = await storage.load();
+    expect(loaded.scheduleEntries.map((entry) => entry.id).sort()).toEqual([
+      "2026-06-15__staff-nurse-001",
+      "2026-06-16__staff-clerk-001"
+    ]);
   });
 });

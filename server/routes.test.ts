@@ -1,9 +1,16 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import Database from "better-sqlite3";
 import express from "express";
 import request from "supertest";
 import { describe, expect, it } from "vitest";
 import type { AppData, Holiday, Shift, StaffMember } from "../src/types/domain";
 import { createRoutes } from "./routes";
 import { createSeedData } from "./seed";
+import { replaceAppDataInSqlite } from "./sqlite/mapper";
+import { initializeSqliteSchema } from "./sqlite/schema";
+import { createSqliteStorage } from "./sqlite/storage";
 
 const TEST_ADMIN_PASSWORD = "123456";
 
@@ -243,6 +250,40 @@ describe("API routes", () => {
       .expect(200);
     expect(response.body.scheduleEntries).toHaveLength(1);
     expect(response.body.scheduleEntries[0].id).toBe("2026-06-15__staff-nurse-001");
+  });
+
+  it("supports representative API writes with SQLite storage", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "schedule-routes-sqlite-"));
+    try {
+      const dbPath = join(dir, "schedule.db");
+      const db = new Database(dbPath);
+      initializeSqliteSchema(db);
+      replaceAppDataInSqlite(db, createSeedData());
+      db.close();
+
+      const app = express();
+      app.use(express.json());
+      app.use("/api", createRoutes(createSqliteStorage(dbPath), { adminPassword: TEST_ADMIN_PASSWORD }));
+      const headers = await adminHeaders(app);
+
+      await request(app)
+        .put("/api/data/schedule-entry")
+        .set(headers)
+        .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+        .expect(200);
+
+      const response = await request(app).get("/api/data").expect(200);
+      expect(response.body.scheduleEntries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2026-06-15__staff-nurse-001",
+            shiftIds: ["shift-a1"]
+          })
+        ])
+      );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 
   it("normalizes omitted schedule entry notes to an empty string", async () => {

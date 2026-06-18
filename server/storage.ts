@@ -1,8 +1,12 @@
+import { resolve } from "node:path";
 import type { ServerConfig } from "./config";
 import { createJsonStorage, DEFAULT_STORAGE_PATH } from "./json-storage";
+import { createSqliteStorage } from "./sqlite/storage";
 import type { AppData } from "./types";
 
-export { createJsonStorage, DEFAULT_STORAGE_PATH };
+export { createJsonStorage, DEFAULT_STORAGE_PATH, createSqliteStorage };
+
+export const DEFAULT_SQLITE_PATH = resolve(process.cwd(), "data/schedule.db");
 
 export interface StorageAdapter {
   load(): Promise<AppData>;
@@ -15,5 +19,5 @@ export function createConfiguredStorage(config: ServerConfig): StorageAdapter {
     return createJsonStorage(config.storagePath);
   }
 
-  throw new Error("SQLite 存储尚未实现");
+  return createSqliteStorage(config.sqlitePath ?? DEFAULT_SQLITE_PATH);
 }
