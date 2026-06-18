@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "concurrently -k \"npm:dev:api\" \"npm:dev:web\"",
     "dev:web": "vite --host ${WEB_HOST:-0.0.0.0} --port ${WEB_PORT:-5173}",
-    "dev:api": "node --watch-preserve-output --watch-path=server/index.ts --watch-path=server/app-data.ts --watch-path=server/config.ts --watch-path=server/json-storage.ts --watch-path=server/routes.ts --watch-path=server/seed.ts --watch-path=server/storage.ts --watch-path=server/types.ts --watch-path=server/sqlite/maintenance.ts --watch-path=server/sqlite/mapper.ts --watch-path=server/sqlite/schema.ts --watch-path=server/sqlite/storage.ts --import tsx server/index.ts",
+    "dev:api": "node --watch --watch-preserve-output --import tsx server/index.ts",
     "build": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
     "test": "vitest run",
     "test:watch": "vitest",

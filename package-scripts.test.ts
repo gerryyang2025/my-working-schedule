@@ -18,8 +18,10 @@ describe("package scripts", () => {
     };
 
     expect(packageJson.scripts["dev:api"]).toContain("node");
-    expect(packageJson.scripts["dev:api"]).toContain("--watch-path=server/index.ts");
+    expect(packageJson.scripts["dev:api"]).toContain("--watch");
+    expect(packageJson.scripts["dev:api"]).toContain("--watch-preserve-output");
     expect(packageJson.scripts["dev:api"]).toContain("--import tsx server/index.ts");
+    expect(packageJson.scripts["dev:api"]).not.toContain("--watch-path");
     expect(packageJson.scripts["dev:api"]).not.toContain("tsx watch");
   });
 

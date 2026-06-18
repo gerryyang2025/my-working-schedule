@@ -223,12 +223,12 @@ return {
 In `package.json`, add:
 
 ```json
-"data:init:sqlite": "tsx server/data-cli.ts init",
-"data:migrate:sqlite": "tsx server/data-cli.ts migrate",
-"data:export:json": "tsx server/data-cli.ts export-json",
-"data:backup": "tsx server/data-cli.ts backup",
-"data:restore": "tsx server/data-cli.ts restore",
-"data:check:sqlite": "tsx server/data-cli.ts check"
+"data:init:sqlite": "node --import tsx server/data-cli.ts init",
+"data:migrate:sqlite": "node --import tsx server/data-cli.ts migrate",
+"data:export:json": "node --import tsx server/data-cli.ts export-json",
+"data:backup": "node --import tsx server/data-cli.ts backup",
+"data:restore": "node --import tsx server/data-cli.ts restore",
+"data:check:sqlite": "node --import tsx server/data-cli.ts check"
 ```
 
 Update `package-scripts.test.ts` with:
@@ -239,12 +239,12 @@ it("exposes SQLite data maintenance scripts", async () => {
     scripts: Record<string, string>;
   };
 
-  expect(packageJson.scripts["data:init:sqlite"]).toBe("tsx server/data-cli.ts init");
-  expect(packageJson.scripts["data:migrate:sqlite"]).toBe("tsx server/data-cli.ts migrate");
-  expect(packageJson.scripts["data:export:json"]).toBe("tsx server/data-cli.ts export-json");
-  expect(packageJson.scripts["data:backup"]).toBe("tsx server/data-cli.ts backup");
-  expect(packageJson.scripts["data:restore"]).toBe("tsx server/data-cli.ts restore");
-  expect(packageJson.scripts["data:check:sqlite"]).toBe("tsx server/data-cli.ts check");
+  expect(packageJson.scripts["data:init:sqlite"]).toBe("node --import tsx server/data-cli.ts init");
+  expect(packageJson.scripts["data:migrate:sqlite"]).toBe("node --import tsx server/data-cli.ts migrate");
+  expect(packageJson.scripts["data:export:json"]).toBe("node --import tsx server/data-cli.ts export-json");
+  expect(packageJson.scripts["data:backup"]).toBe("node --import tsx server/data-cli.ts backup");
+  expect(packageJson.scripts["data:restore"]).toBe("node --import tsx server/data-cli.ts restore");
+  expect(packageJson.scripts["data:check:sqlite"]).toBe("node --import tsx server/data-cli.ts check");
 });
 ```
 
@@ -1350,7 +1350,7 @@ async function main() {
     return;
   }
 
-  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|restore|check>");
+  console.error("Usage: node --import tsx server/data-cli.ts <init|migrate|export-json|backup|restore|check>");
   process.exitCode = 1;
 }
 
@@ -1625,7 +1625,7 @@ Add branch:
 if (command === "restore") {
   const backupFile = process.argv[3];
   if (!backupFile) {
-    console.error("Usage: tsx server/data-cli.ts restore <backup-file>");
+    console.error("Usage: node --import tsx server/data-cli.ts restore <backup-file>");
     process.exitCode = 1;
     return;
   }
