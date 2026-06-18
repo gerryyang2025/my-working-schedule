@@ -30,9 +30,10 @@ Short restore runbook:
 
 1. Stop the Web/API service.
 2. Run `CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>`.
-3. Run `./tools/sqlite-service.sh check`.
-4. Restart the Web/API service.
-5. Verify the service health endpoint or normal startup health checks.
+3. Make sure `SCHEDULE_BACKUP_PATH` has enough free space for a full backup of the current database, because restore creates that safety copy first.
+4. Run `./tools/sqlite-service.sh check`.
+5. Restart the Web/API service.
+6. Verify the service health endpoint or normal startup health checks.
 
 ## Recommended Linux Paths
 

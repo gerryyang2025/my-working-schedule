@@ -488,6 +488,29 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stderr).toContain(restoreGuidance);
   });
 
+  it("runs the real data preflight script end to end", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "data", "app-data.local.json");
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+
+    const result = await runDataCli(["preflight"], {
+      SCHEDULE_DATA_PATH: jsonPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath
+    });
+
+    expect(result.code, `preflight stderr: ${result.stderr}`).toBe(0);
+    expect(result.stderr).toBe("");
+    expect(JSON.parse(result.stdout.trim())).toEqual({
+      ok: true,
+      command: "preflight",
+      jsonPath,
+      sqlitePath,
+      backupPath
+    });
+  });
+
   it("rejects unsafe relative paths for direct data restore", async () => {
     for (const backupFile of ["nested/backup.db", "../escape.db", "nested\\backup.db", ".", ".."]) {
       const dir = await createTempDir();
