@@ -14,6 +14,7 @@ SQLite 存储迁移、备份、恢复和 Linux 维护脚本已经实现。下一
 - 生产 API 启动脚本。
 - systemd 服务示例。
 - Nginx 反向代理示例。
+- Nginx 安装配置脚本，用于处理 nginx 未安装和 `/etc/nginx/conf.d` 不存在的目标机。
 - SQLite 备份定时任务示例。
 - 正式部署运行手册。
 - README、技术方案和功能跟进清单同步。
@@ -39,4 +40,5 @@ SQLite 配置通过 systemd `Environment=` 或 `config/server.local.json` 提供
 - 生产部署手册必须包含 SQLite、构建、启动、systemd、备份和健康检查命令。
 - 生产配置示例必须默认 SQLite，且不能包含真实密码。
 - systemd、Nginx 和 cron 示例必须指向生产命令和正式路径。
+- Nginx 工具脚本必须能安装 nginx、创建配置目录、复制配置、执行 `nginx -t`，并支持不 reload 的配置验证模式。
 - `package.json` 必须提供不依赖开发 watcher 的 `start:api` 脚本。

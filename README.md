@@ -164,6 +164,7 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 - `npm run start:api` 启动 Express API。
 - `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。
 - `deploy/nginx/my-working-schedule.conf.example` 提供静态资源和 `/api/` 反向代理。
+- `tools/nginx-service.sh` 安装 nginx、创建 `conf.d`、复制配置并执行 `nginx -t`。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
 完整步骤见 [正式部署运行手册.md](docs/正式部署运行手册.md)。

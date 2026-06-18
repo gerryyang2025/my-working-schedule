@@ -16,6 +16,7 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("npm run build");
     expect(runbook).toContain("npm run start:api");
     expect(runbook).toContain("systemctl status my-working-schedule");
+    expect(runbook).toContain("./tools/nginx-service.sh install");
     expect(runbook).toContain("./tools/sqlite-service.sh backup");
     expect(runbook).toContain("./tools/sqlite-service.sh check");
     expect(runbook).toContain("/api/health");

@@ -43,6 +43,8 @@ Expected before implementation: missing runbook/example files and missing `start
 - Create: `deploy/systemd/my-working-schedule.service.example`
 - Create: `deploy/nginx/my-working-schedule.conf.example`
 - Create: `deploy/cron/my-working-schedule-backup.cron.example`
+- Create: `tools/nginx-service.sh`
+- Test: `tools/nginx-service.test.ts`
 
 - [x] **Step 1: Add `start:api`**
 
@@ -55,6 +57,10 @@ Add:
 - [x] **Step 2: Add production config and Linux examples**
 
 Use SQLite by default, bind API to `127.0.0.1`, point static files to `dist`, proxy `/api/`, and schedule daily SQLite backup.
+
+- [x] **Step 3: Add Nginx install/configure helper**
+
+Add `tools/nginx-service.sh` to install nginx with `dnf`, `yum`, or `apt-get`, create `/etc/nginx/conf.d`, copy the project Nginx example, run `nginx -t`, and reload nginx. Cover the target-server failure where `nginx` is missing and `/etc/nginx/conf.d` does not exist.
 
 ### Task 3: Add Runbook and Sync Tracking Docs
 

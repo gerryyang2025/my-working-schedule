@@ -1,6 +1,6 @@
 # SQLite Linux Maintenance Tools
 
-SQLite is an embedded file database. This project does not run a separate SQLite daemon. The long-running production process is the Web/API service; this directory only maintains the SQLite database file used by that service.
+SQLite is an embedded file database. This project does not run a separate SQLite daemon. The long-running production process is the Web/API service; this directory maintains production helper scripts for the SQLite database file and Nginx reverse proxy used by that service.
 
 ## Commands
 
@@ -72,3 +72,26 @@ export SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
 ```
 
 The service user must be able to read and write the database file and backup directory.
+
+## Nginx Helper
+
+Use the Nginx helper from the project root:
+
+```bash
+./tools/nginx-service.sh install
+./tools/nginx-service.sh configure --no-reload
+./tools/nginx-service.sh test
+./tools/nginx-service.sh reload
+./tools/nginx-service.sh status
+```
+
+`install` handles the common failure where `nginx` is not installed and `/etc/nginx/conf.d` does not exist. It detects `dnf`, `yum`, or `apt-get`, installs nginx when needed, creates the config directory, copies `deploy/nginx/my-working-schedule.conf.example` to `/etc/nginx/conf.d/my-working-schedule.conf`, runs `nginx -t`, and reloads nginx through systemd when available.
+
+Useful overrides:
+
+```bash
+NGINX_CONF_DIR=/etc/nginx/conf.d
+NGINX_CONF_FILE=/etc/nginx/conf.d/my-working-schedule.conf
+NGINX_SOURCE_CONF=/opt/my-working-schedule/deploy/nginx/my-working-schedule.conf.example
+NGINX_SERVICE_NAME=nginx
+```
