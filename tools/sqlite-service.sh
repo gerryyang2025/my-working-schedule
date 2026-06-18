@@ -84,6 +84,10 @@ case "$COMMAND" in
       exit 1
     fi
     case "$BACKUP_FILE" in
+      /)
+        printf 'restore backup filename must be a simple filename under backup path\n' >&2
+        exit 1
+        ;;
       /*)
         RESTORE_BACKUP_FILE="$BACKUP_FILE"
         ;;

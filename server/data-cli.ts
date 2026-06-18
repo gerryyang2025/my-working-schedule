@@ -19,6 +19,10 @@ const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=y
 const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
 
 function resolveRestoreBackupFile(backupFile: string): string | null {
+  if (backupFile === "/") {
+    return null;
+  }
+
   if (isAbsolute(backupFile) || win32.isAbsolute(backupFile)) {
     return backupFile;
   }

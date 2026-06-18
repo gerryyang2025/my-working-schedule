@@ -271,6 +271,28 @@ describe("tools/sqlite-service.sh", () => {
     ]);
   });
 
+  it("rejects the root path for restore before invoking npm", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const sqliteDir = join(dir, "sqlite");
+    const backupDir = join(dir, "backups");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "npm"), "echo npm should not be invoked >&2\nexit 64\n");
+
+    const result = await runTool(["restore", "/"], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupDir,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+    expect(result.stderr).not.toContain("npm should not be invoked");
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
+  });
+
   it("resolves dotted restore backup filenames under the backup path", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
@@ -414,5 +436,22 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
     expect(result.stdout).toContain(sqlitePath);
     expect(existsSync(sqlitePath)).toBe(true);
+  });
+
+  it("rejects the root path for direct data restore before restore", async () => {
+    const dir = await createTempDir();
+    const sqliteDir = join(dir, "sqlite");
+    const backupDir = join(dir, "backups");
+
+    const result = await runDataCli(["restore", "/"], {
+      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupDir,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
   });
 });
