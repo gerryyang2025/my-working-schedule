@@ -24,6 +24,8 @@ Restore is intentionally guarded:
 CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 ```
 
+Relative restore values must be simple filenames in `SCHEDULE_BACKUP_PATH`; absolute paths are passed through unchanged.
+
 ## Recommended Linux Paths
 
 ```bash

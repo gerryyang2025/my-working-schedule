@@ -15,6 +15,7 @@ const tempDirs: string[] = [];
 const bashPath = "/bin/bash";
 const scriptPath = resolve(process.cwd(), "tools/sqlite-service.sh");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
+const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
 
 async function createTempDir() {
   const dir = await mkdtemp(join(tmpdir(), "sqlite-service-test-"));
@@ -262,6 +263,28 @@ describe("tools/sqlite-service.sh", () => {
       "arg3=--",
       `arg4=${backupFile}`
     ]);
+  });
+
+  it("rejects relative restore paths before invoking npm", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const sqliteDir = join(dir, "sqlite");
+    const backupDir = join(dir, "backups");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "npm"), "echo npm should not be invoked >&2\nexit 64\n");
+
+    const result = await runTool(["restore", "../escape.db"], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupDir,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+    expect(result.stderr).not.toContain("npm should not be invoked");
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
   });
 
   it("does not invoke npm or create dirs for restore without confirmation", async () => {

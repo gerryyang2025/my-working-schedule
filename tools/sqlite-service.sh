@@ -87,6 +87,10 @@ case "$COMMAND" in
       /*)
         RESTORE_BACKUP_FILE="$BACKUP_FILE"
         ;;
+      */*|*..*)
+        printf 'restore backup filename must be a simple filename under backup path\n' >&2
+        exit 1
+        ;;
       *)
         RESTORE_BACKUP_FILE="${BACKUP_PATH%/}/$BACKUP_FILE"
         ;;
