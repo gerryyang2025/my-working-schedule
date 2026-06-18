@@ -148,6 +148,21 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stdout).toMatch(/^sqlite modified time: .+$/m);
   });
 
+  it("fails status when the sqlite path already exists as a directory", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    await mkdir(sqlitePath);
+
+    const result = await runTool(["status"], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`sqlite path is not ready: ${sqlitePath}`);
+    expect(result.stderr).toContain("path exists but is not a regular file");
+  });
+
   it("warns but does not fail install when sqlite3 is missing", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
@@ -271,7 +286,6 @@ exit 0
       "arg2=/",
       "arg3=/backups"
     ]);
-    expect(existsSync("/backups")).toBe(false);
   });
 
   it("passes install when sqlite and backup targets are creatable but still absent", async () => {

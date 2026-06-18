@@ -199,7 +199,12 @@ status() {
   printf 'sqlite path: %s\n' "$SQLITE_PATH"
   printf 'backup path: %s\n' "$BACKUP_PATH"
   printf 'json data path: %s\n' "$DATA_PATH"
-  if [ -f "$SQLITE_PATH" ]; then
+  if [ -e "$SQLITE_PATH" ]; then
+    if [ ! -f "$SQLITE_PATH" ]; then
+      printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
+      printf 'path exists but is not a regular file\n' >&2
+      return 1
+    fi
     printf 'sqlite exists: yes\n'
     ensure_existing_sqlite_file_readable
     if ! sqlite_mtime="$(sqlite_modified_time)"; then
