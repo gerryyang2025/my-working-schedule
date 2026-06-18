@@ -592,6 +592,75 @@ exit 0
     ]);
   });
 
+  it.each([
+    {
+      name: "install",
+      args: ["install"],
+      preserveSystemPath: false
+    },
+    {
+      name: "check",
+      args: ["check"],
+      preserveSystemPath: true
+    }
+  ])('fails %s when runtime preflight JSON omits required fields', async ({ args, preserveSystemPath }) => {
+    const cases = [
+      {
+        label: 'missing "ok": true',
+        preflightOutput: '{\n  "command": "preflight"\n}\n',
+        expectedMessage: 'maintenance runtime preflight output did not include "ok": true'
+      },
+      {
+        label: 'missing "command": "preflight"',
+        preflightOutput: '{\n  "ok": true\n}\n',
+        expectedMessage: 'maintenance runtime preflight output did not include "command": "preflight"'
+      }
+    ] as const;
+
+    for (const testCase of cases) {
+      const dir = await createTempDir();
+      const fakeBin = join(dir, "bin");
+      const logPath = join(dir, `${args[0]}-${testCase.label}.log`);
+      await mkdir(fakeBin);
+      await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+      await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+      await createFakeExecutable(
+        join(fakeBin, "npm"),
+        `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$NPM_LOG"
+if [ "$#" -ge 2 ] && [ "$1" = "run" ] && [ "$2" = "data:preflight" ]; then
+  printf '${testCase.preflightOutput}'
+fi
+exit 0
+`
+      );
+
+      const result = await runTool(args, {
+        PATH: preserveSystemPath ? `${fakeBin}:${process.env.PATH ?? ""}` : fakeBin,
+        NPM_LOG: logPath,
+        SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+        SCHEDULE_BACKUP_PATH: join(dir, "backups")
+      });
+
+      expect(result.code, `${args[0]} ${testCase.label} stderr: ${result.stderr}`).toBe(1);
+      expect(result.stderr).toContain(testCase.expectedMessage);
+      expect(result.stderr).toContain(testCase.preflightOutput.trim());
+      expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+        `cwd=${process.cwd()}`,
+        "argc=2",
+        "arg1=run",
+        "arg2=data:preflight"
+      ]);
+    }
+  });
+
   it("delegates maintenance commands to npm with configured env", async () => {
     const cases = [
       {
