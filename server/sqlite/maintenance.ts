@@ -62,6 +62,10 @@ async function cleanupSqliteFile(path: string): Promise<void> {
   );
 }
 
+async function cleanupSqliteSidecars(path: string): Promise<void> {
+  await Promise.all([`${path}-shm`, `${path}-wal`].map((candidate) => rm(candidate, { force: true })));
+}
+
 function ensureDefaultSettings(db: Database.Database): void {
   db.prepare("insert or ignore into app_settings (key, value) values (?, ?)").run("defaultRequiredShiftsPerWeek", "5");
   db.prepare("insert or ignore into app_settings (key, value) values (?, ?)").run("version", "1");
@@ -237,6 +241,7 @@ export async function restoreSqliteBackup(options: RestoreOptions): Promise<stri
   try {
     await copyFile(options.backupFile, tempSqlitePath);
     validateSqliteFile(tempSqlitePath, "Copied SQLite backup");
+    await cleanupSqliteSidecars(options.sqlitePath);
     await rename(tempSqlitePath, options.sqlitePath);
     return options.sqlitePath;
   } finally {

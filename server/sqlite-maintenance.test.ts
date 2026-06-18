@@ -235,6 +235,60 @@ describe("SQLite maintenance", () => {
     expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(replacement.scheduleEntries);
   });
 
+  it("removes destination SQLite WAL and SHM sidecars during restore", async () => {
+    const dir = await createTempDir();
+    const currentJsonPath = join(dir, "current.json");
+    const replacementJsonPath = join(dir, "replacement.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const migrationBackups = join(dir, "migration-backups");
+    const replacementBackupPath = join(dir, "replacement-backups");
+    const restoreBackupPath = join(dir, "restore-backups");
+    const current = createSeedData();
+    current.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "current"
+      }
+    ];
+    const replacement = createSeedData();
+    replacement.scheduleEntries = [
+      {
+        id: "2026-06-16__staff-nurse-001",
+        date: "2026-06-16",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "replacement"
+      }
+    ];
+    await writeAppData(currentJsonPath, current);
+    await writeAppData(replacementJsonPath, replacement);
+    await migrateJsonToSqlite({ jsonPath: currentJsonPath, sqlitePath, backupPath: migrationBackups });
+
+    const replacementSqlitePath = join(dir, "replacement.db");
+    await migrateJsonToSqlite({
+      jsonPath: replacementJsonPath,
+      sqlitePath: replacementSqlitePath,
+      backupPath: migrationBackups
+    });
+    const replacementBackupFile = await backupSqliteDatabase({
+      sqlitePath: replacementSqlitePath,
+      backupPath: replacementBackupPath
+    });
+
+    await rm(sqlitePath, { force: true });
+    await writeFile(`${sqlitePath}-wal`, "stale wal", "utf8");
+    await writeFile(`${sqlitePath}-shm`, "stale shm", "utf8");
+
+    await restoreSqliteBackup({ sqlitePath, backupPath: restoreBackupPath, backupFile: replacementBackupFile, confirm: true });
+
+    expect(existsSync(`${sqlitePath}-wal`)).toBe(false);
+    expect(existsSync(`${sqlitePath}-shm`)).toBe(false);
+    expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(replacement.scheduleEntries);
+  });
+
   it("rejects a corrupt restore backup before touching the current database", async () => {
     const dir = await createTempDir();
     const jsonPath = join(dir, "app-data.local.json");
