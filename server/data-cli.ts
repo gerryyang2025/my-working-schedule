@@ -35,6 +35,23 @@ function resolveRestoreBackupFile(backupFile: string): string | null {
 }
 
 async function main() {
+  if (command === "preflight") {
+    console.log(
+      JSON.stringify(
+        {
+          ok: true,
+          command: "preflight",
+          jsonPath,
+          sqlitePath,
+          backupPath
+        },
+        null,
+        2
+      )
+    );
+    return;
+  }
+
   if (command === "init") {
     console.log(await initSqliteDatabase({ sqlitePath }));
     return;
@@ -91,7 +108,7 @@ async function main() {
     return;
   }
 
-  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|restore|check>");
+  console.error("Usage: tsx server/data-cli.ts <preflight|init|migrate|export-json|backup|restore|check>");
   process.exitCode = 1;
 }
 

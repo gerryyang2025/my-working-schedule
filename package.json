@@ -17,7 +17,8 @@
     "data:export:json": "tsx server/data-cli.ts export-json",
     "data:backup": "tsx server/data-cli.ts backup",
     "data:restore": "tsx server/data-cli.ts restore",
-    "data:check:sqlite": "tsx server/data-cli.ts check"
+    "data:check:sqlite": "tsx server/data-cli.ts check",
+    "data:preflight": "tsx server/data-cli.ts preflight"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",

@@ -23,5 +23,6 @@ describe("package scripts", () => {
     expect(packageJson.scripts["data:backup"]).toBe("tsx server/data-cli.ts backup");
     expect(packageJson.scripts["data:restore"]).toBe("tsx server/data-cli.ts restore");
     expect(packageJson.scripts["data:check:sqlite"]).toBe("tsx server/data-cli.ts check");
+    expect(packageJson.scripts["data:preflight"]).toBe("tsx server/data-cli.ts preflight");
   });
 });

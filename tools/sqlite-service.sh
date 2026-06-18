@@ -46,16 +46,6 @@ ensure_npm() {
   fi
 }
 
-ensure_local_npm_dependencies() {
-  local tsx_path="$ROOT_DIR/node_modules/.bin/tsx"
-  if [ ! -x "$tsx_path" ]; then
-    printf "Local npm dependency 'tsx' is missing or not executable at %s\n" "$tsx_path" >&2
-    printf "Run 'npm ci --include=dev' in %s before using sqlite maintenance commands.\n" "$ROOT_DIR" >&2
-    printf 'For later production builds, this preflight can stop depending on dev tools once the maintenance flow no longer requires tsx.\n' >&2
-    return 1
-  fi
-}
-
 ensure_dirs() {
   mkdir -p "$(dirname "$SQLITE_PATH")" "$BACKUP_PATH"
 }
@@ -97,7 +87,7 @@ case "$COMMAND" in
     ensure_sqlite3
     ensure_node
     ensure_npm
-    ensure_local_npm_dependencies
+    run_npm_command data:preflight
     status
     ;;
   init)

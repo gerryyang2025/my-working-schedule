@@ -1,6 +1,6 @@
 import { execFile, type ExecFileException } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -95,17 +95,6 @@ exit 0
 `
   );
   return fakeBin;
-}
-
-async function createFakeLocalTsx(rootDir: string) {
-  const tsxPath = join(rootDir, "node_modules", ".bin", "tsx");
-  if (existsSync(tsxPath)) {
-    return tsxPath;
-  }
-  await mkdir(dirname(tsxPath), { recursive: true });
-  await createFakeExecutable(tsxPath, "exit 0\n");
-  tempFiles.push(tsxPath);
-  return tsxPath;
 }
 
 async function readLog(path: string) {
@@ -210,60 +199,51 @@ describe("tools/sqlite-service.sh", () => {
 
   it("does not create configured dirs during install preflight", async () => {
     const dir = await createTempDir();
-    const fakeBin = join(dir, "bin");
+    const fakeBin = await createFakeNpmBin(dir);
     const sqliteDir = join(dir, "sqlite");
     const backupDir = join(dir, "backups");
-    await mkdir(fakeBin);
+    const logPath = join(dir, "install.log");
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
     await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "npm"), "exit 0\n");
-    await createFakeLocalTsx(process.cwd());
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
+      NPM_LOG: logPath,
       SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
       SCHEDULE_BACKUP_PATH: backupDir
     });
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain(`sqlite path: ${join(sqliteDir, "schedule.db")}`);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${join(sqliteDir, "schedule.db")}`,
+      `SCHEDULE_BACKUP_PATH=${backupDir}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
     expect(existsSync(sqliteDir)).toBe(false);
     expect(existsSync(backupDir)).toBe(false);
   });
 
-  it("prints install guidance when local tsx dependencies are missing", async () => {
+  it("fails install when the delegated maintenance runtime preflight fails", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
     await mkdir(fakeBin);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
     await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "npm"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "npm"), "echo maintenance runtime preflight failed >&2\nexit 23\n");
 
-    const tsxPath = join(process.cwd(), "node_modules", ".bin", "tsx");
-    const tsxBackupPath = join(dir, "tsx-backup");
-    const hadRealTsx = existsSync(tsxPath);
-    if (hadRealTsx) {
-      await mkdir(dirname(tsxBackupPath), { recursive: true });
-      await rm(tsxBackupPath, { force: true, recursive: true });
-      await rename(tsxPath, tsxBackupPath);
-    }
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
 
-    try {
-      const result = await runTool(["install"], {
-        PATH: fakeBin,
-        SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
-        SCHEDULE_BACKUP_PATH: join(dir, "backups")
-      });
-
-      expect(result.code).toBe(1);
-      expect(result.stderr).toContain("Local npm dependency 'tsx' is missing");
-      expect(result.stderr).toContain("npm ci --include=dev");
-    } finally {
-      if (hadRealTsx) {
-        await mkdir(dirname(tsxPath), { recursive: true });
-        await rename(tsxBackupPath, tsxPath);
-      }
-    }
+    expect(result.code).toBe(23);
+    expect(result.stderr).toContain("maintenance runtime preflight failed");
   });
 
   it("delegates maintenance commands to npm with configured env", async () => {
