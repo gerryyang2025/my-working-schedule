@@ -23,7 +23,7 @@ function resolveRestoreBackupFile(backupFile: string): string | null {
     return backupFile;
   }
 
-  if (backupFile.includes("/") || backupFile.includes("\\") || backupFile.includes("..")) {
+  if (backupFile === "." || backupFile === ".." || backupFile.includes("/") || backupFile.includes("\\")) {
     return null;
   }
 

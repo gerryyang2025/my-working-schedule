@@ -271,8 +271,40 @@ describe("tools/sqlite-service.sh", () => {
     ]);
   });
 
+  it("resolves dotted restore backup filenames under the backup path", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const logPath = join(dir, "restore-dotted.log");
+    const dataPath = join(dir, "data", "app-data.local.json");
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+    const backupFilename = "backup..db";
+
+    const result = await runTool(["restore", backupFilename], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      NPM_LOG: logPath,
+      SCHEDULE_DATA_PATH: dataPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${dataPath}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${backupPath}`,
+      "argc=4",
+      "arg1=run",
+      "arg2=data:restore",
+      "arg3=--",
+      `arg4=${join(backupPath, backupFilename)}`
+    ]);
+  });
+
   it("rejects unsafe relative restore paths before invoking npm", async () => {
-    for (const backupFile of ["../escape.db", "nested/backup.db"]) {
+    for (const backupFile of ["../escape.db", "nested/backup.db", "nested\\backup.db", ".", ".."]) {
       const dir = await createTempDir();
       const fakeBin = join(dir, "bin");
       const sqliteDir = join(dir, "sqlite");
@@ -330,7 +362,7 @@ describe("tools/sqlite-service.sh", () => {
   });
 
   it("rejects unsafe relative paths for direct data restore", async () => {
-    for (const backupFile of ["nested/backup.db", "../escape.db", "nested\\backup.db"]) {
+    for (const backupFile of ["nested/backup.db", "../escape.db", "nested\\backup.db", ".", ".."]) {
       const dir = await createTempDir();
       const sqliteDir = join(dir, "sqlite");
       const backupDir = join(dir, "backups");
@@ -352,7 +384,7 @@ describe("tools/sqlite-service.sh", () => {
     const dir = await createTempDir();
     const sqlitePath = join(dir, "sqlite", "schedule.db");
     const backupPath = join(dir, "backups");
-    const backupFilename = "backup file.db";
+    const backupFilename = "backup..db";
     await createValidSqliteBackup(join(backupPath, backupFilename));
 
     const result = await runDataCli(["restore", backupFilename], {
