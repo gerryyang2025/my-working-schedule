@@ -69,6 +69,60 @@ cp config/server.example.json config/server.local.json
 ./optools.sh dev restart
 ```
 
+## SQLite 存储与正式单机部署
+
+开发环境默认继续使用 JSON 文件存储，便于本地调试和快速重置数据。正式单机部署可切换到 SQLite 文件数据库：
+
+```bash
+export SCHEDULE_STORAGE_DRIVER=sqlite
+export SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
+export SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
+```
+
+SQLite 是嵌入式文件数据库，不需要单独启动数据库 daemon。长期运行的仍然是当前 Web/API 进程；该进程由 `optools`、systemd 或后续正式部署脚本单独管理。
+
+常用数据维护命令：
+
+```bash
+npm run data:preflight
+npm run data:init:sqlite
+SCHEDULE_DATA_PATH=data/app-data.local.json npm run data:migrate:sqlite
+npm run data:export:json
+npm run data:backup
+CONFIRM_RESTORE=yes npm run data:restore -- <backup-file>
+npm run data:check:sqlite
+```
+
+说明：
+
+- `npm run data:init:sqlite` 只初始化 SQLite 库和表结构，不会自动从 JSON 导入数据。
+- `npm run data:migrate:sqlite` 用当前 JSON 业务数据迁移到 SQLite；如目标库已存在，可按需要追加 `-- --overwrite`。
+- `npm run data:export:json` 用于导出当前 SQLite 数据，便于人工检查或留存可读副本。
+- `npm run data:backup` 会在 `SCHEDULE_BACKUP_PATH` 下生成带时间戳的数据库备份。
+- `npm run data:check:sqlite` 会输出完整性和核心表检查结果，`ok: true` 代表检查通过。
+- `npm run data:preflight` 是无副作用的运行前检查，会回显 JSON 路径、SQLite 路径和备份目录，便于部署联调。
+
+Linux 辅助脚本：
+
+```bash
+./tools/sqlite-service.sh install
+./tools/sqlite-service.sh init
+./tools/sqlite-service.sh migrate
+./tools/sqlite-service.sh backup
+./tools/sqlite-service.sh status
+./tools/sqlite-service.sh check
+```
+
+`./tools/sqlite-service.sh install` 是非写入式预检，不会安装 daemon，也不会创建数据库文件。它会检查 `node`、`npm` 和 `npm run data:preflight` 所需运行时；`sqlite3` 缺失时只给出告警和手工排查提示，不阻塞使用。
+
+推荐恢复 runbook：
+
+1. 先停止 Web/API 服务。
+2. 确认 `SCHEDULE_BACKUP_PATH` 有足够空间保存当前库的保护性备份，同时确认 `SCHEDULE_SQLITE_PATH` 所在文件系统有足够空间放置同目录临时副本。
+3. 执行 `CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>`。
+4. 执行 `./tools/sqlite-service.sh check`。
+5. 重启 Web/API 服务并验证健康检查或关键页面读写。
+
 ## 本地启停
 
 开发模式可以使用根目录脚本后台管理：
