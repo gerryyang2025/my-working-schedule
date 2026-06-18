@@ -1,0 +1,25 @@
+[Unit]
+Description=International Medical Department Nursing Schedule API
+After=network.target
+
+[Service]
+Type=simple
+User=my-working-schedule
+Group=my-working-schedule
+WorkingDirectory=/opt/my-working-schedule
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3001
+Environment=SCHEDULE_STORAGE_DRIVER=sqlite
+Environment=SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
+Environment=SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
+Environment=SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
+Environment=SCHEDULE_ADMIN_PASSWORD=change-me-before-start
+ExecStart=/usr/bin/npm run start:api
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

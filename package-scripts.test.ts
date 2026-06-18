@@ -68,6 +68,16 @@ describe("package scripts", () => {
     expect(packageJson.scripts["dev:api"]).not.toContain("tsx watch");
   });
 
+  it("exposes a production API start script without the development watcher", async () => {
+    const packageJson = JSON.parse(await readFile(resolve(process.cwd(), "package.json"), "utf8")) as {
+      scripts: Record<string, string>;
+    };
+
+    expect(packageJson.scripts["start:api"]).toBe("node --import tsx server/index.ts");
+    expect(packageJson.scripts["start:api"]).not.toContain("dev-api-watch");
+    expect(packageJson.scripts["start:api"]).not.toContain("npm run dev");
+  });
+
   it("configures the API watcher to spawn node with the tsx loader and only watch server directories", async () => {
     const result = await runDevApiWatchDryRun();
 

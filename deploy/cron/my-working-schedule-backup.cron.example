@@ -1,0 +1,9 @@
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+SCHEDULE_STORAGE_DRIVER=sqlite
+SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
+SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
+SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
+
+# Daily SQLite backup at 02:15. Adjust the path if the app is deployed elsewhere.
+15 2 * * * cd /opt/my-working-schedule && /opt/my-working-schedule/tools/sqlite-service.sh backup >> /var/log/my-working-schedule-backup.log 2>&1

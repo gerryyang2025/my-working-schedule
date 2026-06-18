@@ -20,6 +20,7 @@
 - [功能跟进清单.md](docs/功能跟进清单.md)：统一记录已完成功能、部分完成能力和后续待实现事项。
 - [技术方案.md](docs/技术方案.md)：一期技术方案与后续正式架构演进。
 - [正式环境存储优化方案.md](docs/正式环境存储优化方案.md)：正式环境 SQLite 存储、迁移、备份和恢复建议。
+- [正式部署运行手册.md](docs/正式部署运行手册.md)：单机正式部署、systemd、Nginx、备份、恢复和上线检查步骤。
 - [方案细节.md](docs/方案细节.md)：一期落地细节与执行计划对齐说明。
 - [风格样式.md](docs/风格样式.md)：Web 界面风格建议，已标注一期采用 Element Plus。
 - [一期设计规格](docs/superpowers/specs/2026-06-15-nursing-schedule-design.md)：已确认的一期设计范围与规则。
@@ -154,6 +155,18 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 3. 执行 `CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>`。
 4. 执行 `./tools/sqlite-service.sh check`。
 5. 重启 Web/API 服务并验证健康检查或关键页面读写。
+
+## 正式部署
+
+单机正式部署建议使用：
+
+- `npm run build` 构建前端静态资源。
+- `npm run start:api` 启动 Express API。
+- `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。
+- `deploy/nginx/my-working-schedule.conf.example` 提供静态资源和 `/api/` 反向代理。
+- `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
+
+完整步骤见 [正式部署运行手册.md](docs/正式部署运行手册.md)。
 
 ## 本地启停
 
