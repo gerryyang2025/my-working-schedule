@@ -5,12 +5,13 @@ import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSeedData } from "./seed";
 import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./sqlite/mapper";
-import { initializeSqliteSchema } from "./sqlite/schema";
+import { initializeSqliteSchema, listMissingCoreTables } from "./sqlite/schema";
 import { createSqliteStorage } from "./sqlite/storage";
 import type { AppData, MonthlySettlement } from "./types";
 
 const tempDirs: string[] = [];
 const MISSING_SQLITE_ERROR_MESSAGE = "SQLite 数据库文件不存在，请先执行迁移或初始化命令";
+const UNINITIALIZED_SQLITE_ERROR_MESSAGE = "SQLite 数据库结构未初始化，请先执行迁移或初始化命令";
 
 async function createTempDbPath() {
   const dir = await mkdtemp(join(tmpdir(), "schedule-sqlite-"));
@@ -443,6 +444,42 @@ describe("SQLite schema and mapper", () => {
     await expect(access(path)).rejects.toMatchObject({ code: "ENOENT" });
   });
 
+  it("rejects an empty SQLite file without initializing schema implicitly", async () => {
+    const path = await createTempDbPath();
+    await writeFile(path, "");
+    const storage = createSqliteStorage(path);
+
+    await expect(storage.load()).rejects.toThrow(UNINITIALIZED_SQLITE_ERROR_MESSAGE);
+
+    const db = new Database(path, { fileMustExist: true });
+    try {
+      expect(listMissingCoreTables(db)).toEqual(
+        expect.arrayContaining([
+          "app_settings",
+          "schema_migrations",
+          "schedule_entries",
+          "schedule_entry_shifts",
+          "shifts",
+          "staff"
+        ])
+      );
+    } finally {
+      db.close();
+    }
+  });
+
+  it("rejects a missing SQLite path without creating parent directories implicitly", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "schedule-sqlite-missing-parent-"));
+    tempDirs.push(dir);
+    const sqliteDir = join(dir, "nested", "sqlite");
+    const path = join(sqliteDir, "schedule.db");
+    const storage = createSqliteStorage(path);
+
+    await expect(storage.load()).rejects.toThrow(MISSING_SQLITE_ERROR_MESSAGE);
+    await expect(access(path)).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(sqliteDir)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
   it("opens SQLite with fileMustExist to avoid stale existence checks", async () => {
     const path = await createTempDbPath();
     await rm(path, { force: true });
@@ -480,7 +517,7 @@ describe("SQLite schema and mapper", () => {
     }
   });
 
-  it("closes the database when SQLite initialization fails", async () => {
+  it("closes the database when SQLite runtime validation fails", async () => {
     const path = await createTempDbPath();
     await writeFile(path, "", "utf8");
     let closed = false;

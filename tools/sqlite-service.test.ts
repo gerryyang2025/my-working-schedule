@@ -640,7 +640,7 @@ exit 0
     ]);
   });
 
-  it("passes install when runtime preflight output contains brace noise around valid JSON", async () => {
+  it("fails install when runtime preflight output contains brace noise around valid JSON", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
     const logPath = join(dir, "install-brace-noise-preflight.log");
@@ -674,8 +674,10 @@ exit 0
       SCHEDULE_BACKUP_PATH: join(dir, "backups")
     });
 
-    expect(result.code, result.stderr).toBe(0);
-    expect(result.stdout).toContain(`sqlite path: ${join(dir, "schedule.db")}`);
+    expect(result.code, result.stderr).toBe(1);
+    expect(result.stderr).toContain("maintenance runtime preflight output was not valid JSON");
+    expect(result.stderr).toContain("npm notice {warning}");
+    expect(result.stderr).toContain("tail noise {still-not-json}");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
       "argc=2",
