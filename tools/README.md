@@ -14,6 +14,8 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 ./optools.sh nginx status
 ./optools.sh nginx test
 ./optools.sh nginx reload
+./optools.sh app init
+./optools.sh app doctor
 ./optools.sh app status
 ./optools.sh app logs
 ./optools.sh doctor

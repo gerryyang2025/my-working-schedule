@@ -16,6 +16,8 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("npm run build");
     expect(runbook).toContain("./optools.sh build");
     expect(runbook).toContain("npm run start:api");
+    expect(runbook).toContain("./optools.sh app init");
+    expect(runbook).toContain("./optools.sh app doctor");
     expect(runbook).toContain("./optools.sh app status");
     expect(runbook).toContain("./optools.sh nginx install");
     expect(runbook).toContain("./optools.sh data backup");

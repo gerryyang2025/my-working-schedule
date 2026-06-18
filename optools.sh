@@ -41,6 +41,12 @@ INSTALL_DIST_DIR="${OPTOOLS_INSTALL_DIST_DIR:-"$INSTALL_DIR/dist"}"
 NGINX_SERVICE_SCRIPT="${OPTOOLS_NGINX_SERVICE_SCRIPT:-"$ROOT_DIR/tools/nginx-service.sh"}"
 SQLITE_SERVICE_SCRIPT="${OPTOOLS_SQLITE_SERVICE_SCRIPT:-"$ROOT_DIR/tools/sqlite-service.sh"}"
 APP_SERVICE_NAME="${OPTOOLS_APP_SERVICE_NAME:-my-working-schedule}"
+APP_USER="${OPTOOLS_APP_USER:-my-working-schedule}"
+APP_GROUP="${OPTOOLS_APP_GROUP:-my-working-schedule}"
+DATA_DIR="${OPTOOLS_DATA_DIR:-/var/lib/my-working-schedule}"
+BACKUP_DIR="${OPTOOLS_BACKUP_DIR:-/var/backups/my-working-schedule}"
+SYSTEMD_SOURCE_FILE="${OPTOOLS_SYSTEMD_SOURCE_FILE:-"$ROOT_DIR/deploy/systemd/my-working-schedule.service.example"}"
+SYSTEMD_SERVICE_FILE="${OPTOOLS_SYSTEMD_SERVICE_FILE:-"/etc/systemd/system/${APP_SERVICE_NAME}.service"}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -73,6 +79,8 @@ Usage:
   ./optools.sh data backup    Back up SQLite storage
   ./optools.sh data restore <backup-file>
   ./optools.sh data export-json
+  ./optools.sh app init       Initialize production user, directories, and systemd service
+  ./optools.sh app doctor     Check production app prerequisites
   ./optools.sh app start      Start the production systemd service
   ./optools.sh app stop       Stop the production systemd service
   ./optools.sh app restart    Restart the production systemd service
@@ -95,6 +103,12 @@ Environment:
   OPTOOLS_NGINX_SERVICE_SCRIPT Nginx helper script (default: tools/nginx-service.sh)
   OPTOOLS_SQLITE_SERVICE_SCRIPT SQLite helper script (default: tools/sqlite-service.sh)
   OPTOOLS_APP_SERVICE_NAME    systemd service name (default: my-working-schedule)
+  OPTOOLS_APP_USER            systemd service user (default: my-working-schedule)
+  OPTOOLS_APP_GROUP           systemd service group (default: my-working-schedule)
+  OPTOOLS_DATA_DIR            SQLite data directory (default: /var/lib/my-working-schedule)
+  OPTOOLS_BACKUP_DIR          SQLite backup directory (default: /var/backups/my-working-schedule)
+  OPTOOLS_SYSTEMD_SOURCE_FILE systemd source file (default: deploy/systemd/my-working-schedule.service.example)
+  OPTOOLS_SYSTEMD_SERVICE_FILE systemd target file (default: /etc/systemd/system/OPTOOLS_APP_SERVICE_NAME.service)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -557,11 +571,96 @@ run_app_logs() {
   journalctl -u "$APP_SERVICE_NAME" -n "${OPTOOLS_LOG_LINES:-80}" --no-pager
 }
 
+ensure_app_group() {
+  if getent group "$APP_GROUP" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  groupadd --system "$APP_GROUP"
+}
+
+ensure_app_user() {
+  if getent passwd "$APP_USER" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  useradd --system --gid "$APP_GROUP" --home-dir "$DATA_DIR" --shell /sbin/nologin "$APP_USER"
+}
+
+systemd_target_dir() {
+  local path="$1"
+
+  case "$path" in
+    */*)
+      printf '%s\n' "${path%/*}"
+      ;;
+    *)
+      printf '.\n'
+      ;;
+  esac
+}
+
+run_app_init() {
+  if [[ ! -f "$SYSTEMD_SOURCE_FILE" ]]; then
+    echo "systemd source file not found: $SYSTEMD_SOURCE_FILE" >&2
+    return 1
+  fi
+
+  ensure_systemctl
+  ensure_app_group
+  ensure_app_user
+
+  mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
+  chown -R "$APP_USER:$APP_GROUP" "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
+
+  mkdir -p "$(systemd_target_dir "$SYSTEMD_SERVICE_FILE")"
+  cp "$SYSTEMD_SOURCE_FILE" "$SYSTEMD_SERVICE_FILE"
+  systemctl daemon-reload
+  systemctl enable "$APP_SERVICE_NAME"
+
+  echo "app init: completed"
+  echo "service: $APP_SERVICE_NAME"
+  echo "user: $APP_USER"
+  echo "group: $APP_GROUP"
+  echo "install dir: $INSTALL_DIR"
+  echo "data dir: $DATA_DIR"
+  echo "backup dir: $BACKUP_DIR"
+  echo "systemd service file: $SYSTEMD_SERVICE_FILE"
+}
+
+run_app_doctor() {
+  local failed=0
+
+  echo "app doctor: checking production app prerequisites"
+
+  doctor_check "app group" getent group "$APP_GROUP" || failed=1
+  doctor_check "app user" getent passwd "$APP_USER" || failed=1
+  doctor_check "app install dir" test -d "$INSTALL_DIR" || failed=1
+  doctor_check "app data dir" test -d "$DATA_DIR" || failed=1
+  doctor_check "app backup dir" test -d "$BACKUP_DIR" || failed=1
+  doctor_check "systemd service file" test -f "$SYSTEMD_SERVICE_FILE" || failed=1
+  doctor_check "app service status" run_app_systemctl status || failed=1
+
+  if [[ "$failed" == "0" ]]; then
+    echo "app doctor: ok"
+    return 0
+  fi
+
+  echo "app doctor: failed"
+  return 1
+}
+
 run_app_helper() {
   local command="${1:-help}"
   shift || true
 
   case "$command" in
+    init)
+      run_app_init
+      ;;
+    doctor)
+      run_app_doctor
+      ;;
     start|stop|restart|status)
       run_app_systemctl "$command"
       ;;

@@ -77,6 +77,8 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh nginx install");
     expect(result.stdout).toContain("./optools.sh nginx status");
     expect(result.stdout).toContain("./optools.sh data check");
+    expect(result.stdout).toContain("./optools.sh app init");
+    expect(result.stdout).toContain("./optools.sh app doctor");
     expect(result.stdout).toContain("./optools.sh app status");
     expect(result.stdout).toContain("./optools.sh doctor");
     expect(result.stdout).toContain("HOST");
@@ -86,6 +88,9 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("OPTOOLS_NGINX_SERVICE_SCRIPT");
     expect(result.stdout).toContain("OPTOOLS_SQLITE_SERVICE_SCRIPT");
     expect(result.stdout).toContain("OPTOOLS_APP_SERVICE_NAME");
+    expect(result.stdout).toContain("OPTOOLS_APP_USER");
+    expect(result.stdout).toContain("OPTOOLS_APP_GROUP");
+    expect(result.stdout).toContain("OPTOOLS_SYSTEMD_SERVICE_FILE");
   });
 
   it("builds frontend assets and installs dist to the configured deployment directory", async () => {
@@ -251,6 +256,96 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
         ""
       ].join("\n")
     );
+  });
+
+  it("initializes the production app user, directories, and systemd service", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const logPath = join(stateDir, "init.log");
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
+    const sourceFile = join(stateDir, "source.service");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
+    await writeFile(sourceFile, "[Service]\nExecStart=/usr/bin/npm run start:api\n", "utf8");
+    await createExecutable(join(fakeBinDir, "getent"), `printf 'getent %s\\n' "$*" >> "$INIT_LOG"\nexit 2\n`);
+    await createExecutable(join(fakeBinDir, "groupadd"), `printf 'groupadd %s\\n' "$*" >> "$INIT_LOG"\n`);
+    await createExecutable(join(fakeBinDir, "useradd"), `printf 'useradd %s\\n' "$*" >> "$INIT_LOG"\n`);
+    await createExecutable(join(fakeBinDir, "chown"), `printf 'chown %s\\n' "$*" >> "$INIT_LOG"\n`);
+    await createExecutable(join(fakeBinDir, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$INIT_LOG"\n`);
+
+    const result = await runOptools(["app", "init"], {
+      INIT_LOG: logPath,
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SOURCE_FILE: sourceFile,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      OPTOOLS_APP_USER: "schedule-user",
+      OPTOOLS_APP_GROUP: "schedule-group",
+      OPTOOLS_APP_SERVICE_NAME: "schedule-api",
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("app init: completed");
+    expect(await readFile(systemdFile, "utf8")).toBe("[Service]\nExecStart=/usr/bin/npm run start:api\n");
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        "getent group schedule-group",
+        "groupadd --system schedule-group",
+        "getent passwd schedule-user",
+        `useradd --system --gid schedule-group --home-dir ${dataDir} --shell /sbin/nologin schedule-user`,
+        `chown -R schedule-user:schedule-group ${installDir} ${dataDir} ${backupDir}`,
+        "systemctl daemon-reload",
+        "systemctl enable schedule-api",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("reports app doctor failures when the service user is missing", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
+
+    await mkdir(installDir, { recursive: true });
+    await mkdir(dataDir, { recursive: true });
+    await mkdir(backupDir, { recursive: true });
+    await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
+    await writeFile(systemdFile, "[Service]\n", "utf8");
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(
+      join(fakeBinDir, "getent"),
+      `if [ "$1" = "group" ]; then
+  exit 0
+fi
+exit 2
+`
+    );
+    await createExecutable(join(fakeBinDir, "systemctl"), "exit 0\n");
+
+    const result = await runOptools(["app", "doctor"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      OPTOOLS_APP_USER: "schedule-user",
+      OPTOOLS_APP_GROUP: "schedule-group",
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("[ok] app group");
+    expect(result.stdout).toContain("[fail] app user");
+    expect(result.stdout).toContain("[ok] app install dir");
+    expect(result.stdout).toContain("app doctor: failed");
   });
 
   it("returns a failing status when production API health is unavailable", async () => {
