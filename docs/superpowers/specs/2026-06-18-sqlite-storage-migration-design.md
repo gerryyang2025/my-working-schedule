@@ -156,7 +156,7 @@ tools/
 | `init` | 初始化 SQLite 数据库文件和基础表结构；不从 JSON 隐式迁移数据 |
 | `migrate` | 调用 JSON 到 SQLite 迁移能力，并输出迁移校验报告 |
 | `backup` | 调用 SQLite 备份能力，生成带时间戳的备份文件 |
-| `restore <backup-file>` | 从指定备份文件恢复 SQLite 数据库，恢复前必须先备份当前数据库 |
+| `restore <backup-file>` | 从指定备份文件恢复 SQLite 数据库，恢复前必须先备份当前数据库，并确保 `SCHEDULE_BACKUP_PATH` 与 `SCHEDULE_SQLITE_PATH` 所在文件系统都有足够可用空间 |
 | `status` | 显示 SQLite 数据库路径、是否存在、文件大小、更新时间、备份目录和当前配置 |
 | `check` | 执行 SQLite `integrity_check`，并检查核心业务表是否存在 |
 

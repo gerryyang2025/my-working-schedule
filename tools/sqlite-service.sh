@@ -94,6 +94,25 @@ ensure_parent_creatable() {
   fi
 }
 
+ensure_existing_parent_usable() {
+  local target_path="$1"
+  local target_kind="$2"
+  local parent
+  parent="$(path_dirname "$target_path")"
+
+  if [ ! -d "$parent" ]; then
+    printf '%s path is not ready: %s\n' "$target_kind" "$target_path" >&2
+    printf '%s path parent is not a directory: %s\n' "$target_kind" "$parent" >&2
+    return 1
+  fi
+
+  if [ ! -x "$parent" ] || [ ! -w "$parent" ]; then
+    printf '%s path is not ready: %s\n' "$target_kind" "$target_path" >&2
+    printf '%s path parent is not writable/traversable: %s\n' "$target_kind" "$parent" >&2
+    return 1
+  fi
+}
+
 ensure_sqlite_path_ready() {
   if [ -e "$SQLITE_PATH" ]; then
     if [ -d "$SQLITE_PATH" ]; then
@@ -107,6 +126,8 @@ ensure_sqlite_path_ready() {
       printf 'path exists but is not writable\n' >&2
       return 1
     fi
+
+    ensure_existing_parent_usable "$SQLITE_PATH" "sqlite"
     return 0
   fi
 
