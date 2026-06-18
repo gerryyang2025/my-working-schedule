@@ -74,9 +74,14 @@ async function createFakeExecutable(path: string, body: string) {
   await chmod(path, 0o755);
 }
 
+async function createNodeProxyExecutable(path: string) {
+  await createFakeExecutable(path, `exec "${process.execPath}" "$@"\n`);
+}
+
 async function createFakeNpmBin(dir: string) {
   const fakeBin = join(dir, "bin");
   await mkdir(fakeBin);
+  await createNodeProxyExecutable(join(fakeBin, "node"));
   await createFakeExecutable(
     join(fakeBin, "npm"),
     `{
@@ -169,7 +174,7 @@ describe("tools/sqlite-service.sh", () => {
   it("warns but does not fail install when sqlite3 is missing", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -204,7 +209,7 @@ describe("tools/sqlite-service.sh", () => {
     const fakeBin = join(dir, "bin");
     await mkdir(fakeBin);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -223,7 +228,7 @@ describe("tools/sqlite-service.sh", () => {
     const backupDir = join(dir, "backups");
     const logPath = join(dir, "install.log");
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -301,7 +306,7 @@ exit 0
     const logPath = join(dir, "install-creatable.log");
     await mkdir(parentDir);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -332,7 +337,7 @@ exit 0
     const logPath = join(dir, "install-sqlite-parent.log");
     await writeFile(blockedParent, "not a directory");
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -362,7 +367,7 @@ exit 0
     const logPath = join(dir, "install-sqlite-dir.log");
     await mkdir(sqlitePath);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -395,7 +400,7 @@ exit 0
     await writeFile(sqlitePath, "sqlite");
     await chmod(sqliteParent, 0o500);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -430,7 +435,7 @@ exit 0
     await writeFile(sqlitePath, "sqlite");
     await chmod(sqlitePath, 0o200);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -482,7 +487,7 @@ exit 0
     const logPath = join(dir, "install-backup-parent.log");
     await writeFile(blockedParent, "not a directory");
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -512,7 +517,7 @@ exit 0
     const logPath = join(dir, "install-backup-file.log");
     await writeFile(backupPath, "not a directory");
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
@@ -540,7 +545,7 @@ exit 0
     const fakeBin = join(dir, "bin");
     await mkdir(fakeBin);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
     await createFakeExecutable(join(fakeBin, "npm"), "echo maintenance runtime preflight failed >&2\nexit 23\n");
 
     const result = await runTool(["install"], {
@@ -559,7 +564,7 @@ exit 0
     const logPath = join(dir, "install-empty-preflight.log");
     await mkdir(fakeBin);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
     await createFakeExecutable(
       join(fakeBin, "npm"),
       `{
@@ -592,6 +597,93 @@ exit 0
     ]);
   });
 
+  it("passes install when runtime preflight emits compact JSON within npm output", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "install-compact-preflight.log");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
+    await createFakeExecutable(
+      join(fakeBin, "npm"),
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$NPM_LOG"
+if [ "$#" -ge 2 ] && [ "$1" = "run" ] && [ "$2" = "data:preflight" ]; then
+  printf 'npm notice mock banner\\n'
+  printf '{"ok":true,"command":"preflight","sqlitePath":"x"}\\n'
+fi
+exit 0
+`
+    );
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain(`sqlite path: ${join(dir, "schedule.db")}`);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
+  it("fails install when runtime preflight output contains field fragments but is not valid JSON", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "install-invalid-preflight.log");
+    const invalidOutput = 'npm notice {"ok": true, "command": "preflight"';
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createNodeProxyExecutable(join(fakeBin, "node"));
+    await createFakeExecutable(
+      join(fakeBin, "npm"),
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$NPM_LOG"
+if [ "$#" -ge 2 ] && [ "$1" = "run" ] && [ "$2" = "data:preflight" ]; then
+  printf '${invalidOutput}\\n'
+fi
+exit 0
+`
+    );
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code, result.stderr).toBe(1);
+    expect(result.stderr).toContain("maintenance runtime preflight output was not valid JSON");
+    expect(result.stderr).toContain(invalidOutput);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
   it.each([
     {
       name: "install",
@@ -608,12 +700,12 @@ exit 0
       {
         label: 'missing "ok": true',
         preflightOutput: '{\n  "command": "preflight"\n}\n',
-        expectedMessage: 'maintenance runtime preflight output did not include "ok": true'
+        expectedMessage: "maintenance runtime preflight output did not report ok=true"
       },
       {
         label: 'missing "command": "preflight"',
         preflightOutput: '{\n  "ok": true\n}\n',
-        expectedMessage: 'maintenance runtime preflight output did not include "command": "preflight"'
+        expectedMessage: 'maintenance runtime preflight output did not report command="preflight"'
       }
     ] as const;
 
@@ -623,7 +715,7 @@ exit 0
       const logPath = join(dir, `${args[0]}-${testCase.label}.log`);
       await mkdir(fakeBin);
       await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
-      await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+      await createNodeProxyExecutable(join(fakeBin, "node"));
       await createFakeExecutable(
         join(fakeBin, "npm"),
         `{

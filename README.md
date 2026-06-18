@@ -113,7 +113,7 @@ Linux 辅助脚本：
 ./tools/sqlite-service.sh check
 ```
 
-`./tools/sqlite-service.sh install` 是非写入式预检，不会安装 daemon，也不会创建数据库文件。它会检查 `node`、`npm` 和 `npm run data:preflight` 所需运行时，并要求预检输出中确实包含 `ok: true` 与 `command: "preflight"` 对应的 JSON 字段；`sqlite3` 缺失时只给出告警和手工排查提示，不阻塞使用。
+`./tools/sqlite-service.sh install` 是非写入式预检，不会安装 daemon，也不会创建数据库文件。它会检查 `node`、`npm` 和 `npm run data:preflight` 所需运行时，并解析预检输出中的 JSON，确认 `ok: true` 与 `command: "preflight"` 字段真实存在；`sqlite3` 缺失时只给出告警和手工排查提示，不阻塞使用。
 
 推荐恢复 runbook：
 

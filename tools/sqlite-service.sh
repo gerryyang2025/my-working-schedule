@@ -227,8 +227,54 @@ run_npm_command() {
   SCHEDULE_DATA_PATH="$DATA_PATH" SCHEDULE_SQLITE_PATH="$SQLITE_PATH" SCHEDULE_BACKUP_PATH="$BACKUP_PATH" npm run "$@"
 }
 
+validate_runtime_preflight_output() {
+  printf '%s' "$1" | node --input-type=module -e '
+let input = "";
+
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => {
+  input += chunk;
+});
+process.stdin.on("end", () => {
+  const start = input.indexOf("{");
+  const end = input.lastIndexOf("}");
+
+  if (start === -1 || end === -1 || end < start) {
+    process.stdout.write("invalid-json");
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = JSON.parse(input.slice(start, end + 1));
+  } catch {
+    process.stdout.write("invalid-json");
+    return;
+  }
+
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    process.stdout.write("invalid-json");
+    return;
+  }
+
+  if (parsed.ok !== true) {
+    process.stdout.write("missing-ok");
+    return;
+  }
+
+  if (parsed.command !== "preflight") {
+    process.stdout.write("missing-command");
+    return;
+  }
+
+  process.stdout.write("ok");
+});
+'
+}
+
 run_runtime_preflight() {
   local preflight_output
+  local validation_result
   preflight_output="$(run_npm_command data:preflight)" || return $?
 
   case "$preflight_output" in
@@ -240,21 +286,28 @@ run_runtime_preflight() {
       ;;
   esac
 
-  case "$preflight_output" in
-    *'"ok": true'*)
+  validation_result="$(validate_runtime_preflight_output "$preflight_output")" || return $?
+
+  case "$validation_result" in
+    ok)
       ;;
-    *)
-      printf 'maintenance runtime preflight output did not include "ok": true\n' >&2
+    invalid-json)
+      printf 'maintenance runtime preflight output was not valid JSON\n' >&2
       printf '%s\n' "$preflight_output" >&2
       return 1
       ;;
-  esac
-
-  case "$preflight_output" in
-    *'"command": "preflight"'*)
+    missing-ok)
+      printf 'maintenance runtime preflight output did not report ok=true\n' >&2
+      printf '%s\n' "$preflight_output" >&2
+      return 1
+      ;;
+    missing-command)
+      printf 'maintenance runtime preflight output did not report command="preflight"\n' >&2
+      printf '%s\n' "$preflight_output" >&2
+      return 1
       ;;
     *)
-      printf 'maintenance runtime preflight output did not include "command": "preflight"\n' >&2
+      printf 'maintenance runtime preflight output validation failed unexpectedly\n' >&2
       printf '%s\n' "$preflight_output" >&2
       return 1
       ;;
