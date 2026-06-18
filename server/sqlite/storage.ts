@@ -7,18 +7,32 @@ import type { AppData } from "../types";
 import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./mapper";
 import { initializeSqliteSchema } from "./schema";
 
+const MISSING_SQLITE_ERROR_MESSAGE = "SQLite 数据库文件不存在，请先执行迁移或初始化命令";
+
 export function createSqliteStorage(path: string): StorageAdapter {
   let updateQueue = Promise.resolve();
 
   async function openDatabase() {
-    if (!existsSync(path)) {
-      throw new Error("SQLite 数据库文件不存在，请先执行迁移或初始化命令");
-    }
     await mkdir(dirname(path), { recursive: true });
-    const db = new Database(path);
-    db.pragma("foreign_keys = ON");
-    initializeSqliteSchema(db);
-    return db;
+    let db: Database.Database | undefined;
+    try {
+      db = new Database(path, { fileMustExist: true });
+      db.pragma("foreign_keys = ON");
+      initializeSqliteSchema(db);
+      return db;
+    } catch (error) {
+      if (db) {
+        try {
+          db.close();
+        } catch {
+          // Preserve the original initialization/open error.
+        }
+      }
+      if (!existsSync(path)) {
+        throw new Error(MISSING_SQLITE_ERROR_MESSAGE);
+      }
+      throw error;
+    }
   }
 
   async function loadData(): Promise<AppData> {

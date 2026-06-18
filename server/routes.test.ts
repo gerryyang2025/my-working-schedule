@@ -257,9 +257,12 @@ describe("API routes", () => {
     try {
       const dbPath = join(dir, "schedule.db");
       const db = new Database(dbPath);
-      initializeSqliteSchema(db);
-      replaceAppDataInSqlite(db, createSeedData());
-      db.close();
+      try {
+        initializeSqliteSchema(db);
+        replaceAppDataInSqlite(db, createSeedData());
+      } finally {
+        db.close();
+      }
 
       const app = express();
       app.use(express.json());

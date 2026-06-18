@@ -1,8 +1,8 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Database from "better-sqlite3";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSeedData } from "./seed";
 import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./sqlite/mapper";
 import { initializeSqliteSchema } from "./sqlite/schema";
@@ -10,6 +10,7 @@ import { createSqliteStorage } from "./sqlite/storage";
 import type { AppData, MonthlySettlement } from "./types";
 
 const tempDirs: string[] = [];
+const MISSING_SQLITE_ERROR_MESSAGE = "SQLite 数据库文件不存在，请先执行迁移或初始化命令";
 
 async function createTempDbPath() {
   const dir = await mkdtemp(join(tmpdir(), "schedule-sqlite-"));
@@ -430,15 +431,118 @@ describe("SQLite schema and mapper", () => {
     await rm(path, { force: true });
     const storage = createSqliteStorage(path);
 
-    await expect(storage.load()).rejects.toThrow("SQLite 数据库文件不存在，请先执行迁移或初始化命令");
+    await storage.load().then(
+      () => {
+        throw new Error("expected missing SQLite database load to reject");
+      },
+      (error: unknown) => {
+        expect(error).toBeInstanceOf(Error);
+        expect((error as Error).message).toBe(MISSING_SQLITE_ERROR_MESSAGE);
+      }
+    );
+    await expect(access(path)).rejects.toMatchObject({ code: "ENOENT" });
+  });
+
+  it("opens SQLite with fileMustExist to avoid stale existence checks", async () => {
+    const path = await createTempDbPath();
+    await rm(path, { force: true });
+    let receivedOptions: unknown;
+    vi.resetModules();
+    vi.doMock("better-sqlite3", () => ({
+      default: class FakeDatabase {
+        constructor(_path: string, options?: unknown) {
+          receivedOptions = options;
+          const error = new Error("unable to open database file") as Error & { code?: string };
+          error.code = "SQLITE_CANTOPEN";
+          throw error;
+        }
+      }
+    }));
+
+    try {
+      const { createSqliteStorage: createStorageWithMockDatabase } = await import("./sqlite/storage");
+      const storage = createStorageWithMockDatabase(path);
+
+      await storage.load().then(
+        () => {
+          throw new Error("expected mocked missing SQLite database load to reject");
+        },
+        (error: unknown) => {
+          expect(error).toBeInstanceOf(Error);
+          expect((error as Error).message).toBe(MISSING_SQLITE_ERROR_MESSAGE);
+        }
+      );
+      expect(receivedOptions).toEqual({ fileMustExist: true });
+      await expect(access(path)).rejects.toMatchObject({ code: "ENOENT" });
+    } finally {
+      vi.doUnmock("better-sqlite3");
+      vi.resetModules();
+    }
+  });
+
+  it("closes the database when SQLite initialization fails", async () => {
+    const path = await createTempDbPath();
+    await writeFile(path, "", "utf8");
+    let closed = false;
+    vi.resetModules();
+    vi.doMock("better-sqlite3", () => ({
+      default: class FakeDatabase {
+        pragma() {
+          throw new Error("pragma failed");
+        }
+
+        close() {
+          closed = true;
+        }
+      }
+    }));
+
+    try {
+      const { createSqliteStorage: createStorageWithMockDatabase } = await import("./sqlite/storage");
+      const storage = createStorageWithMockDatabase(path);
+
+      await expect(storage.load()).rejects.toThrow("pragma failed");
+      expect(closed).toBe(true);
+    } finally {
+      vi.doUnmock("better-sqlite3");
+      vi.resetModules();
+    }
+  });
+
+  it("does not load the SQLite adapter for JSON configured storage", async () => {
+    const path = await createTempDbPath();
+    vi.resetModules();
+    vi.doMock("./sqlite/storage", () => {
+      throw new Error("SQLite adapter imported");
+    });
+
+    try {
+      const { createConfiguredStorage } = await import("./storage");
+      const storage = createConfiguredStorage({
+        host: "127.0.0.1",
+        port: 0,
+        storageDriver: "json",
+        storagePath: path
+      });
+
+      const data = await storage.load();
+
+      expect(data.staff).toHaveLength(3);
+    } finally {
+      vi.doUnmock("./sqlite/storage");
+      vi.resetModules();
+    }
   });
 
   it("loads explicit SQLite data without creating seed data implicitly", async () => {
     const path = await createTempDbPath();
     const db = new Database(path);
-    initializeSqliteSchema(db);
-    replaceAppDataInSqlite(db, createSeedData());
-    db.close();
+    try {
+      initializeSqliteSchema(db);
+      replaceAppDataInSqlite(db, createSeedData());
+    } finally {
+      db.close();
+    }
 
     const storage = createSqliteStorage(path);
 
@@ -451,9 +555,12 @@ describe("SQLite schema and mapper", () => {
   it("serializes concurrent SQLite updates", async () => {
     const path = await createTempDbPath();
     const db = new Database(path);
-    initializeSqliteSchema(db);
-    replaceAppDataInSqlite(db, createSeedData());
-    db.close();
+    try {
+      initializeSqliteSchema(db);
+      replaceAppDataInSqlite(db, createSeedData());
+    } finally {
+      db.close();
+    }
     const storage = createSqliteStorage(path);
 
     await Promise.all([
