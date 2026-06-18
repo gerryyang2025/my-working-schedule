@@ -69,7 +69,7 @@ Usage:
   ./optools.sh dev status     Show daemon, port, and health status
   ./optools.sh dev logs       Show recent daemon logs
   ./optools.sh dev logs -f    Follow daemon logs
-  ./optools.sh build          Build frontend assets and install dist
+  ./optools.sh build          Build frontend assets and install production runtime files
   ./optools.sh nginx install  Install/configure nginx and reload
   ./optools.sh nginx configure [--no-reload]
   ./optools.sh nginx test     Run nginx -t through the helper
@@ -99,7 +99,7 @@ Environment:
   OPTOOLS_REQUIRED_NODE_PACKAGES Runtime npm packages checked before dev start (default: html2canvas jspdf)
   OPTOOLS_BUILD_COMMAND       Build command used by build (default: npm run build)
   OPTOOLS_BUILD_SOURCE_DIR    Built static asset directory (default: dist)
-  OPTOOLS_INSTALL_DIR         Static asset install root (default: /opt/my-working-schedule)
+  OPTOOLS_INSTALL_DIR         Production app install root (default: /opt/my-working-schedule)
   OPTOOLS_INSTALL_DIST_DIR    Static asset install dir (default: OPTOOLS_INSTALL_DIR/dist)
   OPTOOLS_NGINX_SERVICE_SCRIPT Nginx helper script (default: tools/nginx-service.sh)
   OPTOOLS_SQLITE_SERVICE_SCRIPT SQLite helper script (default: tools/sqlite-service.sh)
@@ -471,9 +471,44 @@ build_static_assets() {
   rm -rf "$INSTALL_DIST_DIR"
   mv "$temp_dist_dir" "$INSTALL_DIST_DIR"
 
+  install_runtime_files
+
   echo "build: completed"
   echo "source dist: $BUILD_SOURCE_DIR"
   echo "installed dist: $INSTALL_DIST_DIR"
+}
+
+copy_runtime_path() {
+  local relative_path="$1"
+  local source_path="$ROOT_DIR/$relative_path"
+  local target_path="$INSTALL_DIR/$relative_path"
+
+  if [[ ! -e "$source_path" ]]; then
+    echo "build: runtime source not found: $source_path" >&2
+    return 1
+  fi
+
+  mkdir -p "$(systemd_target_dir "$target_path")"
+  rm -rf "$target_path"
+  cp -a "$source_path" "$target_path"
+  chmod -R a+rX "$target_path"
+}
+
+install_runtime_files() {
+  local runtime_path
+
+  mkdir -p "$INSTALL_DIR"
+
+  for runtime_path in package.json package-lock.json server src tsconfig.json tsconfig.node.json; do
+    copy_runtime_path "$runtime_path"
+  done
+
+  rm -rf "$INSTALL_DIR/config"
+  mkdir -p "$INSTALL_DIR/config"
+  cp -a "$ROOT_DIR/config/server.production.example.json" "$INSTALL_DIR/config/server.production.example.json"
+  chmod -R a+rX "$INSTALL_DIR/config"
+
+  echo "installed runtime: $INSTALL_DIR"
 }
 
 run_nginx_helper() {
@@ -767,6 +802,9 @@ run_app_doctor() {
   doctor_check "app group" getent group "$APP_GROUP" || failed=1
   doctor_check "app user" getent passwd "$APP_USER" || failed=1
   doctor_check "app install dir" test -d "$INSTALL_DIR" || failed=1
+  doctor_check "app package.json" test -f "$INSTALL_DIR/package.json" || failed=1
+  doctor_check "app server entry" test -f "$INSTALL_DIR/server/index.ts" || failed=1
+  doctor_check "app shared source" test -f "$INSTALL_DIR/src/types/domain.ts" || failed=1
   doctor_check "app data dir" test -d "$DATA_DIR" || failed=1
   doctor_check "app backup dir" test -d "$BACKUP_DIR" || failed=1
   doctor_check "systemd service file" test -f "$SYSTEMD_SERVICE_FILE" || failed=1
@@ -848,6 +886,9 @@ run_doctor() {
   doctor_check "node" command -v node || failed=1
   doctor_check "npm" command -v npm || failed=1
   doctor_check "static dist" test -f "$INSTALL_DIST_DIR/index.html" || failed=1
+  doctor_check "app package.json" test -f "$INSTALL_DIR/package.json" || failed=1
+  doctor_check "app server entry" test -f "$INSTALL_DIR/server/index.ts" || failed=1
+  doctor_check "app shared source" test -f "$INSTALL_DIR/src/types/domain.ts" || failed=1
   doctor_check "data status" run_data_helper status || failed=1
   doctor_check "data check" run_data_helper check || failed=1
   doctor_check "nginx status" run_nginx_helper status || failed=1

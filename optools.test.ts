@@ -93,7 +93,7 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("OPTOOLS_SYSTEMD_SERVICE_FILE");
   });
 
-  it("builds frontend assets and installs dist to the configured deployment directory", async () => {
+  it("builds frontend assets and installs the API runtime files to the configured deployment directory", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");
     const installDir = join(stateDir, "install");
@@ -123,8 +123,18 @@ printf 'asset\\n' > dist/assets/app.js
     expect(await readFile(commandLogPath, "utf8")).toBe("npm run build\n");
     expect(await readFile(join(installDir, "dist", "index.html"), "utf8")).toBe("<html>built</html>\n");
     expect(await readFile(join(installDir, "dist", "assets", "app.js"), "utf8")).toBe("asset\n");
+    expect(await readFile(join(installDir, "package.json"), "utf8")).toContain('"start:api"');
+    expect(await readFile(join(installDir, "package-lock.json"), "utf8")).toContain('"lockfileVersion"');
+    expect(await readFile(join(installDir, "server", "index.ts"), "utf8")).toContain("Schedule API");
+    expect(await readFile(join(installDir, "src", "types", "domain.ts"), "utf8")).toContain("export interface StaffMember");
+    expect(await readFile(join(installDir, "tsconfig.node.json"), "utf8")).toContain('"compilerOptions"');
+    expect(await readFile(join(installDir, "config", "server.production.example.json"), "utf8")).toContain(
+      '"storageDriver"'
+    );
+    await expect(readFile(join(installDir, "config", "server.local.json"), "utf8")).rejects.toThrow();
     expect(result.stdout).toContain("build: completed");
     expect(result.stdout).toContain(`installed dist: ${join(installDir, "dist")}`);
+    expect(result.stdout).toContain(`installed runtime: ${installDir}`);
   });
 
   it("delegates nginx operations to the nginx helper script", async () => {
