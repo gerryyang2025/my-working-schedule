@@ -229,6 +229,51 @@ describe("tools/sqlite-service.sh", () => {
     expect(existsSync(backupDir)).toBe(false);
   });
 
+  it("passes root-level sqlite and backup parents through init without empty mkdir args", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "mkdir.log");
+    await mkdir(fakeBin);
+    await createFakeExecutable(
+      join(fakeBin, "mkdir"),
+      `{
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$MKDIR_LOG"
+exit 0
+`
+    );
+    await createFakeExecutable(
+      join(fakeBin, "npm"),
+      `{
+  printf 'npm=%s\\n' "$0"
+} > "$NPM_LOG"
+exit 0
+`
+    );
+
+    const result = await runTool(["init"], {
+      PATH: fakeBin,
+      MKDIR_LOG: logPath,
+      NPM_LOG: join(dir, "npm.log"),
+      SCHEDULE_SQLITE_PATH: "/schedule.db",
+      SCHEDULE_BACKUP_PATH: "/backups"
+    });
+
+    expect(result.code).toBe(0);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      "argc=3",
+      "arg1=-p",
+      "arg2=/",
+      "arg3=/backups"
+    ]);
+    expect(existsSync("/backups")).toBe(false);
+  });
+
   it("passes install when sqlite and backup targets are creatable but still absent", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);

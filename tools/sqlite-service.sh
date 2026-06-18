@@ -51,7 +51,19 @@ path_dirname() {
 
   case "$path" in
     */*)
-      printf '%s\n' "${path%/*}"
+      local parent="${path%/*}"
+      if [ -z "$parent" ]; then
+        case "$path" in
+          /*)
+            printf '/\n'
+            ;;
+          *)
+            printf '.\n'
+            ;;
+        esac
+      else
+        printf '%s\n' "$parent"
+      fi
       ;;
     *)
       printf '.\n'
