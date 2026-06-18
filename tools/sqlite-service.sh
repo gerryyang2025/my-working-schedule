@@ -125,6 +125,21 @@ ensure_existing_parent_usable() {
   fi
 }
 
+ensure_existing_sqlite_file_usable() {
+  if [ ! -r "$SQLITE_PATH" ] || [ ! -w "$SQLITE_PATH" ]; then
+    printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
+    printf 'path exists but is not readable/writable\n' >&2
+    return 1
+  fi
+}
+
+ensure_existing_sqlite_file_readable() {
+  if [ ! -r "$SQLITE_PATH" ]; then
+    printf 'sqlite file is not readable: %s\n' "$SQLITE_PATH" >&2
+    return 1
+  fi
+}
+
 ensure_sqlite_path_ready() {
   if [ -e "$SQLITE_PATH" ]; then
     if [ -d "$SQLITE_PATH" ]; then
@@ -133,11 +148,7 @@ ensure_sqlite_path_ready() {
       return 1
     fi
 
-    if [ ! -w "$SQLITE_PATH" ]; then
-      printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
-      printf 'path exists but is not writable\n' >&2
-      return 1
-    fi
+    ensure_existing_sqlite_file_usable
 
     ensure_existing_parent_usable "$SQLITE_PATH" "sqlite"
     return 0
@@ -190,8 +201,17 @@ status() {
   printf 'json data path: %s\n' "$DATA_PATH"
   if [ -f "$SQLITE_PATH" ]; then
     printf 'sqlite exists: yes\n'
-    printf 'sqlite modified time: %s\n' "$(sqlite_modified_time)"
-    printf 'sqlite size: %s bytes\n' "$(wc -c < "$SQLITE_PATH" | tr -d ' ')"
+    ensure_existing_sqlite_file_readable
+    if ! sqlite_mtime="$(sqlite_modified_time)"; then
+      printf 'sqlite file metadata is not readable: %s\n' "$SQLITE_PATH" >&2
+      return 1
+    fi
+    if ! sqlite_size="$(wc -c < "$SQLITE_PATH" | tr -d ' ')"; then
+      printf 'sqlite file size is not readable: %s\n' "$SQLITE_PATH" >&2
+      return 1
+    fi
+    printf 'sqlite modified time: %s\n' "$sqlite_mtime"
+    printf 'sqlite size: %s bytes\n' "$sqlite_size"
   else
     printf 'sqlite exists: no\n'
   fi

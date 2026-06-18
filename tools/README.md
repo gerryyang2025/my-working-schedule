@@ -14,7 +14,7 @@ SQLite is an embedded file database. This project does not run a separate SQLite
 ./tools/sqlite-service.sh check
 ```
 
-`install` is a non-mutating preflight check that requires `node`, `npm`, and the app's side-effect-free SQLite maintenance runtime preflight (`npm run data:preflight`) to work. It also verifies that the configured SQLite file location and backup directory are writable or can be created by the service user from the nearest existing parent, without creating those paths during the check. This catches broken or missing runtime dependencies such as `tsx` or `better-sqlite3` without creating app directories or touching app data. If `sqlite3` is missing, the script prints an informational warning because that CLI is only useful for manual inspection/debugging.
+`install` is a non-mutating preflight check that requires `node`, `npm`, and the app's side-effect-free SQLite maintenance runtime preflight (`npm run data:preflight`) to work. It also verifies that an existing SQLite file is both readable and writable, or that the configured SQLite file location and backup directory can be created by the service user from the nearest existing parent, without creating those paths during the check. This catches broken or missing runtime dependencies such as `tsx` or `better-sqlite3` without creating app directories or touching app data. If `sqlite3` is missing, the script prints an informational warning because that CLI is only useful for manual inspection/debugging.
 
 `check` delegates to the app-level SQLite integrity check and does not require the system `sqlite3` command.
 

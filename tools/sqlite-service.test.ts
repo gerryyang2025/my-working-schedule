@@ -403,6 +403,60 @@ exit 0
     ]);
   });
 
+  it("fails install when an existing sqlite file is write-only and unreadable", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const sqliteParent = join(dir, "sqlite-parent");
+    const sqlitePath = join(sqliteParent, "schedule.db");
+    const logPath = join(dir, "install-sqlite-unreadable.log");
+    await mkdir(sqliteParent);
+    await writeFile(sqlitePath, "sqlite");
+    await chmod(sqlitePath, 0o200);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    await chmod(sqlitePath, 0o600);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`sqlite path is not ready: ${sqlitePath}`);
+    expect(result.stderr).toContain("path exists but is not readable/writable");
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
+  it("fails status explicitly when the sqlite file is unreadable", async () => {
+    const dir = await createTempDir();
+    const sqliteParent = join(dir, "sqlite-parent");
+    const sqlitePath = join(sqliteParent, "schedule.db");
+    await mkdir(sqliteParent);
+    await writeFile(sqlitePath, "sqlite");
+    await chmod(sqlitePath, 0o200);
+
+    const result = await runTool(["status"], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    await chmod(sqlitePath, 0o600);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`sqlite file is not readable: ${sqlitePath}`);
+  });
+
   it("fails install when the nearest backup parent is not a directory", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
