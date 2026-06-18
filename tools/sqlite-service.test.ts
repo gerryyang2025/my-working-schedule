@@ -2,8 +2,9 @@ import { execFile, type ExecFileException } from "node:child_process";
 import { existsSync } from "node:fs";
 import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
+import { initSqliteDatabase } from "../server/sqlite/maintenance";
 
 interface CommandResult {
   code: number;
@@ -97,6 +98,11 @@ exit 0
 
 async function readLog(path: string) {
   return readFile(path, "utf8");
+}
+
+async function createValidSqliteBackup(path: string) {
+  await mkdir(dirname(path), { recursive: true });
+  await initSqliteDatabase({ sqlitePath: path });
 }
 
 afterEach(async () => {
@@ -321,5 +327,40 @@ describe("tools/sqlite-service.sh", () => {
 
     expect(result.code).toBe(1);
     expect(result.stderr).toContain(restoreGuidance);
+  });
+
+  it("rejects unsafe relative paths for direct data restore", async () => {
+    const dir = await createTempDir();
+    const sqliteDir = join(dir, "sqlite");
+    const backupDir = join(dir, "backups");
+
+    const result = await runDataCli(["restore", "nested/backup.db"], {
+      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupDir,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
+  });
+
+  it("resolves bare filenames under the backup path for direct data restore", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+    const backupFilename = "backup file.db";
+    await createValidSqliteBackup(join(backupPath, backupFilename));
+
+    const result = await runDataCli(["restore", backupFilename], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
+    expect(result.stdout).toContain(sqlitePath);
+    expect(existsSync(sqlitePath)).toBe(true);
   });
 });

@@ -16,6 +16,19 @@ const jsonPath = resolve(config.storagePath ?? DEFAULT_STORAGE_PATH);
 const sqlitePath = resolve(config.sqlitePath ?? "data/schedule.db");
 const backupPath = resolve(config.backupPath ?? "backups");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
+const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
+
+function resolveRestoreBackupFile(backupFile: string): string | null {
+  if (backupFile.startsWith("/")) {
+    return backupFile;
+  }
+
+  if (backupFile.includes("/") || backupFile.includes("..")) {
+    return null;
+  }
+
+  return resolve(backupPath, backupFile);
+}
 
 async function main() {
   if (command === "init") {
@@ -64,7 +77,13 @@ async function main() {
       process.exitCode = 1;
       return;
     }
-    console.log(await restoreSqliteBackup({ sqlitePath, backupPath, backupFile, confirm: true }));
+    const restoreBackupFile = resolveRestoreBackupFile(backupFile);
+    if (!restoreBackupFile) {
+      console.error(invalidRestoreFilenameMessage);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(await restoreSqliteBackup({ sqlitePath, backupPath, backupFile: restoreBackupFile, confirm: true }));
     return;
   }
 
