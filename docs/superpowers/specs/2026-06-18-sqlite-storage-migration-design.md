@@ -14,6 +14,7 @@
 - 提供 JSON 到 SQLite 的迁移命令。
 - 提供 SQLite 到 JSON 的导出命令。
 - 提供 SQLite 手动备份命令。
+- 在根目录新增 `tools/`，提供 Linux 下 SQLite 安装、初始化、迁移、备份、恢复和检查维护入口。
 - 迁移和备份过程有明确的错误处理、校验报告和回滚路径。
 - 当前所有 API、前端调用和业务规则保持兼容。
 
@@ -22,6 +23,7 @@
 - 不新增账号登录、角色权限和密码哈希。
 - 不新增审计日志表写入逻辑。
 - 不做 PostgreSQL 或远程数据库适配。
+- 不把 SQLite 包装成常驻数据库 daemon。SQLite 是嵌入式文件数据库，正式环境需要 systemd 管理的是当前 Web/API 应用，不是 SQLite 本身。
 - 不做 UI 页面改造。
 - 不修改月结、奖金分配、周统计和月统计算法。
 - 不自动删除原 JSON 数据文件。
@@ -123,6 +125,65 @@ npm run data:migrate:sqlite
 npm run data:export:json
 npm run data:backup
 ```
+
+同时在根目录新增 Linux 运维工具目录：
+
+```text
+tools/
+  sqlite-service.sh
+  README.md
+```
+
+`tools/sqlite-service.sh` 是当前系统的 SQLite 数据库文件维护入口，不是 SQLite 后台服务进程。脚本面向 Linux 部署环境，封装安装检查、目录准备、迁移、备份、恢复和健康检查。
+
+建议命令：
+
+```bash
+./tools/sqlite-service.sh install
+./tools/sqlite-service.sh init
+./tools/sqlite-service.sh migrate
+./tools/sqlite-service.sh backup
+./tools/sqlite-service.sh restore <backup-file>
+./tools/sqlite-service.sh status
+./tools/sqlite-service.sh check
+```
+
+命令职责：
+
+| 命令 | 职责 |
+| --- | --- |
+| `install` | 检查 Linux 环境和 `sqlite3` CLI；如缺失则给出 Ubuntu/Debian 安装提示；创建数据目录和备份目录 |
+| `init` | 初始化 SQLite 数据库文件和基础表结构；不从 JSON 隐式迁移数据 |
+| `migrate` | 调用 JSON 到 SQLite 迁移能力，并输出迁移校验报告 |
+| `backup` | 调用 SQLite 备份能力，生成带时间戳的备份文件 |
+| `restore <backup-file>` | 从指定备份文件恢复 SQLite 数据库，恢复前必须先备份当前数据库 |
+| `status` | 显示 SQLite 数据库路径、是否存在、文件大小、更新时间、备份目录和当前配置 |
+| `check` | 执行 SQLite `integrity_check`，并检查核心业务表是否存在 |
+
+默认 Linux 正式路径建议：
+
+```text
+数据库文件：/var/lib/my-working-schedule/schedule.db
+备份目录：/var/backups/my-working-schedule
+```
+
+脚本应允许通过环境变量覆盖路径：
+
+- `SCHEDULE_SQLITE_PATH`
+- `SCHEDULE_BACKUP_PATH`
+- `SCHEDULE_DATA_PATH`
+
+权限要求：
+
+- 数据库文件和备份目录应由运行 Web/API 服务的 Linux 用户可读写。
+- `install` 可以只给出 `sudo apt install sqlite3` 提示，不应在未确认的情况下自动执行提权安装。
+- `restore` 属于高风险操作，必须要求显式确认，且恢复前自动创建当前数据库备份。
+
+`tools/README.md` 需要说明：
+
+- SQLite 没有独立后台服务。
+- `sqlite-service.sh` 管理的是当前系统使用的 SQLite 数据库文件。
+- 正式 Web/API 应用的进程管理应由后续正式部署脚本或 systemd unit 负责。
 
 ### `data:migrate:sqlite`
 
@@ -270,6 +331,9 @@ exports/app-data-YYYYMMDD-HHmmss.json
 - 页面能读取同样的人员、班次、节假日、排班和月结数据。
 - 修改一条排班后重启服务，数据仍存在。
 - 备份命令生成可恢复的数据库文件。
+- `./tools/sqlite-service.sh status` 能显示当前 SQLite 路径、状态和备份目录。
+- `./tools/sqlite-service.sh check` 能对 SQLite 数据库执行完整性检查并通过。
+- `./tools/sqlite-service.sh restore <backup-file>` 能在测试数据库上恢复备份，并保留恢复前备份。
 
 ## 文档更新
 
@@ -278,6 +342,7 @@ exports/app-data-YYYYMMDD-HHmmss.json
 - `README.md`：新增 SQLite 配置、迁移、备份命令。
 - `docs/正式环境存储优化方案.md`：根据实际命令和路径修订。
 - `docs/功能跟进清单.md`：将 SQLite 存储迁移与备份状态更新为已完成或部分完成。
+- `tools/README.md`：说明 Linux 下 SQLite 数据库文件维护脚本的使用方式。
 
 ## 后续衔接
 
@@ -288,4 +353,3 @@ SQLite 存储完成后，下一阶段再实现：
 3. 正式部署脚本。
 
 账号和审计应直接基于 SQLite 实现，不再扩展 JSON 存储。
-
