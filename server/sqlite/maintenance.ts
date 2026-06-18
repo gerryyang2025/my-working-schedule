@@ -1,12 +1,21 @@
 import { randomUUID } from "node:crypto";
 import { existsSync } from "node:fs";
-import { copyFile, mkdir, rename, rm } from "node:fs/promises";
+import * as fsPromises from "node:fs/promises";
 import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
 import { readJsonAppData, writeJsonAppData } from "../app-data";
 import type { AppData } from "../types";
 import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./mapper";
 import { checkSqliteIntegrity, initializeSqliteSchema, listMissingCoreTables } from "./schema";
+
+export const sqliteMaintenanceFs = {
+  copyFile: fsPromises.copyFile,
+  mkdir: fsPromises.mkdir,
+  rename: fsPromises.rename,
+  rm: fsPromises.rm
+};
+
+const SQLITE_SIDECAR_SUFFIXES = ["-journal", "-shm", "-wal"] as const;
 
 export interface MigrationCount {
   expected: number;
@@ -56,14 +65,49 @@ function createTempSqlitePath(sqlitePath: string): string {
   return `${sqlitePath}.tmp-${process.pid}-${timestamp()}-${randomUUID()}`;
 }
 
-async function cleanupSqliteFile(path: string): Promise<void> {
-  await Promise.all(
-    [path, `${path}-journal`, `${path}-shm`, `${path}-wal`].map((candidate) => rm(candidate, { force: true }))
-  );
+function createRollbackSqliteArtifactPath(path: string): string {
+  return `${path}.restore-${process.pid}-${timestamp()}-${randomUUID()}`;
 }
 
-async function cleanupSqliteRestoreArtifacts(path: string): Promise<void> {
-  await Promise.all([`${path}-journal`, `${path}-shm`, `${path}-wal`].map((candidate) => rm(candidate, { force: true })));
+function listSqliteArtifactPaths(path: string): string[] {
+  return [path, ...SQLITE_SIDECAR_SUFFIXES.map((suffix) => `${path}${suffix}`)];
+}
+
+async function cleanupSqliteFile(path: string): Promise<void> {
+  await Promise.all(listSqliteArtifactPaths(path).map((candidate) => sqliteMaintenanceFs.rm(candidate, { force: true })));
+}
+
+interface MovedSqliteArtifact {
+  originalPath: string;
+  rollbackPath: string;
+}
+
+async function restoreMovedSqliteArtifacts(artifacts: MovedSqliteArtifact[]): Promise<void> {
+  for (const artifact of artifacts) {
+    await sqliteMaintenanceFs.rename(artifact.rollbackPath, artifact.originalPath);
+  }
+}
+
+async function cleanupMovedSqliteArtifacts(artifacts: MovedSqliteArtifact[]): Promise<void> {
+  await Promise.all(artifacts.map((artifact) => sqliteMaintenanceFs.rm(artifact.rollbackPath, { force: true })));
+}
+
+async function moveSqliteArtifactsToRollback(path: string): Promise<MovedSqliteArtifact[]> {
+  const movedArtifacts: MovedSqliteArtifact[] = [];
+  try {
+    for (const candidate of listSqliteArtifactPaths(path)) {
+      if (!existsSync(candidate)) {
+        continue;
+      }
+      const rollbackPath = createRollbackSqliteArtifactPath(candidate);
+      await sqliteMaintenanceFs.rename(candidate, rollbackPath);
+      movedArtifacts.push({ originalPath: candidate, rollbackPath });
+    }
+    return movedArtifacts;
+  } catch (error) {
+    await restoreMovedSqliteArtifacts(movedArtifacts);
+    throw error;
+  }
 }
 
 function ensureDefaultSettings(db: Database.Database): void {
@@ -149,7 +193,7 @@ function validateSqliteFile(path: string, label: string): void {
 }
 
 export async function initSqliteDatabase(options: CheckOptions): Promise<string> {
-  await mkdir(dirname(options.sqlitePath), { recursive: true });
+  await sqliteMaintenanceFs.mkdir(dirname(options.sqlitePath), { recursive: true });
   const db = new Database(options.sqlitePath);
   try {
     initializeSqliteSchema(db);
@@ -166,10 +210,10 @@ export async function migrateJsonToSqlite(options: MigrationOptions): Promise<Mi
   }
 
   const { data } = await readJsonAppData(options.jsonPath);
-  await mkdir(options.backupPath, { recursive: true });
+  await sqliteMaintenanceFs.mkdir(options.backupPath, { recursive: true });
   const sourceJsonBackupPath = join(options.backupPath, `app-data-before-sqlite-${timestamp()}.json`);
-  await copyFile(options.jsonPath, sourceJsonBackupPath);
-  await mkdir(dirname(options.sqlitePath), { recursive: true });
+  await sqliteMaintenanceFs.copyFile(options.jsonPath, sourceJsonBackupPath);
+  await sqliteMaintenanceFs.mkdir(dirname(options.sqlitePath), { recursive: true });
 
   const tempSqlitePath = createTempSqlitePath(options.sqlitePath);
   let db: Database.Database | undefined;
@@ -192,7 +236,7 @@ export async function migrateJsonToSqlite(options: MigrationOptions): Promise<Mi
 
     db.close();
     db = undefined;
-    await rename(tempSqlitePath, options.sqlitePath);
+    await sqliteMaintenanceFs.rename(tempSqlitePath, options.sqlitePath);
     return report;
   } finally {
     if (db) {
@@ -214,7 +258,7 @@ export async function exportSqliteToJson(options: ExportOptions): Promise<string
 }
 
 export async function backupSqliteDatabase(options: BackupOptions): Promise<string> {
-  await mkdir(options.backupPath, { recursive: true });
+  await sqliteMaintenanceFs.mkdir(options.backupPath, { recursive: true });
   const backupFile = join(options.backupPath, `schedule-${timestamp()}-${randomUUID()}.db`);
   const db = new Database(options.sqlitePath, { fileMustExist: true });
   try {
@@ -236,13 +280,20 @@ export async function restoreSqliteBackup(options: RestoreOptions): Promise<stri
     await backupSqliteDatabase({ sqlitePath: options.sqlitePath, backupPath: options.backupPath });
   }
 
-  await mkdir(dirname(options.sqlitePath), { recursive: true });
+  await sqliteMaintenanceFs.mkdir(dirname(options.sqlitePath), { recursive: true });
   const tempSqlitePath = createTempSqlitePath(options.sqlitePath);
+  let rollbackArtifacts: MovedSqliteArtifact[] = [];
   try {
-    await copyFile(options.backupFile, tempSqlitePath);
+    await sqliteMaintenanceFs.copyFile(options.backupFile, tempSqlitePath);
     validateSqliteFile(tempSqlitePath, "Copied SQLite backup");
-    await cleanupSqliteRestoreArtifacts(options.sqlitePath);
-    await rename(tempSqlitePath, options.sqlitePath);
+    rollbackArtifacts = await moveSqliteArtifactsToRollback(options.sqlitePath);
+    try {
+      await sqliteMaintenanceFs.rename(tempSqlitePath, options.sqlitePath);
+    } catch (error) {
+      await restoreMovedSqliteArtifacts(rollbackArtifacts);
+      throw error;
+    }
+    await cleanupMovedSqliteArtifacts(rollbackArtifacts);
     return options.sqlitePath;
   } finally {
     await cleanupSqliteFile(tempSqlitePath);

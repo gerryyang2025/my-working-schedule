@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 import Database from "better-sqlite3";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createSeedData } from "./seed";
 import {
   backupSqliteDatabase,
@@ -11,7 +11,8 @@ import {
   exportSqliteToJson,
   initSqliteDatabase,
   migrateJsonToSqlite,
-  restoreSqliteBackup
+  restoreSqliteBackup,
+  sqliteMaintenanceFs
 } from "./sqlite/maintenance";
 
 const tempDirs: string[] = [];
@@ -289,6 +290,90 @@ describe("SQLite maintenance", () => {
     expect(existsSync(`${sqlitePath}-shm`)).toBe(false);
     expect(existsSync(`${sqlitePath}-journal`)).toBe(false);
     expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(replacement.scheduleEntries);
+  });
+
+  it("restores the current database and sidecars when the final swap fails", async () => {
+    const dir = await createTempDir();
+    const currentJsonPath = join(dir, "current.json");
+    const replacementJsonPath = join(dir, "replacement.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const migrationBackups = join(dir, "migration-backups");
+    const replacementBackupPath = join(dir, "replacement-backups");
+    const restoreBackupPath = join(dir, "restore-backups");
+    const current = createSeedData();
+    current.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "current"
+      }
+    ];
+    const replacement = createSeedData();
+    replacement.scheduleEntries = [
+      {
+        id: "2026-06-16__staff-nurse-001",
+        date: "2026-06-16",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "replacement"
+      }
+    ];
+    await writeAppData(currentJsonPath, current);
+    await writeAppData(replacementJsonPath, replacement);
+    await migrateJsonToSqlite({ jsonPath: currentJsonPath, sqlitePath, backupPath: migrationBackups });
+
+    const replacementSqlitePath = join(dir, "replacement.db");
+    await migrateJsonToSqlite({
+      jsonPath: replacementJsonPath,
+      sqlitePath: replacementSqlitePath,
+      backupPath: migrationBackups
+    });
+    const replacementBackupFile = await backupSqliteDatabase({
+      sqlitePath: replacementSqlitePath,
+      backupPath: replacementBackupPath
+    });
+
+    const walContents = "current wal";
+    const shmContents = "current shm";
+    const journalContents = "current journal";
+    const originalCopyFile = sqliteMaintenanceFs.copyFile;
+    const copyFileSpy = vi.spyOn(sqliteMaintenanceFs, "copyFile").mockImplementation(async (sourcePath, destinationPath) => {
+      await originalCopyFile(sourcePath, destinationPath);
+      if (sourcePath === replacementBackupFile) {
+        await writeFile(`${sqlitePath}-wal`, walContents, "utf8");
+        await writeFile(`${sqlitePath}-shm`, shmContents, "utf8");
+        await writeFile(`${sqlitePath}-journal`, journalContents, "utf8");
+      }
+    });
+    const originalRename = sqliteMaintenanceFs.rename;
+    let shouldFailNextRenameIntoDestination = true;
+    const renameSpy = vi.spyOn(sqliteMaintenanceFs, "rename").mockImplementation(async (oldPath, newPath) => {
+      if (shouldFailNextRenameIntoDestination && newPath === sqlitePath) {
+        shouldFailNextRenameIntoDestination = false;
+        throw new Error(`Injected rename failure for ${newPath}`);
+      }
+      return originalRename(oldPath, newPath);
+    });
+    try {
+      await expect(
+        restoreSqliteBackup({
+          sqlitePath,
+          backupPath: restoreBackupPath,
+          backupFile: replacementBackupFile,
+          confirm: true
+        })
+      ).rejects.toThrow(/Injected rename failure/);
+    } finally {
+      copyFileSpy.mockRestore();
+      renameSpy.mockRestore();
+    }
+
+    expect(await readFile(`${sqlitePath}-wal`, "utf8")).toBe(walContents);
+    expect(await readFile(`${sqlitePath}-shm`, "utf8")).toBe(shmContents);
+    expect(await readFile(`${sqlitePath}-journal`, "utf8")).toBe(journalContents);
+    expect((await exportSqliteData(sqlitePath, dir)).scheduleEntries).toEqual(current.scheduleEntries);
   });
 
   it("rejects a corrupt restore backup before touching the current database", async () => {
