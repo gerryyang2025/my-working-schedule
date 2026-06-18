@@ -6,7 +6,8 @@ import {
   checkSqliteDatabase,
   exportSqliteToJson,
   initSqliteDatabase,
-  migrateJsonToSqlite
+  migrateJsonToSqlite,
+  restoreSqliteBackup
 } from "./sqlite/maintenance";
 
 const command = process.argv[2];
@@ -51,12 +52,17 @@ async function main() {
   }
 
   if (command === "restore") {
-    console.error("Restore is not supported by this CLI yet; it is deferred to Task 6.");
-    process.exitCode = 1;
+    const backupFile = process.argv[3];
+    if (!backupFile) {
+      console.error("Usage: tsx server/data-cli.ts restore <backup-file>");
+      process.exitCode = 1;
+      return;
+    }
+    console.log(await restoreSqliteBackup({ sqlitePath, backupPath, backupFile, confirm: true }));
     return;
   }
 
-  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|check>");
+  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|restore|check>");
   process.exitCode = 1;
 }
 
