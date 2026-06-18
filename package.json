@@ -11,10 +11,17 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "lint": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit"
+    "lint": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
+    "data:init:sqlite": "tsx server/data-cli.ts init",
+    "data:migrate:sqlite": "tsx server/data-cli.ts migrate",
+    "data:export:json": "tsx server/data-cli.ts export-json",
+    "data:backup": "tsx server/data-cli.ts backup",
+    "data:restore": "tsx server/data-cli.ts restore",
+    "data:check:sqlite": "tsx server/data-cli.ts check"
   },
   "dependencies": {
     "@vitejs/plugin-vue": "^5.2.4",
+    "better-sqlite3": "^12.11.1",
     "element-plus": "^2.9.11",
     "express": "^4.21.2",
     "html2canvas": "^1.4.1",
@@ -24,6 +31,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.2",
     "@types/supertest": "^6.0.2",

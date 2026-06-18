@@ -27,6 +27,14 @@ describe("server config", () => {
     expect(config.adminPassword).toBeUndefined();
   });
 
+  it("uses JSON storage by default", () => {
+    const config = resolveServerConfig({}, { defaultConfigPath: null });
+
+    expect(config.storageDriver).toBe("json");
+    expect(config.sqlitePath).toBeUndefined();
+    expect(config.backupPath).toBeUndefined();
+  });
+
   it("allows host, port, storage path, and admin password env overrides", () => {
     const config = resolveServerConfig({
       HOST: "127.0.0.1",
@@ -41,11 +49,49 @@ describe("server config", () => {
     expect(config.adminPassword).toBe("env-password");
   });
 
+  it("allows SQLite storage env overrides", () => {
+    const config = resolveServerConfig(
+      {
+        SCHEDULE_STORAGE_DRIVER: "sqlite",
+        SCHEDULE_SQLITE_PATH: "/var/lib/my-working-schedule/schedule.db",
+        SCHEDULE_BACKUP_PATH: "/var/backups/my-working-schedule"
+      },
+      { defaultConfigPath: null }
+    );
+
+    expect(config.storageDriver).toBe("sqlite");
+    expect(config.sqlitePath).toBe("/var/lib/my-working-schedule/schedule.db");
+    expect(config.backupPath).toBe("/var/backups/my-working-schedule");
+  });
+
   it("loads the admin password from the server config file", () => {
     withTempConfig({ adminPassword: "file-password" }, (path) => {
       const config = resolveServerConfig({ SCHEDULE_CONFIG_PATH: path });
 
       expect(config.adminPassword).toBe("file-password");
+    });
+  });
+
+  it("loads SQLite storage settings from the server config file", () => {
+    withTempConfig(
+      {
+        storageDriver: "sqlite",
+        sqlitePath: "data/schedule.db",
+        backupPath: "backups"
+      },
+      (path) => {
+        const config = resolveServerConfig({ SCHEDULE_CONFIG_PATH: path });
+
+        expect(config.storageDriver).toBe("sqlite");
+        expect(config.sqlitePath).toBe("data/schedule.db");
+        expect(config.backupPath).toBe("backups");
+      }
+    );
+  });
+
+  it("rejects unsupported storage drivers", () => {
+    withTempConfig({ storageDriver: "postgres" }, (path) => {
+      expect(() => resolveServerConfig({ SCHEDULE_CONFIG_PATH: path })).toThrow("存储驱动配置不正确");
     });
   });
 
