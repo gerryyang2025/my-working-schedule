@@ -86,7 +86,7 @@ function createHolidayPayload(overrides: Partial<Holiday> = {}) {
   };
 }
 
-describe("API routes", () => {
+describe.sequential("API routes", () => {
   it("returns health", async () => {
     await request(createTestApp()).get("/api/health").expect(200, { ok: true });
   });
