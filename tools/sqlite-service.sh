@@ -46,8 +46,92 @@ ensure_npm() {
   fi
 }
 
+path_dirname() {
+  local path="$1"
+
+  case "$path" in
+    */*)
+      printf '%s\n' "${path%/*}"
+      ;;
+    *)
+      printf '.\n'
+      ;;
+  esac
+}
+
+find_existing_parent() {
+  local path="$1"
+
+  while [ ! -e "$path" ]; do
+    local parent
+    parent="$(path_dirname "$path")"
+    if [ "$parent" = "$path" ]; then
+      break
+    fi
+    path="$parent"
+  done
+
+  printf '%s\n' "$path"
+}
+
+ensure_parent_creatable() {
+  local target_path="$1"
+  local target_kind="$2"
+  local create_target="$3"
+  local parent
+  parent="$(find_existing_parent "$create_target")"
+
+  if [ ! -d "$parent" ]; then
+    printf '%s path is not ready: %s\n' "$target_kind" "$target_path" >&2
+    printf 'nearest existing parent is not a directory: %s\n' "$parent" >&2
+    return 1
+  fi
+
+  if [ ! -x "$parent" ] || [ ! -w "$parent" ]; then
+    printf '%s path is not ready: %s\n' "$target_kind" "$target_path" >&2
+    printf 'nearest existing parent is not writable/traversable: %s\n' "$parent" >&2
+    return 1
+  fi
+}
+
+ensure_sqlite_path_ready() {
+  if [ -e "$SQLITE_PATH" ]; then
+    if [ ! -w "$SQLITE_PATH" ]; then
+      printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
+      printf 'path exists but is not writable\n' >&2
+      return 1
+    fi
+    return 0
+  fi
+
+  ensure_parent_creatable "$SQLITE_PATH" "sqlite" "$(path_dirname "$SQLITE_PATH")"
+}
+
+ensure_backup_path_ready() {
+  if [ -e "$BACKUP_PATH" ]; then
+    if [ ! -d "$BACKUP_PATH" ]; then
+      printf 'backup path is not ready: %s\n' "$BACKUP_PATH" >&2
+      printf 'path exists but is not a directory\n' >&2
+      return 1
+    fi
+    if [ ! -w "$BACKUP_PATH" ]; then
+      printf 'backup path is not ready: %s\n' "$BACKUP_PATH" >&2
+      printf 'path exists but is not writable\n' >&2
+      return 1
+    fi
+    return 0
+  fi
+
+  ensure_parent_creatable "$BACKUP_PATH" "backup" "$BACKUP_PATH"
+}
+
+ensure_install_paths_ready() {
+  ensure_sqlite_path_ready
+  ensure_backup_path_ready
+}
+
 ensure_dirs() {
-  mkdir -p "$(dirname "$SQLITE_PATH")" "$BACKUP_PATH"
+  mkdir -p "$(path_dirname "$SQLITE_PATH")" "$BACKUP_PATH"
 }
 
 sqlite_modified_time() {
@@ -88,6 +172,7 @@ case "$COMMAND" in
     ensure_npm
     warn_sqlite3
     run_npm_command data:preflight
+    ensure_install_paths_ready
     status
     ;;
   init)

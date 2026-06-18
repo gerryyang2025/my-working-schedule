@@ -229,6 +229,101 @@ describe("tools/sqlite-service.sh", () => {
     expect(existsSync(backupDir)).toBe(false);
   });
 
+  it("passes install when sqlite and backup targets are creatable but still absent", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const parentDir = join(dir, "existing-parent");
+    const sqliteDir = join(parentDir, "sqlite");
+    const backupDir = join(parentDir, "backups");
+    const sqlitePath = join(sqliteDir, "schedule.db");
+    const logPath = join(dir, "install-creatable.log");
+    await mkdir(parentDir);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupDir
+    });
+
+    expect(result.code).toBe(0);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${backupDir}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
+  });
+
+  it("fails install when the nearest sqlite parent is not a directory", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const blockedParent = join(dir, "sqlite-parent-blocker");
+    const sqlitePath = join(blockedParent, "nested", "schedule.db");
+    const logPath = join(dir, "install-sqlite-parent.log");
+    await writeFile(blockedParent, "not a directory");
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`sqlite path is not ready: ${sqlitePath}`);
+    expect(result.stderr).toContain(`nearest existing parent is not a directory: ${blockedParent}`);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
+  it("fails install when the nearest backup parent is not a directory", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const blockedParent = join(dir, "backup-parent-blocker");
+    const backupPath = join(blockedParent, "nested-backups");
+    const logPath = join(dir, "install-backup-parent.log");
+    await writeFile(blockedParent, "not a directory");
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "sqlite", "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupPath
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`backup path is not ready: ${backupPath}`);
+    expect(result.stderr).toContain(`nearest existing parent is not a directory: ${blockedParent}`);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${join(dir, "sqlite", "schedule.db")}`,
+      `SCHEDULE_BACKUP_PATH=${backupPath}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
   it("fails install when the delegated maintenance runtime preflight fails", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
