@@ -75,7 +75,6 @@ case "$COMMAND" in
     run_npm_command data:backup
     ;;
   restore)
-    ensure_dirs
     BACKUP_FILE="${2:-}"
     if [ -z "$BACKUP_FILE" ]; then
       printf 'restore requires <backup-file>\n' >&2
@@ -85,6 +84,7 @@ case "$COMMAND" in
     if [ "${CONFIRM_RESTORE:-}" != "yes" ]; then
       exit 1
     fi
+    ensure_dirs
     run_npm_command data:restore -- "$BACKUP_FILE"
     ;;
   status)

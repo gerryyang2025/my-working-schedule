@@ -14,6 +14,14 @@ SQLite is an embedded file database. This project does not run a separate SQLite
 ./tools/sqlite-service.sh check
 ```
 
+`install` is a preflight check that verifies local requirements and prints install guidance. It does not install packages or run `sudo`.
+
+Restore is intentionally guarded:
+
+```bash
+CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
+```
+
 ## Recommended Linux Paths
 
 ```bash

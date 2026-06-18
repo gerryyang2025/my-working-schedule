@@ -15,6 +15,7 @@ const config = resolveServerConfig();
 const jsonPath = resolve(config.storagePath ?? DEFAULT_STORAGE_PATH);
 const sqlitePath = resolve(config.sqlitePath ?? "data/schedule.db");
 const backupPath = resolve(config.backupPath ?? "backups");
+const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
 
 async function main() {
   if (command === "init") {
@@ -55,6 +56,11 @@ async function main() {
     const backupFile = process.argv[3];
     if (!backupFile) {
       console.error("Usage: tsx server/data-cli.ts restore <backup-file>");
+      process.exitCode = 1;
+      return;
+    }
+    if (process.env.CONFIRM_RESTORE !== "yes") {
+      console.error(restoreGuidance);
       process.exitCode = 1;
       return;
     }
