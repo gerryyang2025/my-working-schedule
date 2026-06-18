@@ -146,6 +146,39 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stderr).toContain("sudo apt install -y sqlite3");
   });
 
+  it("prints install guidance when node is missing", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("node command is missing");
+  });
+
+  it("prints install guidance when npm is missing", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("npm command is missing");
+  });
+
   it("does not create configured dirs during install preflight", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
@@ -153,9 +186,11 @@ describe("tools/sqlite-service.sh", () => {
     const backupDir = join(dir, "backups");
     await mkdir(fakeBin);
     await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "npm"), "exit 0\n");
 
     const result = await runTool(["install"], {
-      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      PATH: fakeBin,
       SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
       SCHEDULE_BACKUP_PATH: backupDir
     });
@@ -349,6 +384,31 @@ describe("tools/sqlite-service.sh", () => {
     }
   });
 
+  it("rejects windows-style absolute restore paths before invoking npm", async () => {
+    for (const backupFile of ["C:\\tmp\\backup.db", "\\\\server\\share\\backup.db"]) {
+      const dir = await createTempDir();
+      const fakeBin = join(dir, "bin");
+      const sqliteDir = join(dir, "sqlite");
+      const backupDir = join(dir, "backups");
+      await mkdir(fakeBin);
+      await createFakeExecutable(join(fakeBin, "npm"), "echo npm should not be invoked >&2\nexit 64\n");
+
+      const result = await runTool(["restore", backupFile], {
+        PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+        SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+        SCHEDULE_BACKUP_PATH: backupDir,
+        CONFIRM_RESTORE: "yes"
+      });
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+      expect(result.stderr).not.toContain("npm should not be invoked");
+      expect(result.stderr).not.toContain(restoreGuidance);
+      expect(existsSync(sqliteDir)).toBe(false);
+      expect(existsSync(backupDir)).toBe(false);
+    }
+  });
+
   it("does not invoke npm or create dirs for restore without confirmation", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
@@ -397,6 +457,26 @@ describe("tools/sqlite-service.sh", () => {
 
       expect(result.code).toBe(1);
       expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+      expect(existsSync(sqliteDir)).toBe(false);
+      expect(existsSync(backupDir)).toBe(false);
+    }
+  });
+
+  it("rejects windows-style absolute paths for direct data restore", async () => {
+    for (const backupFile of ["C:\\tmp\\backup.db", "\\\\server\\share\\backup.db"]) {
+      const dir = await createTempDir();
+      const sqliteDir = join(dir, "sqlite");
+      const backupDir = join(dir, "backups");
+
+      const result = await runDataCli(["restore", backupFile], {
+        SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+        SCHEDULE_BACKUP_PATH: backupDir,
+        CONFIRM_RESTORE: "yes"
+      });
+
+      expect(result.code).toBe(1);
+      expect(result.stderr).toContain(invalidRestoreFilenameMessage);
+      expect(result.stderr).not.toContain(restoreGuidance);
       expect(existsSync(sqliteDir)).toBe(false);
       expect(existsSync(backupDir)).toBe(false);
     }

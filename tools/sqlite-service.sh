@@ -32,6 +32,20 @@ ensure_sqlite3() {
   fi
 }
 
+ensure_node() {
+  if ! command -v node >/dev/null 2>&1; then
+    printf 'node command is missing\n' >&2
+    return 1
+  fi
+}
+
+ensure_npm() {
+  if ! command -v npm >/dev/null 2>&1; then
+    printf 'npm command is missing\n' >&2
+    return 1
+  fi
+}
+
 ensure_dirs() {
   mkdir -p "$(dirname "$SQLITE_PATH")" "$BACKUP_PATH"
 }
@@ -59,6 +73,8 @@ case "$COMMAND" in
     ;;
   install)
     ensure_sqlite3
+    ensure_node
+    ensure_npm
     status
     ;;
   init)
@@ -79,8 +95,8 @@ case "$COMMAND" in
       printf 'restore requires <backup-file>\n' >&2
       exit 1
     fi
-    printf 'Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.\n' >&2
     if [ "${CONFIRM_RESTORE:-}" != "yes" ]; then
+      printf 'Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.\n' >&2
       exit 1
     fi
     case "$BACKUP_FILE" in

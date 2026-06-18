@@ -1,4 +1,4 @@
-import { isAbsolute, resolve, win32 } from "node:path";
+import { isAbsolute, resolve } from "node:path";
 import { resolveServerConfig } from "./config";
 import { DEFAULT_STORAGE_PATH } from "./storage";
 import {
@@ -23,7 +23,7 @@ function resolveRestoreBackupFile(backupFile: string): string | null {
     return null;
   }
 
-  if (isAbsolute(backupFile) || win32.isAbsolute(backupFile)) {
+  if (isAbsolute(backupFile)) {
     return backupFile;
   }
 
