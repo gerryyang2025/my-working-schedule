@@ -156,7 +156,7 @@ tools/
 
 | 命令 | 职责 |
 | --- | --- |
-| `install` | 执行非写入式预检，强制检查 `node`、`npm` 与 `npm run data:preflight` 所需运行时可用性，并校验现有 SQLite 文件可读写，或校验目标 SQLite 路径、备份目录可由服务用户从最近现有父目录创建；`sqlite3` 如缺失仅给出手工排查用途的安装提示，不阻塞预检，并输出状态 |
+| `install` | 执行非写入式预检，强制检查 `node`、`npm` 与 `npm run data:preflight` 所需运行时可用性，并确认预检输出中实际包含 `ok: true` 与 `command: "preflight"` 对应 JSON 字段；随后校验现有 SQLite 文件可读写，或校验目标 SQLite 路径、备份目录可由服务用户从最近现有父目录创建；`sqlite3` 如缺失仅给出手工排查用途的安装提示，不阻塞预检，并输出状态 |
 | `init` | 初始化 SQLite 数据库文件和基础表结构；不从 JSON 隐式迁移数据 |
 | `migrate` | 调用 JSON 到 SQLite 迁移能力，并输出迁移校验报告 |
 | `backup` | 调用 SQLite 备份能力，生成带时间戳的备份文件 |
@@ -196,6 +196,7 @@ tools/
 
 1. 读取配置，解析当前 JSON 源路径、SQLite 路径和备份目录。
 2. 输出无副作用预检结果，供 `tools/sqlite-service.sh install` 和正式部署联调使用。
+3. 允许 `tools/sqlite-service.sh install` / `check` 通过输出字段校验识别“退出 0 但命令空跑”的运行时异常。
 
 输出应包含：
 

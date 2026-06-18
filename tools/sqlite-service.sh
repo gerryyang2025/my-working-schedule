@@ -227,6 +227,40 @@ run_npm_command() {
   SCHEDULE_DATA_PATH="$DATA_PATH" SCHEDULE_SQLITE_PATH="$SQLITE_PATH" SCHEDULE_BACKUP_PATH="$BACKUP_PATH" npm run "$@"
 }
 
+run_runtime_preflight() {
+  local preflight_output
+  preflight_output="$(run_npm_command data:preflight)" || return $?
+
+  case "$preflight_output" in
+    *[![:space:]]*)
+      ;;
+    *)
+      printf 'maintenance runtime preflight output was empty\n' >&2
+      return 1
+      ;;
+  esac
+
+  case "$preflight_output" in
+    *'"ok": true'*)
+      ;;
+    *)
+      printf 'maintenance runtime preflight output did not include "ok": true\n' >&2
+      printf '%s\n' "$preflight_output" >&2
+      return 1
+      ;;
+  esac
+
+  case "$preflight_output" in
+    *'"command": "preflight"'*)
+      ;;
+    *)
+      printf 'maintenance runtime preflight output did not include "command": "preflight"\n' >&2
+      printf '%s\n' "$preflight_output" >&2
+      return 1
+      ;;
+  esac
+}
+
 case "$COMMAND" in
   help|-h|--help)
     usage
@@ -235,7 +269,7 @@ case "$COMMAND" in
     ensure_node
     ensure_npm
     warn_sqlite3
-    run_npm_command data:preflight
+    run_runtime_preflight
     ensure_install_paths_ready
     status
     ;;
@@ -284,6 +318,7 @@ case "$COMMAND" in
     status
     ;;
   check)
+    run_runtime_preflight
     run_npm_command data:check:sqlite
     ;;
   *)

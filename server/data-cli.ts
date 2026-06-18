@@ -89,7 +89,7 @@ async function main() {
   if (command === "restore") {
     const backupFile = process.argv[3];
     if (!backupFile) {
-      console.error("Usage: tsx server/data-cli.ts restore <backup-file>");
+      console.error("Usage: node --import tsx server/data-cli.ts restore <backup-file>");
       process.exitCode = 1;
       return;
     }
@@ -108,7 +108,7 @@ async function main() {
     return;
   }
 
-  console.error("Usage: tsx server/data-cli.ts <preflight|init|migrate|export-json|backup|restore|check>");
+  console.error("Usage: node --import tsx server/data-cli.ts <preflight|init|migrate|export-json|backup|restore|check>");
   process.exitCode = 1;
 }
 

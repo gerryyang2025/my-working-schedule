@@ -90,7 +90,10 @@ async function createFakeNpmBin(dir: string) {
     printf 'arg%s=%s\\n' "$index" "$arg"
     index=$((index + 1))
   done
-} > "$NPM_LOG"
+} >> "$NPM_LOG"
+if [ "$#" -ge 2 ] && [ "$1" = "run" ] && [ "$2" = "data:preflight" ]; then
+  printf '{\\n  "ok": true,\\n  "command": "preflight"\\n}\\n'
+fi
 exit 0
 `
   );
@@ -550,53 +553,121 @@ exit 0
     expect(result.stderr).toContain("maintenance runtime preflight failed");
   });
 
+  it("fails install when the delegated maintenance runtime preflight exits 0 but prints no JSON", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "install-empty-preflight.log");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+    await createFakeExecutable(
+      join(fakeBin, "npm"),
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$NPM_LOG"
+exit 0
+`
+    );
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("maintenance runtime preflight output was empty");
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
   it("delegates maintenance commands to npm with configured env", async () => {
     const cases = [
       {
         name: "init",
         args: ["init"],
-        expectedNpmArgs: ["run", "data:init:sqlite"],
+        expectedNpmCalls: [["run", "data:init:sqlite"]],
         preserveSystemPath: true
       },
       {
         name: "migrate",
         args: ["migrate"],
-        expectedNpmArgs: ["run", "data:migrate:sqlite"],
+        expectedNpmCalls: [["run", "data:migrate:sqlite"]],
         preserveSystemPath: true
       },
       {
         name: "backup",
         args: ["backup"],
-        expectedNpmArgs: ["run", "data:backup"],
+        expectedNpmCalls: [["run", "data:backup"]],
         preserveSystemPath: true
       },
       {
         name: "check",
         args: ["check"],
-        expectedNpmArgs: ["run", "data:check:sqlite"],
+        expectedNpmCalls: [
+          ["run", "data:preflight"],
+          ["run", "data:check:sqlite"]
+        ],
         preserveSystemPath: false
       },
       {
         name: "restore",
         args: ["restore", "backup file with spaces.db"],
-        expectedNpmArgs: (backupPath: string) => [
+        expectedNpmCalls: (backupPath: string) => [[
           "run",
           "data:restore",
           "--",
           join(backupPath, "backup file with spaces.db")
-        ],
+        ]],
         preserveSystemPath: true,
         confirmRestore: true
+      },
+      {
+        name: "check-fails-fast-on-empty-preflight",
+        args: ["check"],
+        expectedNpmCalls: [["run", "data:preflight"]],
+        preserveSystemPath: false,
+        confirmRestore: false,
+        npmBody: `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'SCHEDULE_DATA_PATH=%s\\n' "$SCHEDULE_DATA_PATH"
+  printf 'SCHEDULE_SQLITE_PATH=%s\\n' "$SCHEDULE_SQLITE_PATH"
+  printf 'SCHEDULE_BACKUP_PATH=%s\\n' "$SCHEDULE_BACKUP_PATH"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$NPM_LOG"
+exit 0
+`
       }
-    ];
+    ] as const;
 
     for (const testCase of cases) {
       const dir = await createTempDir();
-      const fakeBin = await createFakeNpmBin(dir);
+      const fakeBin = testCase.npmBody ? join(dir, "bin") : await createFakeNpmBin(dir);
       const logPath = join(dir, `${testCase.name}.log`);
       const dataPath = join(dir, "data", "app-data.local.json");
       const sqlitePath = join(dir, "sqlite", "schedule.db");
       const backupPath = join(dir, "backups");
+
+      if (testCase.npmBody) {
+        await mkdir(fakeBin);
+        await createFakeExecutable(join(fakeBin, "npm"), testCase.npmBody);
+      }
 
       const result = await runTool(testCase.args, {
         PATH: testCase.preserveSystemPath ? `${fakeBin}:${process.env.PATH ?? ""}` : fakeBin,
@@ -607,12 +678,17 @@ exit 0
         CONFIRM_RESTORE: testCase.confirmRestore ? "yes" : ""
       });
 
-      expect(result.code, `${testCase.name} stderr: ${result.stderr}`).toBe(0);
-      const log = await readLog(logPath);
-      const expectedNpmArgs =
-        typeof testCase.expectedNpmArgs === "function" ? testCase.expectedNpmArgs(backupPath) : testCase.expectedNpmArgs;
+      if (testCase.name === "check-fails-fast-on-empty-preflight") {
+        expect(result.code, `${testCase.name} stderr: ${result.stderr}`).toBe(1);
+        expect(result.stderr).toContain("maintenance runtime preflight output was empty");
+      } else {
+        expect(result.code, `${testCase.name} stderr: ${result.stderr}`).toBe(0);
+      }
 
-      expect(log.trimEnd().split("\n")).toEqual([
+      const log = await readLog(logPath);
+      const expectedNpmCalls =
+        typeof testCase.expectedNpmCalls === "function" ? testCase.expectedNpmCalls(backupPath) : testCase.expectedNpmCalls;
+      const expectedLogLines = expectedNpmCalls.flatMap((expectedNpmArgs) => [
         `cwd=${process.cwd()}`,
         `SCHEDULE_DATA_PATH=${dataPath}`,
         `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
@@ -620,6 +696,8 @@ exit 0
         `argc=${expectedNpmArgs.length}`,
         ...expectedNpmArgs.map((arg, index) => `arg${index + 1}=${arg}`)
       ]);
+
+      expect(log.trimEnd().split("\n")).toEqual(expectedLogLines);
     }
   });
 
