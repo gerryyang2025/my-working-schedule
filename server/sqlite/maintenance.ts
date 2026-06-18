@@ -16,6 +16,7 @@ export const sqliteMaintenanceFs = {
 };
 
 const SQLITE_SIDECAR_SUFFIXES = ["-journal", "-shm", "-wal"] as const;
+const SQLITE_PERSISTED_SETTING_KEYS = ["defaultRequiredShiftsPerWeek", "version"] as const;
 
 export interface MigrationCount {
   expected: number;
@@ -129,7 +130,7 @@ function countExpectedRows(data: AppData): Record<string, number> {
     scheduleEntryShifts: data.scheduleEntries.reduce((total, entry) => total + entry.shiftIds.length, 0),
     monthlySettlements: data.monthlySettlements.length,
     monthlySettlementRows: data.monthlySettlements.reduce((total, settlement) => total + settlement.rows.length, 0),
-    settings: Object.keys(data.settings).length
+    settings: SQLITE_PERSISTED_SETTING_KEYS.reduce((total, key) => total + (key in data.settings ? 1 : 0), 0)
   };
 }
 

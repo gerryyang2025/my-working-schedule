@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { isAbsolute, join, relative } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import type { AppData } from "../src/types/domain";
 import { createSeedData } from "./seed";
 import {
   backupSqliteDatabase,
@@ -79,6 +80,35 @@ describe("SQLite maintenance", () => {
     expect(existsSync(report.sourceJsonBackupPath)).toBe(true);
     expect(await readFile(report.sourceJsonBackupPath, "utf8")).toBe(jsonContent);
     expect(existsSync(sqlitePath)).toBe(true);
+  });
+
+  it("ignores legacy adminPassword during JSON migration count verification and export", async () => {
+    const dir = await createTempDir();
+    const jsonPath = join(dir, "app-data.local.json");
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const seed = createSeedData() as AppData & { settings: AppData["settings"] & { adminPassword: string } };
+    seed.settings.adminPassword = "legacy-secret";
+    seed.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+    ];
+    await writeAppData(jsonPath, seed);
+
+    const report = await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
+    const exported = await exportSqliteData(sqlitePath, dir);
+
+    expect(report.ok).toBe(true);
+    expect(report.counts.settings).toEqual({ expected: 2, actual: 2 });
+    expect(exported.settings).toEqual({
+      defaultRequiredShiftsPerWeek: seed.settings.defaultRequiredShiftsPerWeek,
+      version: seed.settings.version
+    });
+    expect("adminPassword" in exported.settings).toBe(false);
+    expect(exported.scheduleEntries).toEqual(seed.scheduleEntries);
+    expect(exported.staff).toEqual(seed.staff);
+    expect(exported.shifts).toEqual(seed.shifts);
+    expect(exported.holidays).toEqual(seed.holidays);
+    expect(exported.monthlySettlements).toEqual(seed.monthlySettlements);
   });
 
   it("exports SQLite data back to JSON", async () => {
