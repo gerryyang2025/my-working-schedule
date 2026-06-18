@@ -96,6 +96,12 @@ ensure_parent_creatable() {
 
 ensure_sqlite_path_ready() {
   if [ -e "$SQLITE_PATH" ]; then
+    if [ -d "$SQLITE_PATH" ]; then
+      printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
+      printf 'path exists but is a directory\n' >&2
+      return 1
+    fi
+
     if [ ! -w "$SQLITE_PATH" ]; then
       printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
       printf 'path exists but is not writable\n' >&2
@@ -114,9 +120,9 @@ ensure_backup_path_ready() {
       printf 'path exists but is not a directory\n' >&2
       return 1
     fi
-    if [ ! -w "$BACKUP_PATH" ]; then
+    if [ ! -w "$BACKUP_PATH" ] || [ ! -x "$BACKUP_PATH" ]; then
       printf 'backup path is not ready: %s\n' "$BACKUP_PATH" >&2
-      printf 'path exists but is not writable\n' >&2
+      printf 'path exists but is not writable/traversable\n' >&2
       return 1
     fi
     return 0

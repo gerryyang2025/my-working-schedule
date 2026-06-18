@@ -293,6 +293,36 @@ describe("tools/sqlite-service.sh", () => {
     ]);
   });
 
+  it("fails install when the sqlite path already exists as a directory", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const sqlitePath = join(dir, "schedule.db");
+    const logPath = join(dir, "install-sqlite-dir.log");
+    await mkdir(sqlitePath);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`sqlite path is not ready: ${sqlitePath}`);
+    expect(result.stderr).toContain("path exists but is a directory");
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
   it("fails install when the nearest backup parent is not a directory", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
@@ -313,6 +343,36 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.code).toBe(1);
     expect(result.stderr).toContain(`backup path is not ready: ${backupPath}`);
     expect(result.stderr).toContain(`nearest existing parent is not a directory: ${blockedParent}`);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
+      `SCHEDULE_SQLITE_PATH=${join(dir, "sqlite", "schedule.db")}`,
+      `SCHEDULE_BACKUP_PATH=${backupPath}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:preflight"
+    ]);
+  });
+
+  it("fails install when the backup path already exists as a file", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const backupPath = join(dir, "backups");
+    const logPath = join(dir, "install-backup-file.log");
+    await writeFile(backupPath, "not a directory");
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "sqlite", "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupPath
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(`backup path is not ready: ${backupPath}`);
+    expect(result.stderr).toContain("path exists but is not a directory");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
       `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
