@@ -50,7 +50,7 @@ async function main() {
     return;
   }
 
-  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|restore|check>");
+  console.error("Usage: tsx server/data-cli.ts <init|migrate|export-json|backup|check>");
   process.exitCode = 1;
 }
 

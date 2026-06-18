@@ -1,7 +1,7 @@
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { isAbsolute, join, relative } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSeedData } from "./seed";
 import {
@@ -45,12 +45,19 @@ describe("SQLite maintenance", () => {
     seed.scheduleEntries = [
       { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
     ];
-    await writeFile(jsonPath, `${JSON.stringify(seed, null, 2)}\n`, "utf8");
+    const jsonContent = `${JSON.stringify(seed, null, 2)}\n`;
+    await writeFile(jsonPath, jsonContent, "utf8");
 
     const report = await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath });
+    const backupRelativePath = relative(backupPath, report.sourceJsonBackupPath);
 
     expect(report.ok).toBe(true);
     expect(report.counts.scheduleEntries).toEqual({ expected: 1, actual: 1 });
+    expect(backupRelativePath).not.toBe("");
+    expect(backupRelativePath.startsWith("..")).toBe(false);
+    expect(isAbsolute(backupRelativePath)).toBe(false);
+    expect(existsSync(report.sourceJsonBackupPath)).toBe(true);
+    expect(await readFile(report.sourceJsonBackupPath, "utf8")).toBe(jsonContent);
     expect(existsSync(sqlitePath)).toBe(true);
   });
 
