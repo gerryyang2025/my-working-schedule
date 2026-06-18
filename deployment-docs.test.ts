@@ -14,11 +14,14 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db");
     expect(runbook).toContain("SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule");
     expect(runbook).toContain("npm run build");
+    expect(runbook).toContain("./optools.sh build");
     expect(runbook).toContain("npm run start:api");
-    expect(runbook).toContain("systemctl status my-working-schedule");
-    expect(runbook).toContain("./tools/nginx-service.sh install");
-    expect(runbook).toContain("./tools/sqlite-service.sh backup");
-    expect(runbook).toContain("./tools/sqlite-service.sh check");
+    expect(runbook).toContain("./optools.sh app status");
+    expect(runbook).toContain("./optools.sh nginx install");
+    expect(runbook).toContain("./optools.sh data backup");
+    expect(runbook).toContain("./optools.sh data check");
+    expect(runbook).toContain("./optools.sh app status");
+    expect(runbook).toContain("./optools.sh doctor");
     expect(runbook).toContain("/api/health");
   });
 

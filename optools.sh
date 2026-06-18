@@ -34,6 +34,13 @@ PID_FILE="${OPTOOLS_DEV_PID_FILE:-"$STATE_DIR/dev.pid"}"
 LOG_FILE="${OPTOOLS_DEV_LOG_FILE:-"$LOG_DIR/dev.log"}"
 NODE_MODULES_BIN_DIR="${OPTOOLS_NODE_MODULES_BIN_DIR:-"$ROOT_DIR/node_modules/.bin"}"
 REQUIRED_NODE_PACKAGES="${OPTOOLS_REQUIRED_NODE_PACKAGES:-"html2canvas jspdf"}"
+INSTALL_DIR="${OPTOOLS_INSTALL_DIR:-/opt/my-working-schedule}"
+BUILD_COMMAND="${OPTOOLS_BUILD_COMMAND:-npm run build}"
+BUILD_SOURCE_DIR="${OPTOOLS_BUILD_SOURCE_DIR:-"$ROOT_DIR/dist"}"
+INSTALL_DIST_DIR="${OPTOOLS_INSTALL_DIST_DIR:-"$INSTALL_DIR/dist"}"
+NGINX_SERVICE_SCRIPT="${OPTOOLS_NGINX_SERVICE_SCRIPT:-"$ROOT_DIR/tools/nginx-service.sh"}"
+SQLITE_SERVICE_SCRIPT="${OPTOOLS_SQLITE_SERVICE_SCRIPT:-"$ROOT_DIR/tools/sqlite-service.sh"}"
+APP_SERVICE_NAME="${OPTOOLS_APP_SERVICE_NAME:-my-working-schedule}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -55,6 +62,24 @@ Usage:
   ./optools.sh dev status     Show daemon, port, and health status
   ./optools.sh dev logs       Show recent daemon logs
   ./optools.sh dev logs -f    Follow daemon logs
+  ./optools.sh build          Build frontend assets and install dist
+  ./optools.sh nginx install  Install/configure nginx and reload
+  ./optools.sh nginx configure [--no-reload]
+  ./optools.sh nginx test     Run nginx -t through the helper
+  ./optools.sh nginx reload   Reload nginx through the helper
+  ./optools.sh nginx status   Show nginx helper status
+  ./optools.sh data status    Show SQLite storage status
+  ./optools.sh data check     Check SQLite storage integrity
+  ./optools.sh data backup    Back up SQLite storage
+  ./optools.sh data restore <backup-file>
+  ./optools.sh data export-json
+  ./optools.sh app start      Start the production systemd service
+  ./optools.sh app stop       Stop the production systemd service
+  ./optools.sh app restart    Restart the production systemd service
+  ./optools.sh app status     Show production service status
+  ./optools.sh app logs       Show production service logs
+  ./optools.sh app health     Check production API health
+  ./optools.sh doctor         Run production deployment checks
   ./optools.sh help           Show this help
 
 Environment:
@@ -63,6 +88,13 @@ Environment:
   OPTOOLS_DEV_COMMAND         Command used by dev start (default: npm run dev)
   OPTOOLS_NODE_MODULES_BIN_DIR Local npm bin directory (default: node_modules/.bin)
   OPTOOLS_REQUIRED_NODE_PACKAGES Runtime npm packages checked before dev start (default: html2canvas jspdf)
+  OPTOOLS_BUILD_COMMAND       Build command used by build (default: npm run build)
+  OPTOOLS_BUILD_SOURCE_DIR    Built static asset directory (default: dist)
+  OPTOOLS_INSTALL_DIR         Static asset install root (default: /opt/my-working-schedule)
+  OPTOOLS_INSTALL_DIST_DIR    Static asset install dir (default: OPTOOLS_INSTALL_DIR/dist)
+  OPTOOLS_NGINX_SERVICE_SCRIPT Nginx helper script (default: tools/nginx-service.sh)
+  OPTOOLS_SQLITE_SERVICE_SCRIPT SQLite helper script (default: tools/sqlite-service.sh)
+  OPTOOLS_APP_SERVICE_NAME    systemd service name (default: my-working-schedule)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -122,6 +154,24 @@ health_status() {
   else
     printf '%s: unavailable <%s>\n' "$label" "$url"
   fi
+}
+
+health_check() {
+  local label="$1"
+  local url="$2"
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s: unknown (curl not found) <%s>\n' "$label" "$url"
+    return 1
+  fi
+
+  if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
+    printf '%s: ok <%s>\n' "$label" "$url"
+    return 0
+  fi
+
+  printf '%s: unavailable <%s>\n' "$label" "$url"
+  return 1
 }
 
 join_by_comma() {
@@ -371,6 +421,218 @@ dev_logs() {
   tail -n "${OPTOOLS_LOG_LINES:-80}" "$LOG_FILE"
 }
 
+build_static_assets() {
+  local temp_dist_dir
+
+  if ! command -v npm >/dev/null 2>&1 && [[ "$BUILD_COMMAND" == npm* ]]; then
+    echo "build: cannot start" >&2
+    echo "missing command: npm" >&2
+    return 1
+  fi
+
+  echo "build: running $BUILD_COMMAND"
+  (
+    cd "$ROOT_DIR"
+    bash -lc "$BUILD_COMMAND"
+  )
+
+  if [[ ! -d "$BUILD_SOURCE_DIR" ]]; then
+    echo "build: source dist directory not found: $BUILD_SOURCE_DIR" >&2
+    return 1
+  fi
+
+  if [[ ! -f "$BUILD_SOURCE_DIR/index.html" ]]; then
+    echo "build: source dist index.html not found: $BUILD_SOURCE_DIR/index.html" >&2
+    return 1
+  fi
+
+  mkdir -p "$INSTALL_DIR"
+  temp_dist_dir="${INSTALL_DIST_DIR}.tmp.$$"
+  rm -rf "$temp_dist_dir"
+  mkdir -p "$temp_dist_dir"
+  cp -a "$BUILD_SOURCE_DIR/." "$temp_dist_dir/"
+  chmod -R a+rX "$temp_dist_dir"
+  rm -rf "$INSTALL_DIST_DIR"
+  mv "$temp_dist_dir" "$INSTALL_DIST_DIR"
+
+  echo "build: completed"
+  echo "source dist: $BUILD_SOURCE_DIR"
+  echo "installed dist: $INSTALL_DIST_DIR"
+}
+
+run_nginx_helper() {
+  local command="${1:-help}"
+  shift || true
+
+  if [[ ! -f "$NGINX_SERVICE_SCRIPT" ]]; then
+    echo "nginx helper script not found: $NGINX_SERVICE_SCRIPT" >&2
+    return 1
+  fi
+
+  case "$command" in
+    install|configure|test|reload|status|help|-h|--help)
+      (
+        cd "$ROOT_DIR"
+        bash "$NGINX_SERVICE_SCRIPT" "$command" "$@"
+      )
+      ;;
+    *)
+      echo "Unknown nginx command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
+run_data_export_json() {
+  if ! command -v npm >/dev/null 2>&1; then
+    echo "data export-json: cannot start" >&2
+    echo "missing command: npm" >&2
+    return 1
+  fi
+
+  (
+    cd "$ROOT_DIR"
+    npm run data:export:json
+  )
+}
+
+run_data_helper() {
+  local command="${1:-help}"
+  shift || true
+
+  if [[ "$command" == "export-json" ]]; then
+    run_data_export_json "$@"
+    return
+  fi
+
+  if [[ ! -f "$SQLITE_SERVICE_SCRIPT" ]]; then
+    echo "SQLite helper script not found: $SQLITE_SERVICE_SCRIPT" >&2
+    return 1
+  fi
+
+  case "$command" in
+    install|init|migrate|backup|restore|status|check|help|-h|--help)
+      (
+        cd "$ROOT_DIR"
+        bash "$SQLITE_SERVICE_SCRIPT" "$command" "$@"
+      )
+      ;;
+    *)
+      echo "Unknown data command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
+ensure_systemctl() {
+  if ! command -v systemctl >/dev/null 2>&1; then
+    echo "systemctl command is missing" >&2
+    return 1
+  fi
+}
+
+ensure_journalctl() {
+  if ! command -v journalctl >/dev/null 2>&1; then
+    echo "journalctl command is missing" >&2
+    return 1
+  fi
+}
+
+run_app_systemctl() {
+  local command="$1"
+  ensure_systemctl
+  systemctl "$command" "$APP_SERVICE_NAME"
+}
+
+run_app_logs() {
+  ensure_journalctl
+
+  if [[ "${1:-}" == "-f" || "${1:-}" == "--follow" ]]; then
+    journalctl -u "$APP_SERVICE_NAME" -f
+    return
+  fi
+
+  journalctl -u "$APP_SERVICE_NAME" -n "${OPTOOLS_LOG_LINES:-80}" --no-pager
+}
+
+run_app_helper() {
+  local command="${1:-help}"
+  shift || true
+
+  case "$command" in
+    start|stop|restart|status)
+      run_app_systemctl "$command"
+      ;;
+    logs)
+      run_app_logs "$@"
+      ;;
+    health)
+      health_check "api health" "$API_HEALTH_URL"
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown app command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
+doctor_check() {
+  local label="$1"
+  shift
+
+  if "$@" >/dev/null 2>&1; then
+    printf '[ok] %s\n' "$label"
+    return 0
+  fi
+
+  printf '[fail] %s\n' "$label"
+  return 1
+}
+
+doctor_check_api_health() {
+  if [[ "$API_HEALTH_URL" == "disabled" || "$API_HEALTH_URL" == "skip" ]]; then
+    printf '[skip] api health\n'
+    return 0
+  fi
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '[fail] api health\n'
+    return 1
+  fi
+
+  doctor_check "api health" curl -fsS --max-time 2 "$API_HEALTH_URL"
+}
+
+run_doctor() {
+  local failed=0
+
+  echo "doctor: checking production runtime"
+
+  doctor_check "node" command -v node || failed=1
+  doctor_check "npm" command -v npm || failed=1
+  doctor_check "static dist" test -f "$INSTALL_DIST_DIR/index.html" || failed=1
+  doctor_check "data status" run_data_helper status || failed=1
+  doctor_check "data check" run_data_helper check || failed=1
+  doctor_check "nginx status" run_nginx_helper status || failed=1
+  doctor_check "nginx test" run_nginx_helper test || failed=1
+  doctor_check "app status" run_app_systemctl status || failed=1
+  doctor_check_api_health || failed=1
+
+  if [[ "$failed" == "0" ]]; then
+    echo "doctor: ok"
+    return 0
+  fi
+
+  echo "doctor: failed"
+  return 1
+}
+
 main() {
   local scope="${1:-help}"
   local command="${2:-}"
@@ -378,6 +640,24 @@ main() {
   case "$scope" in
     help|-h|--help)
       usage
+      ;;
+    build)
+      build_static_assets
+      ;;
+    nginx)
+      shift || true
+      run_nginx_helper "$@"
+      ;;
+    data)
+      shift || true
+      run_data_helper "$@"
+      ;;
+    app)
+      shift || true
+      run_app_helper "$@"
+      ;;
+    doctor)
+      run_doctor
       ;;
     dev)
       case "$command" in

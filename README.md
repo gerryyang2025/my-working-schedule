@@ -80,30 +80,31 @@ export SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
 export SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
 ```
 
-SQLite 是嵌入式文件数据库，不需要单独启动数据库 daemon。长期运行的仍然是当前 Web/API 进程；该进程由 `optools`、systemd 或后续正式部署脚本单独管理。
+SQLite 是嵌入式文件数据库，不需要单独启动数据库 daemon。长期运行的仍然是当前 Web/API 进程；正式环境推荐通过 `optools.sh` 统一封装 systemd、Nginx 和 SQLite 维护操作。
 
-常用数据维护命令：
+常用数据维护命令推荐使用统一入口：
 
 ```bash
-npm run data:preflight
-npm run data:init:sqlite
-SCHEDULE_DATA_PATH=data/app-data.local.json npm run data:migrate:sqlite
-npm run data:export:json
-npm run data:backup
-CONFIRM_RESTORE=yes npm run data:restore -- <backup-file>
-npm run data:check:sqlite
+./optools.sh data install
+./optools.sh data init
+./optools.sh data migrate
+./optools.sh data export-json
+./optools.sh data backup
+CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
+./optools.sh data status
+./optools.sh data check
 ```
 
 说明：
 
-- `npm run data:init:sqlite` 只初始化 SQLite 库和表结构，不会自动从 JSON 导入数据。
-- `npm run data:migrate:sqlite` 用当前 JSON 业务数据迁移到 SQLite；如目标库已存在，可按需要追加 `-- --overwrite`。
-- `npm run data:export:json` 用于导出当前 SQLite 数据，便于人工检查或留存可读副本。
-- `npm run data:backup` 会在 `SCHEDULE_BACKUP_PATH` 下生成带时间戳的数据库备份。
-- `npm run data:check:sqlite` 会输出完整性和核心表检查结果，`ok: true` 代表检查通过。
-- `npm run data:preflight` 是无副作用的运行前检查，会回显 JSON 路径、SQLite 路径和备份目录，便于部署联调。
+- `./optools.sh data init` 只初始化 SQLite 库和表结构，不会自动从 JSON 导入数据。
+- `./optools.sh data migrate` 用当前 JSON 业务数据迁移到 SQLite；如目标库已存在且确认覆盖，仍可使用底层命令 `npm run data:migrate:sqlite -- --overwrite`。
+- `./optools.sh data export-json` 用于导出当前 SQLite 数据，便于人工检查或留存可读副本。
+- `./optools.sh data backup` 会在 `SCHEDULE_BACKUP_PATH` 下生成带时间戳的数据库备份。
+- `./optools.sh data check` 会输出完整性和核心表检查结果，`ok: true` 代表检查通过。
+- `./optools.sh data install` 是无副作用的运行前检查，会回显 JSON 路径、SQLite 路径和备份目录，便于部署联调。
 
-Linux 辅助脚本：
+底层 Linux 辅助脚本仍保留，便于单独调试：
 
 ```bash
 ./tools/sqlite-service.sh install
@@ -120,9 +121,9 @@ Linux 辅助脚本：
 备份方法：
 
 ```bash
-./tools/sqlite-service.sh status
-./tools/sqlite-service.sh check
-./tools/sqlite-service.sh backup
+./optools.sh data status
+./optools.sh data check
+./optools.sh data backup
 ```
 
 说明：
@@ -130,15 +131,15 @@ Linux 辅助脚本：
 - 建议在月结、系统升级、服务器迁移前手动执行一次备份。
 - 备份文件会写入 `SCHEDULE_BACKUP_PATH`，默认是 `/var/backups/my-working-schedule`。
 - 如果不使用维护脚本，也可以执行 `npm run data:backup`，但仍需提前设置 `SCHEDULE_STORAGE_DRIVER=sqlite`、`SCHEDULE_SQLITE_PATH` 和 `SCHEDULE_BACKUP_PATH`。
-- 备份后建议执行 `./tools/sqlite-service.sh status` 查看数据库路径和备份目录是否符合预期。
+- 备份后建议执行 `./optools.sh data status` 查看数据库路径和备份目录是否符合预期。
 
 恢复方法：
 
 ```bash
-./optools.sh dev stop
-CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
-./tools/sqlite-service.sh check
-./optools.sh dev start
+./optools.sh app stop
+CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
+./optools.sh data check
+./optools.sh app start
 ```
 
 说明：
@@ -146,14 +147,14 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 - `<backup-file>` 可以是 `SCHEDULE_BACKUP_PATH` 下的备份文件名，例如 `schedule-2026-06-18-153000.db`；也可以是绝对路径。
 - 恢复必须显式设置 `CONFIRM_RESTORE=yes`，避免误操作覆盖当前数据库。
 - 恢复前脚本会先对当前数据库做保护性备份，再替换为指定备份文件。
-- 恢复后必须执行 `./tools/sqlite-service.sh check`，再启动服务并检查页面数据。
+- 恢复后必须执行 `./optools.sh data check`，再启动服务并检查页面数据。
 
 推荐恢复 runbook：
 
 1. 先停止 Web/API 服务。
 2. 确认 `SCHEDULE_BACKUP_PATH` 有足够空间保存当前库的保护性备份，同时确认 `SCHEDULE_SQLITE_PATH` 所在文件系统有足够空间放置同目录临时副本。
-3. 执行 `CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>`。
-4. 执行 `./tools/sqlite-service.sh check`。
+3. 执行 `CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>`。
+4. 执行 `./optools.sh data check`。
 5. 重启 Web/API 服务并验证健康检查或关键页面读写。
 
 ## 正式部署
@@ -164,7 +165,9 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 - `npm run start:api` 启动 Express API。
 - `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。
 - `deploy/nginx/my-working-schedule.conf.example` 提供静态资源和 `/api/` 反向代理。
-- `tools/nginx-service.sh` 安装 nginx、创建 `conf.d`、复制配置并执行 `nginx -t`。
+- `./optools.sh nginx install` 安装 nginx、创建 `conf.d`、复制配置并执行 `nginx -t`。
+- `./optools.sh app start|status|logs` 管理正式 API 服务。
+- `./optools.sh doctor` 聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
 完整步骤见 [正式部署运行手册.md](docs/正式部署运行手册.md)。
@@ -181,7 +184,7 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 ./optools.sh dev restart
 ```
 
-脚本会以 daemon 方式启动 `npm run dev`，PID 写入 `tmp/optools/dev.pid`，日志写入 `logs/optools/dev.log`。该脚本仅用于本地开发模式；正式部署启停后续单独实现。
+脚本会以 daemon 方式启动 `npm run dev`，PID 写入 `tmp/optools/dev.pid`，日志写入 `logs/optools/dev.log`。该脚本仅用于本地开发模式；正式部署使用 `./optools.sh app start|stop|restart|status|logs` 管理 systemd 服务。
 
 开发 daemon 默认对外监听。启动后可通过状态命令查看当前机器对外访问地址：
 

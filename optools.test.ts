@@ -42,6 +42,11 @@ function runOptools(args: string[], env: Record<string, string> = {}): Promise<C
   });
 }
 
+async function createExecutable(path: string, body: string): Promise<void> {
+  await writeFile(path, `#!/usr/bin/env bash\n${body}`, "utf8");
+  await chmod(path, 0o755);
+}
+
 async function readUntilContains(path: string, expected: string): Promise<string> {
   let content = "";
 
@@ -68,9 +73,247 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh dev start");
     expect(result.stdout).toContain("./optools.sh dev status");
     expect(result.stdout).toContain("./optools.sh dev stop");
+    expect(result.stdout).toContain("./optools.sh build");
+    expect(result.stdout).toContain("./optools.sh nginx install");
+    expect(result.stdout).toContain("./optools.sh nginx status");
+    expect(result.stdout).toContain("./optools.sh data check");
+    expect(result.stdout).toContain("./optools.sh app status");
+    expect(result.stdout).toContain("./optools.sh doctor");
     expect(result.stdout).toContain("HOST");
     expect(result.stdout).toContain("WEB_HOST");
     expect(result.stdout).toContain("PUBLIC_HOST");
+    expect(result.stdout).toContain("OPTOOLS_INSTALL_DIR");
+    expect(result.stdout).toContain("OPTOOLS_NGINX_SERVICE_SCRIPT");
+    expect(result.stdout).toContain("OPTOOLS_SQLITE_SERVICE_SCRIPT");
+    expect(result.stdout).toContain("OPTOOLS_APP_SERVICE_NAME");
+  });
+
+  it("builds frontend assets and installs dist to the configured deployment directory", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "install");
+    const fakeNpmPath = join(fakeBinDir, "npm");
+    const commandLogPath = join(stateDir, "commands.log");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await writeFile(
+      fakeNpmPath,
+      `#!/usr/bin/env bash
+printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
+mkdir -p dist/assets
+printf '<html>built</html>\\n' > dist/index.html
+printf 'asset\\n' > dist/assets/app.js
+`,
+      "utf8"
+    );
+    await chmod(fakeNpmPath, 0o755);
+
+    const result = await runOptools(["build"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      COMMAND_LOG: commandLogPath,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(commandLogPath, "utf8")).toBe("npm run build\n");
+    expect(await readFile(join(installDir, "dist", "index.html"), "utf8")).toBe("<html>built</html>\n");
+    expect(await readFile(join(installDir, "dist", "assets", "app.js"), "utf8")).toBe("asset\n");
+    expect(result.stdout).toContain("build: completed");
+    expect(result.stdout).toContain(`installed dist: ${join(installDir, "dist")}`);
+  });
+
+  it("delegates nginx operations to the nginx helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const logPath = join(stateDir, "nginx.log");
+
+    await writeFile(
+      fakeNginxHelper,
+      `#!/usr/bin/env bash
+{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$NGINX_LOG"
+`,
+      "utf8"
+    );
+    await chmod(fakeNginxHelper, 0o755);
+
+    const result = await runOptools(["nginx", "configure", "--no-reload"], {
+      OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      NGINX_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        `cwd=${process.cwd()}`,
+        "argc=2",
+        "arg1=configure",
+        "arg2=--no-reload",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("delegates SQLite data operations to the data helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeDataHelper = join(stateDir, "sqlite-service.sh");
+    const logPath = join(stateDir, "data.log");
+
+    await createExecutable(
+      fakeDataHelper,
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$DATA_LOG"
+`
+    );
+
+    const result = await runOptools(["data", "restore", "schedule.db"], {
+      OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
+      DATA_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        `cwd=${process.cwd()}`,
+        "argc=2",
+        "arg1=restore",
+        "arg2=schedule.db",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("runs data export-json through npm from the project root", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const fakeNpmPath = join(fakeBinDir, "npm");
+    const commandLogPath = join(stateDir, "commands.log");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(
+      fakeNpmPath,
+      `printf 'cwd=%s\\n' "$PWD" >> "$COMMAND_LOG"
+printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
+`
+    );
+
+    const result = await runOptools(["data", "export-json"], {
+      COMMAND_LOG: commandLogPath,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(commandLogPath, "utf8")).toBe(
+      [`cwd=${process.cwd()}`, "npm run data:export:json", ""].join("\n")
+    );
+  });
+
+  it("delegates production app operations to systemd and journalctl", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const logPath = join(stateDir, "app.log");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(join(fakeBinDir, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$APP_LOG"\n`);
+    await createExecutable(join(fakeBinDir, "journalctl"), `printf 'journalctl %s\\n' "$*" >> "$APP_LOG"\n`);
+
+    const status = await runOptools(["app", "status"], {
+      APP_LOG: logPath,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`,
+      OPTOOLS_APP_SERVICE_NAME: "schedule-api"
+    });
+    const logs = await runOptools(["app", "logs"], {
+      APP_LOG: logPath,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`,
+      OPTOOLS_APP_SERVICE_NAME: "schedule-api"
+    });
+
+    expect(status.code, status.stderr).toBe(0);
+    expect(logs.code, logs.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        "systemctl status schedule-api",
+        "journalctl -u schedule-api -n 80 --no-pager",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("returns a failing status when production API health is unavailable", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const logPath = join(stateDir, "health.log");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(
+      join(fakeBinDir, "curl"),
+      `printf 'curl %s\\n' "$*" >> "$HEALTH_LOG"
+exit 7
+`
+    );
+
+    const result = await runOptools(["app", "health"], {
+      HEALTH_LOG: logPath,
+      OPTOOLS_API_HEALTH_URL: "http://127.0.0.1:3001/api/health",
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("api health: unavailable");
+    expect(await readFile(logPath, "utf8")).toContain("curl -fsS --max-time 2 http://127.0.0.1:3001/api/health");
+  });
+
+  it("runs doctor checks and returns non-zero when any check fails", async () => {
+    const stateDir = await createStateDir();
+    const installDir = join(stateDir, "install");
+    const fakeBinDir = join(stateDir, "bin");
+    const fakeDataHelper = join(stateDir, "sqlite-service.sh");
+    const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const logPath = join(stateDir, "doctor.log");
+
+    await mkdir(join(installDir, "dist"), { recursive: true });
+    await writeFile(join(installDir, "dist", "index.html"), "<html></html>\n", "utf8");
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(join(fakeBinDir, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$DOCTOR_LOG"\n`);
+    await createExecutable(
+      fakeDataHelper,
+      `printf 'data %s\\n' "$*" >> "$DOCTOR_LOG"
+if [ "$1" = "check" ]; then
+  exit 1
+fi
+`
+    );
+    await createExecutable(fakeNginxHelper, `printf 'nginx %s\\n' "$*" >> "$DOCTOR_LOG"\n`);
+
+    const result = await runOptools(["doctor"], {
+      DOCTOR_LOG: logPath,
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
+      OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      OPTOOLS_API_HEALTH_URL: "disabled",
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("[ok] node");
+    expect(result.stdout).toContain("[ok] static dist");
+    expect(result.stdout).toContain("[fail] data check");
+    expect(result.stdout).toContain("doctor: failed");
+    expect(await readFile(logPath, "utf8")).toContain("data check");
   });
 
   it("reports stopped when no dev pid exists", async () => {

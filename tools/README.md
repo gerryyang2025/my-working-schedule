@@ -2,7 +2,26 @@
 
 SQLite is an embedded file database. This project does not run a separate SQLite daemon. The long-running production process is the Web/API service; this directory maintains production helper scripts for the SQLite database file and Nginx reverse proxy used by that service.
 
-## Commands
+## Recommended Entry Point
+
+Daily operations should use the root wrapper first:
+
+```bash
+./optools.sh data status
+./optools.sh data check
+./optools.sh data backup
+CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
+./optools.sh nginx status
+./optools.sh nginx test
+./optools.sh nginx reload
+./optools.sh app status
+./optools.sh app logs
+./optools.sh doctor
+```
+
+The scripts in this directory are lower-level helpers used by `optools.sh` and can still be run directly for focused debugging.
+
+## SQLite Commands
 
 ```bash
 ./tools/sqlite-service.sh install
@@ -75,7 +94,7 @@ The service user must be able to read and write the database file and backup dir
 
 ## Nginx Helper
 
-Use the Nginx helper from the project root:
+Use the Nginx helper from the project root when debugging below the `optools.sh nginx` wrapper:
 
 ```bash
 ./tools/nginx-service.sh install
