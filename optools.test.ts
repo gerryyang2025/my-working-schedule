@@ -278,6 +278,7 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
     await createExecutable(join(fakeBinDir, "useradd"), `printf 'useradd %s\\n' "$*" >> "$INIT_LOG"\n`);
     await createExecutable(join(fakeBinDir, "chown"), `printf 'chown %s\\n' "$*" >> "$INIT_LOG"\n`);
     await createExecutable(join(fakeBinDir, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$INIT_LOG"\n`);
+    await createExecutable(join(fakeBinDir, "runuser"), `printf 'runuser %s\\n' "$*" >> "$INIT_LOG"\n`);
 
     const result = await runOptools(["app", "init"], {
       INIT_LOG: logPath,
@@ -294,19 +295,62 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
 
     expect(result.code, result.stderr).toBe(0);
     expect(result.stdout).toContain("app init: completed");
-    expect(await readFile(systemdFile, "utf8")).toBe(`[Service]\nExecStart=${fakeNpmPath} run start:api\n`);
+    expect(await readFile(systemdFile, "utf8")).toBe(
+      [
+        "[Service]",
+        `Environment=PATH=${fakeBinDir}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
+        `ExecStart=${fakeNpmPath} run start:api`,
+        ""
+      ].join("\n")
+    );
     expect(await readFile(logPath, "utf8")).toBe(
       [
         "getent group schedule-group",
         "groupadd --system schedule-group",
         "getent passwd schedule-user",
         `useradd --system --gid schedule-group --home-dir ${dataDir} --shell /sbin/nologin schedule-user`,
+        `runuser -u schedule-user -- ${fakeNpmPath} --version`,
         `chown -R schedule-user:schedule-group ${installDir} ${dataDir} ${backupDir}`,
         "systemctl daemon-reload",
         "systemctl enable schedule-api",
         ""
       ].join("\n")
     );
+  });
+
+  it("rejects npm executables that the production app user cannot run", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
+    const sourceFile = join(stateDir, "source.service");
+    const rootOnlyNpm = join(stateDir, "root", ".nvm", "versions", "node", "v22", "bin", "npm");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
+    await mkdir(join(rootOnlyNpm, ".."), { recursive: true });
+    await writeFile(sourceFile, "[Service]\nExecStart=/usr/bin/npm run start:api\n", "utf8");
+    await createExecutable(rootOnlyNpm, "exit 0\n");
+    await createExecutable(join(fakeBinDir, "getent"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "systemctl"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "chown"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "runuser"), "exit 126\n");
+
+    const result = await runOptools(["app", "init"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SOURCE_FILE: sourceFile,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      OPTOOLS_NPM_BIN: rootOnlyNpm,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("npm executable cannot be run by service user");
+    expect(result.stderr).toContain("OPTOOLS_NPM_BIN");
   });
 
   it("reports app doctor failures when the service user is missing", async () => {
@@ -366,6 +410,49 @@ exit 2
     await mkdir(fakeBinDir, { recursive: true });
     await createExecutable(join(fakeBinDir, "getent"), "exit 0\n");
     await createExecutable(join(fakeBinDir, "systemctl"), "exit 0\n");
+
+    const result = await runOptools(["app", "doctor"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stdout).toContain("[fail] systemd exec start");
+    expect(result.stdout).toContain("app doctor: failed");
+  });
+
+  it("reports app doctor failures when the service user cannot run systemd ExecStart", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "my-working-schedule.service");
+    const rootOnlyNpm = join(stateDir, "root", ".nvm", "versions", "node", "v22", "bin", "npm");
+
+    await mkdir(installDir, { recursive: true });
+    await mkdir(dataDir, { recursive: true });
+    await mkdir(backupDir, { recursive: true });
+    await mkdir(join(stateDir, "etc", "systemd", "system"), { recursive: true });
+    await mkdir(join(rootOnlyNpm, ".."), { recursive: true });
+    await createExecutable(rootOnlyNpm, "exit 0\n");
+    await writeFile(
+      systemdFile,
+      [
+        "[Service]",
+        `Environment=PATH=${join(rootOnlyNpm, "..")}:/usr/local/bin:/usr/bin`,
+        `ExecStart=${rootOnlyNpm} run start:api`,
+        ""
+      ].join("\n"),
+      "utf8"
+    );
+    await mkdir(fakeBinDir, { recursive: true });
+    await createExecutable(join(fakeBinDir, "getent"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "systemctl"), "exit 0\n");
+    await createExecutable(join(fakeBinDir, "runuser"), "exit 126\n");
 
     const result = await runOptools(["app", "doctor"], {
       OPTOOLS_INSTALL_DIR: installDir,

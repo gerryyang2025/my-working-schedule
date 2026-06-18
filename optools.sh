@@ -622,14 +622,61 @@ resolve_npm_bin() {
   printf '%s\n' "$npm_bin"
 }
 
+service_default_path() {
+  local npm_bin="$1"
+  local npm_dir
+  npm_dir="$(systemd_target_dir "$npm_bin")"
+  printf '%s\n' "$npm_dir:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+}
+
+ensure_npm_runnable_by_app_user() {
+  local npm_bin="$1"
+  local service_path
+  service_path="$(service_default_path "$npm_bin")"
+
+  if command -v runuser >/dev/null 2>&1; then
+    if env PATH="$service_path" runuser -u "$APP_USER" -- "$npm_bin" --version >/dev/null 2>&1; then
+      return 0
+    fi
+
+    {
+      echo "npm executable cannot be run by service user: $APP_USER"
+      echo "npm executable: $npm_bin"
+      echo "hint: do not use npm under /root/.nvm for a non-root systemd service."
+      echo "hint: install/copy Node.js to a service-user accessible path, then rerun:"
+      echo "      OPTOOLS_NPM_BIN=/opt/node/bin/npm ./optools.sh app init"
+    } >&2
+    return 1
+  fi
+
+  if [[ ! -x "$npm_bin" ]]; then
+    echo "npm executable is not executable: $npm_bin" >&2
+    return 1
+  fi
+}
+
 install_systemd_service_file() {
   local npm_bin="$1"
+  local service_path
+  service_path="$(service_default_path "$npm_bin")"
 
-  awk -v npm_bin="$npm_bin" '
+  awk -v npm_bin="$npm_bin" -v service_path="$service_path" '
     BEGIN {
       replaced = 0
+      path_written = 0
+    }
+    /^Environment=PATH=/ {
+      if (path_written == 0) {
+        print "Environment=PATH=" service_path
+        path_written = 1
+      }
+      next
     }
     /^ExecStart=/ {
+      if (path_written == 0) {
+        print "Environment=PATH=" service_path
+        path_written = 1
+      }
       print "ExecStart=" npm_bin " run start:api"
       replaced = 1
       next
@@ -639,6 +686,9 @@ install_systemd_service_file() {
     }
     END {
       if (replaced == 0) {
+        if (path_written == 0) {
+          print "Environment=PATH=" service_path
+        }
         print "ExecStart=" npm_bin " run start:api"
       }
     }
@@ -652,12 +702,28 @@ systemd_exec_start_is_executable() {
 
   local line
   local executable
+  local service_path
   line="$(grep -E '^ExecStart=' "$SYSTEMD_SERVICE_FILE" | tail -n 1 || true)"
   line="${line#ExecStart=}"
   line="${line#"${line%%[![:space:]]*}"}"
   executable="${line%%[[:space:]]*}"
 
-  [[ -n "$executable" && -x "$executable" ]]
+  if [[ -z "$executable" || ! -x "$executable" ]]; then
+    return 1
+  fi
+
+  service_path="$(grep -E '^Environment=PATH=' "$SYSTEMD_SERVICE_FILE" | tail -n 1 || true)"
+  service_path="${service_path#Environment=PATH=}"
+  if [[ -z "$service_path" || "$service_path" == "Environment=PATH=" ]]; then
+    service_path="$(service_default_path "$executable")"
+  fi
+
+  if command -v runuser >/dev/null 2>&1; then
+    env PATH="$service_path" runuser -u "$APP_USER" -- "$executable" --version >/dev/null 2>&1
+    return
+  fi
+
+  return 0
 }
 
 run_app_init() {
@@ -672,6 +738,7 @@ run_app_init() {
   ensure_systemctl
   ensure_app_group
   ensure_app_user
+  ensure_npm_runnable_by_app_user "$npm_bin"
 
   mkdir -p "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
   chown -R "$APP_USER:$APP_GROUP" "$INSTALL_DIR" "$DATA_DIR" "$BACKUP_DIR"
