@@ -42,6 +42,12 @@ function createCanvasMock(width: number, height: number): HTMLCanvasElement {
 describe("createPrintPdfFile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
+      drawImage: vi.fn(),
+      fillRect: vi.fn(),
+      fillStyle: ""
+    } as unknown as CanvasRenderingContext2D);
+    vi.spyOn(HTMLCanvasElement.prototype, "toDataURL").mockReturnValue("data:image/png;base64,page");
     pdfMocks.output.mockReturnValue(new Blob(["pdf-bytes"], { type: "application/pdf" }));
     pdfMocks.pageSize.getWidth.mockReturnValue(297);
     pdfMocks.pageSize.getHeight.mockReturnValue(210);
@@ -74,7 +80,7 @@ describe("createPrintPdfFile", () => {
     );
     expect(jsPDF).toHaveBeenCalledWith({ orientation: "landscape", unit: "mm", format: "a4" });
     expect(pdfMocks.addImage).toHaveBeenCalledWith(
-      "data:image/png;base64,preview",
+      "data:image/png;base64,page",
       "PNG",
       expect.any(Number),
       expect.any(Number),
@@ -87,7 +93,7 @@ describe("createPrintPdfFile", () => {
     expect(file.type).toBe("application/pdf");
   });
 
-  it("adds pages when the captured preview is taller than one PDF page", async () => {
+  it("slices tall print captures into visible PDF pages without negative offsets", async () => {
     const preview = document.createElement("section");
     const canvas = createCanvasMock(1000, 3000);
     vi.mocked(html2canvas).mockResolvedValue(canvas);
@@ -95,6 +101,10 @@ describe("createPrintPdfFile", () => {
     await createPrintPdfFile({ element: preview, filename: "month-schedule.pdf" });
 
     expect(pdfMocks.addPage).toHaveBeenCalled();
+    for (const call of pdfMocks.addImage.mock.calls) {
+      expect(call[3]).toBeGreaterThanOrEqual(8);
+      expect(call[5]).toBeLessThanOrEqual(194);
+    }
   });
 
   it("captures a print-width clone instead of the narrow mobile preview", async () => {

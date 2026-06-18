@@ -71,6 +71,33 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   };
 }
 
+function createPdfPageSliceCanvas(sourceCanvas: HTMLCanvasElement, sourceY: number, sliceHeight: number): HTMLCanvasElement {
+  const sliceCanvas = document.createElement("canvas");
+  sliceCanvas.width = sourceCanvas.width;
+  sliceCanvas.height = sliceHeight;
+
+  const context = sliceCanvas.getContext("2d");
+  if (!context) {
+    throw new Error("打印内容不可用");
+  }
+
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
+  context.drawImage(
+    sourceCanvas,
+    0,
+    sourceY,
+    sourceCanvas.width,
+    sliceHeight,
+    0,
+    0,
+    sourceCanvas.width,
+    sliceHeight
+  );
+
+  return sliceCanvas;
+}
+
 export async function createPrintPdfFile({ element, filename }: CreatePrintPdfFileOptions): Promise<File> {
   if (!element) {
     throw new Error("打印内容不可用");
@@ -96,18 +123,29 @@ export async function createPrintPdfFile({ element, filename }: CreatePrintPdfFi
   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
-  const imageData = canvas.toDataURL("image/png");
   const printableWidth = pageWidth - PDF_MARGIN_MM * 2;
   const printableHeight = pageHeight - PDF_MARGIN_MM * 2;
-  const imageHeight = (canvas.height * printableWidth) / canvas.width;
-  const pageCount = Math.max(1, Math.ceil(imageHeight / printableHeight));
+  const pageSliceHeight = Math.max(1, Math.floor((printableHeight / printableWidth) * canvas.width));
+  const pageCount = Math.max(1, Math.ceil(canvas.height / pageSliceHeight));
 
   for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
     if (pageIndex > 0) {
       pdf.addPage();
     }
 
-    pdf.addImage(imageData, "PNG", PDF_MARGIN_MM, PDF_MARGIN_MM - pageIndex * printableHeight, printableWidth, imageHeight);
+    const sourceY = pageIndex * pageSliceHeight;
+    const sliceHeight = Math.min(pageSliceHeight, canvas.height - sourceY);
+    const pageSliceCanvas = createPdfPageSliceCanvas(canvas, sourceY, sliceHeight);
+    const pageImageHeight = (sliceHeight * printableWidth) / canvas.width;
+
+    pdf.addImage(
+      pageSliceCanvas.toDataURL("image/png"),
+      "PNG",
+      PDF_MARGIN_MM,
+      PDF_MARGIN_MM,
+      printableWidth,
+      pageImageHeight
+    );
   }
 
   const pdfBlob = pdf.output("blob");

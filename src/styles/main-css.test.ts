@@ -103,15 +103,15 @@ describe("main.css schedule grid sticky column rules", () => {
 });
 
 describe("main.css print month layout rules", () => {
-  it("keeps the month PDF table within the print capture width", () => {
-    const monthTable = ruleBlocks(".print-preview-content .print-month .print-table")[0] ?? "";
+  it("keeps the month detail table on a scrollable print canvas instead of squeezing it on mobile", () => {
+    const monthTable = ruleBlocks(".print-preview-content .print-month .print-month-detail-table")[0] ?? "";
     const monthCells =
       ruleBlocks(
-        ".print-preview-content .print-month .print-table th,\n.print-preview-content .print-month .print-table td"
+        ".print-preview-content .print-month .print-month-detail-table th,\n.print-preview-content .print-month .print-month-detail-table td"
       )[0] ?? "";
 
-    expect(monthTable).toContain("width: 100%");
-    expect(monthTable).toContain("min-width: 100%");
+    expect(monthTable).toContain("width: max-content");
+    expect(monthTable).toContain("min-width: 1120px");
     expect(monthTable).toContain("table-layout: fixed");
     expect(monthCells).toContain("padding: 4px 2px");
   });

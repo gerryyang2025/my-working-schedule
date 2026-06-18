@@ -537,26 +537,34 @@ body {
   font-size: 11px;
 }
 
-.print-preview-content .print-month .print-table,
 .print-preview-content .print-week-detail .print-table {
   min-width: 760px;
 }
 
-.print-preview-content .print-month .print-table {
-  width: 100%;
-  min-width: 100%;
+.print-preview-content .print-month .print-month-detail-table {
+  width: max-content;
+  min-width: 1120px;
   table-layout: fixed;
 }
 
-.print-preview-content .print-month .print-table th,
-.print-preview-content .print-month .print-table td {
+.print-preview-content .print-month .print-month-detail-table th,
+.print-preview-content .print-month .print-month-detail-table td {
   padding: 4px 2px;
   word-break: keep-all;
 }
 
 .print-preview-content .print-month .print-month-detail-table th:first-child,
 .print-preview-content .print-month .print-month-detail-table td:first-child {
-  width: 68px;
+  width: 86px;
+  min-width: 86px;
+  max-width: 86px;
+}
+
+.print-preview-content .print-month .print-month-detail-table th:not(:first-child),
+.print-preview-content .print-month .print-month-detail-table td:not(:first-child) {
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
 }
 
 .print-preview-content .print-table th,
@@ -648,11 +656,13 @@ body {
 
 .print-preview-content .print-month .print-day-heading {
   gap: 1px;
-  font-size: 10px;
+  font-size: 9px;
+  line-height: 1.08;
 }
 
 .print-preview-content .print-month .print-holiday-name {
-  font-size: 9px;
+  font-size: 8px;
+  line-height: 1.05;
 }
 
 .print-preview-content .print-month .print-cell-shifts {
@@ -661,7 +671,8 @@ body {
 
 .print-preview-content .print-month .print-shift-chip {
   padding: 0 1px;
-  font-size: 11px;
+  font-size: 10px;
+  white-space: nowrap;
 }
 
 .print-preview-content .print-month-summary {
