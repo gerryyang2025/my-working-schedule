@@ -14,7 +14,9 @@ SQLite is an embedded file database. This project does not run a separate SQLite
 ./tools/sqlite-service.sh check
 ```
 
-`install` is a preflight check that verifies local requirements and prints install guidance. It does not install packages or run `sudo`.
+`install` is a preflight check that verifies local requirements and prints install guidance. It does not install packages, run `sudo`, or create app directories.
+
+`check` delegates to the app-level SQLite integrity check and does not require the system `sqlite3` command.
 
 Restore is intentionally guarded:
 

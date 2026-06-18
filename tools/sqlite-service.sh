@@ -59,7 +59,6 @@ case "$COMMAND" in
     ;;
   install)
     ensure_sqlite3
-    ensure_dirs
     status
     ;;
   init)
@@ -91,7 +90,6 @@ case "$COMMAND" in
     status
     ;;
   check)
-    ensure_sqlite3
     run_npm_command data:check:sqlite
     ;;
   *)

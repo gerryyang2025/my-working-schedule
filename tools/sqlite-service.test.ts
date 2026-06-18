@@ -1,6 +1,6 @@
 import { execFile, type ExecFileException } from "node:child_process";
 import { existsSync } from "node:fs";
-import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
@@ -66,6 +66,38 @@ function runDataCli(args: string[], env: Record<string, string> = {}): Promise<C
   });
 }
 
+async function createFakeExecutable(path: string, body: string) {
+  await writeFile(path, `#!/bin/sh\n${body}`);
+  await chmod(path, 0o755);
+}
+
+async function createFakeNpmBin(dir: string) {
+  const fakeBin = join(dir, "bin");
+  await mkdir(fakeBin);
+  await createFakeExecutable(
+    join(fakeBin, "npm"),
+    `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'SCHEDULE_DATA_PATH=%s\\n' "$SCHEDULE_DATA_PATH"
+  printf 'SCHEDULE_SQLITE_PATH=%s\\n' "$SCHEDULE_SQLITE_PATH"
+  printf 'SCHEDULE_BACKUP_PATH=%s\\n' "$SCHEDULE_BACKUP_PATH"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} > "$NPM_LOG"
+exit 0
+`
+  );
+  return fakeBin;
+}
+
+async function readLog(path: string) {
+  return readFile(path, "utf8");
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -107,14 +139,98 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stderr).toContain("sudo apt install -y sqlite3");
   });
 
+  it("does not create configured dirs during install preflight", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const sqliteDir = join(dir, "sqlite");
+    const backupDir = join(dir, "backups");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "sqlite3"), "exit 0\n");
+
+    const result = await runTool(["install"], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      SCHEDULE_SQLITE_PATH: join(sqliteDir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: backupDir
+    });
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain(`sqlite path: ${join(sqliteDir, "schedule.db")}`);
+    expect(existsSync(sqliteDir)).toBe(false);
+    expect(existsSync(backupDir)).toBe(false);
+  });
+
+  it("delegates maintenance commands to npm with configured env", async () => {
+    const cases = [
+      {
+        name: "init",
+        args: ["init"],
+        expectedNpmArgs: ["run", "data:init:sqlite"],
+        preserveSystemPath: true
+      },
+      {
+        name: "migrate",
+        args: ["migrate"],
+        expectedNpmArgs: ["run", "data:migrate:sqlite"],
+        preserveSystemPath: true
+      },
+      {
+        name: "backup",
+        args: ["backup"],
+        expectedNpmArgs: ["run", "data:backup"],
+        preserveSystemPath: true
+      },
+      {
+        name: "check",
+        args: ["check"],
+        expectedNpmArgs: ["run", "data:check:sqlite"],
+        preserveSystemPath: false
+      },
+      {
+        name: "restore",
+        args: ["restore", "backup file with spaces.db"],
+        expectedNpmArgs: ["run", "data:restore", "--", "backup file with spaces.db"],
+        preserveSystemPath: true,
+        confirmRestore: true
+      }
+    ];
+
+    for (const testCase of cases) {
+      const dir = await createTempDir();
+      const fakeBin = await createFakeNpmBin(dir);
+      const logPath = join(dir, `${testCase.name}.log`);
+      const dataPath = join(dir, "data", "app-data.local.json");
+      const sqlitePath = join(dir, "sqlite", "schedule.db");
+      const backupPath = join(dir, "backups");
+
+      const result = await runTool(testCase.args, {
+        PATH: testCase.preserveSystemPath ? `${fakeBin}:${process.env.PATH ?? ""}` : fakeBin,
+        NPM_LOG: logPath,
+        SCHEDULE_DATA_PATH: dataPath,
+        SCHEDULE_SQLITE_PATH: sqlitePath,
+        SCHEDULE_BACKUP_PATH: backupPath,
+        CONFIRM_RESTORE: testCase.confirmRestore ? "yes" : ""
+      });
+
+      expect(result.code, `${testCase.name} stderr: ${result.stderr}`).toBe(0);
+      const log = await readLog(logPath);
+      expect(log.trimEnd().split("\n")).toEqual([
+        `cwd=${process.cwd()}`,
+        `SCHEDULE_DATA_PATH=${dataPath}`,
+        `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+        `SCHEDULE_BACKUP_PATH=${backupPath}`,
+        `argc=${testCase.expectedNpmArgs.length}`,
+        ...testCase.expectedNpmArgs.map((arg, index) => `arg${index + 1}=${arg}`)
+      ]);
+    }
+  });
+
   it("does not invoke npm or create dirs for restore without confirmation", async () => {
     const dir = await createTempDir();
     const fakeBin = join(dir, "bin");
     const sqliteDir = join(dir, "sqlite");
     const backupDir = join(dir, "backups");
     await mkdir(fakeBin);
-    await writeFile(join(fakeBin, "npm"), "#!/usr/bin/env sh\necho npm should not be invoked >&2\nexit 64\n");
-    await chmod(join(fakeBin, "npm"), 0o755);
+    await createFakeExecutable(join(fakeBin, "npm"), "echo npm should not be invoked >&2\nexit 64\n");
 
     const result = await runTool(["restore", join(dir, "backup.db")], {
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
