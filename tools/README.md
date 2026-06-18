@@ -29,7 +29,7 @@ Relative restore values must be simple filenames in `SCHEDULE_BACKUP_PATH`; abso
 Short restore runbook:
 
 1. Stop the Web/API service.
-2. Make sure `SCHEDULE_BACKUP_PATH` has enough free space for a full backup of the current database, and make sure the filesystem containing `SCHEDULE_SQLITE_PATH` also has enough free space for a sibling temp copy. Restore creates both the safety backup and a temp database copy beside the live SQLite file before renaming it into place.
+2. Make sure `SCHEDULE_BACKUP_PATH` has enough free space for a full backup of the current database when one exists, and make sure the filesystem containing `SCHEDULE_SQLITE_PATH` also has enough free space for the sibling temp copy beside the live SQLite file before renaming it into place.
 3. Run `CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>`.
 4. Run `./tools/sqlite-service.sh check`.
 5. Restart the Web/API service.
