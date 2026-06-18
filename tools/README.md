@@ -18,6 +18,26 @@ SQLite is an embedded file database. This project does not run a separate SQLite
 
 `check` re-runs the same runtime preflight validation before delegating to the app-level SQLite integrity check, and it still does not require the system `sqlite3` command.
 
+## Backup
+
+Run backups from the project root after the SQLite environment variables are set:
+
+```bash
+./tools/sqlite-service.sh status
+./tools/sqlite-service.sh check
+./tools/sqlite-service.sh backup
+```
+
+Backups are written to `SCHEDULE_BACKUP_PATH`. Run a manual backup before month-end settlement, system upgrades, server migration, or any high-risk maintenance window. If you do not use the wrapper script, the underlying command is:
+
+```bash
+npm run data:backup
+```
+
+The npm command still depends on the same `SCHEDULE_STORAGE_DRIVER=sqlite`, `SCHEDULE_SQLITE_PATH`, and `SCHEDULE_BACKUP_PATH` configuration.
+
+## Restore
+
 Restore is intentionally guarded:
 
 ```bash
@@ -25,6 +45,14 @@ CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
 ```
 
 Relative restore values must be simple filenames in `SCHEDULE_BACKUP_PATH`; absolute paths are passed through unchanged.
+
+Before restoring, stop the Web/API service. The restore command first validates the backup file, then creates a protective backup of the current database when one exists, and finally replaces the live database. After restoring, always run:
+
+```bash
+./tools/sqlite-service.sh check
+```
+
+Then restart the Web/API service and verify normal page reads/writes.
 
 Short restore runbook:
 

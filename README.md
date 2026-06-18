@@ -116,6 +116,37 @@ Linux 辅助脚本：
 
 `./tools/sqlite-service.sh install` 是非写入式预检，不会安装 daemon，也不会创建数据库文件。它会检查 `node`、`npm` 和 `npm run data:preflight` 所需运行时，并解析预检输出中的 JSON，确认 `ok: true` 与 `command: "preflight"` 字段真实存在；`sqlite3` 缺失时只给出告警和手工排查提示，不阻塞使用。
 
+备份方法：
+
+```bash
+./tools/sqlite-service.sh status
+./tools/sqlite-service.sh check
+./tools/sqlite-service.sh backup
+```
+
+说明：
+
+- 建议在月结、系统升级、服务器迁移前手动执行一次备份。
+- 备份文件会写入 `SCHEDULE_BACKUP_PATH`，默认是 `/var/backups/my-working-schedule`。
+- 如果不使用维护脚本，也可以执行 `npm run data:backup`，但仍需提前设置 `SCHEDULE_STORAGE_DRIVER=sqlite`、`SCHEDULE_SQLITE_PATH` 和 `SCHEDULE_BACKUP_PATH`。
+- 备份后建议执行 `./tools/sqlite-service.sh status` 查看数据库路径和备份目录是否符合预期。
+
+恢复方法：
+
+```bash
+./optools.sh dev stop
+CONFIRM_RESTORE=yes ./tools/sqlite-service.sh restore <backup-file>
+./tools/sqlite-service.sh check
+./optools.sh dev start
+```
+
+说明：
+
+- `<backup-file>` 可以是 `SCHEDULE_BACKUP_PATH` 下的备份文件名，例如 `schedule-2026-06-18-153000.db`；也可以是绝对路径。
+- 恢复必须显式设置 `CONFIRM_RESTORE=yes`，避免误操作覆盖当前数据库。
+- 恢复前脚本会先对当前数据库做保护性备份，再替换为指定备份文件。
+- 恢复后必须执行 `./tools/sqlite-service.sh check`，再启动服务并检查页面数据。
+
 推荐恢复 runbook：
 
 1. 先停止 Web/API 服务。
