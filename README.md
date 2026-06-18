@@ -168,9 +168,9 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 - `deploy/nginx/my-working-schedule.conf.example` 提供静态资源和 `/api/` 反向代理。
 - `./optools.sh nginx install` 安装 nginx、创建 `conf.d`、复制配置并执行 `nginx -t`。
 - `./optools.sh app init` 创建服务用户/组、部署目录、systemd service 并启用服务。
-- `./optools.sh app doctor` 检查服务用户、目录、systemd service 和服务状态。
+- `./optools.sh app doctor` 专项检查 API/systemd 前置条件和服务状态。
 - `./optools.sh app start|status|logs` 管理正式 API 服务。
-- `./optools.sh doctor` 聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
+- `./optools.sh doctor` 执行完整生产运行体检，聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
 推荐部署命令：

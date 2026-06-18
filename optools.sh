@@ -83,14 +83,14 @@ Usage:
   ./optools.sh data restore <backup-file>
   ./optools.sh data export-json
   ./optools.sh app init       Initialize production user, directories, and systemd service
-  ./optools.sh app doctor     Check production app prerequisites
+  ./optools.sh app doctor     Check API/systemd prerequisites
   ./optools.sh app start      Start the production systemd service
   ./optools.sh app stop       Stop the production systemd service
   ./optools.sh app restart    Restart the production systemd service
   ./optools.sh app status     Show production service status
   ./optools.sh app logs       Show production service logs
   ./optools.sh app health     Check production API health
-  ./optools.sh doctor         Run production deployment checks
+  ./optools.sh doctor         Run full production runtime checks
   ./optools.sh help           Show this help
 
 Environment:
@@ -839,7 +839,7 @@ run_app_init() {
 run_app_doctor() {
   local failed=0
 
-  echo "app doctor: checking production app prerequisites"
+  echo "app doctor: checking API/systemd prerequisites"
 
   doctor_check "app group" getent group "$APP_GROUP" || failed=1
   doctor_check "app user" getent passwd "$APP_USER" || failed=1
@@ -983,7 +983,7 @@ doctor_check_api_health() {
 run_doctor() {
   local failed=0
 
-  echo "doctor: checking production runtime"
+  echo "doctor: checking full production runtime"
 
   doctor_check "node" command -v node || failed=1
   doctor_check "npm" command -v npm || failed=1
