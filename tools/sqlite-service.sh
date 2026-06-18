@@ -236,38 +236,44 @@ process.stdin.on("data", (chunk) => {
   input += chunk;
 });
 process.stdin.on("end", () => {
-  const start = input.indexOf("{");
-  const end = input.lastIndexOf("}");
-
-  if (start === -1 || end === -1 || end < start) {
-    process.stdout.write("invalid-json");
-    return;
+  const objectStartIndexes = [];
+  for (let index = 0; index < input.length; index += 1) {
+    if (input[index] === "{") {
+      objectStartIndexes.push(index);
+    }
   }
 
-  let parsed;
-  try {
-    parsed = JSON.parse(input.slice(start, end + 1));
-  } catch {
-    process.stdout.write("invalid-json");
-    return;
+  let firstFieldError = null;
+
+  for (const start of objectStartIndexes) {
+    for (let end = input.indexOf("}", start); end !== -1; end = input.indexOf("}", end + 1)) {
+      let parsed;
+      try {
+        parsed = JSON.parse(input.slice(start, end + 1));
+      } catch {
+        continue;
+      }
+
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        continue;
+      }
+
+      if (parsed.ok !== true) {
+        firstFieldError ??= "missing-ok";
+        continue;
+      }
+
+      if (parsed.command !== "preflight") {
+        firstFieldError ??= "missing-command";
+        continue;
+      }
+
+      process.stdout.write("ok");
+      return;
+    }
   }
 
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-    process.stdout.write("invalid-json");
-    return;
-  }
-
-  if (parsed.ok !== true) {
-    process.stdout.write("missing-ok");
-    return;
-  }
-
-  if (parsed.command !== "preflight") {
-    process.stdout.write("missing-command");
-    return;
-  }
-
-  process.stdout.write("ok");
+  process.stdout.write(firstFieldError ?? "invalid-json");
 });
 '
 }

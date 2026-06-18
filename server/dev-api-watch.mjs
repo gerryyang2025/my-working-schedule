@@ -18,13 +18,14 @@ const signalNumbers = {
 
 /** @type {import("node:fs").FSWatcher[]} */
 let watchers = [];
-/** @type {import("node:child_process").ChildProcess | null} */
-let child = null;
-/** @type {NodeJS.Timeout | null} */
-let restartTimer = null;
-let shuttingDown = false;
-let restartRequested = false;
-let currentShutdownSignal = null;
+
+function exitForShutdownSignal(signal, exitProcess = process.exit) {
+  if (signal && signalNumbers[signal]) {
+    exitProcess(128 + signalNumbers[signal]);
+    return;
+  }
+  exitProcess(0);
+}
 
 async function collectWatchDirs(dir) {
   /** @type {string[]} */
@@ -55,19 +56,19 @@ function closeWatchers() {
   watchers = [];
 }
 
-async function refreshWatchers() {
+async function refreshWatchers(onChange) {
   const watchDirs = await collectWatchDirs(serverDir);
   closeWatchers();
 
   for (const watchDir of watchDirs) {
     const watcher = watch(watchDir, () => {
-      scheduleRestart();
+      onChange();
     });
     watcher.on("error", (error) => {
-      if (!shuttingDown) {
+      if (!runtime.getState().shuttingDown) {
         console.error(`[dev:api] watcher error in ${watchDir}`);
         console.error(error);
-        scheduleRestart();
+        onChange();
       }
     });
     watchers.push(watcher);
@@ -76,111 +77,319 @@ async function refreshWatchers() {
   return watchDirs;
 }
 
-function startChild() {
-  child = spawn(childCommand, childArgs, {
-    cwd: rootDir,
-    env: process.env,
-    stdio: "inherit"
-  });
+function createWatcherRuntime({
+  spawnChildProcess,
+  refreshWatchersFn,
+  closeWatchersFn,
+  exitProcess = (code) => {
+    process.exit(code);
+  },
+  logError = (...args) => {
+    console.error(...args);
+  },
+  scheduleTimer = setTimeout,
+  clearScheduledTimer = clearTimeout,
+  restartDebounceMs = debounceMs
+}) {
+  /** @type {import("node:child_process").ChildProcess | null} */
+  let child = null;
+  /** @type {NodeJS.Timeout | null} */
+  let restartTimer = null;
+  let shuttingDown = false;
+  let currentShutdownSignal = null;
+  let pendingRestart = false;
+  /** @type {Promise<void> | null} */
+  let restartLoopPromise = null;
+  /** @type {import("node:child_process").ChildProcess | null} */
+  let restartingChild = null;
+  /** @type {(() => void) | null} */
+  let restartCompletionResolver = null;
+  /** @type {WeakSet<object>} */
+  const ignoredRestartExitChildren = new WeakSet();
 
-  child.on("error", (error) => {
-    if (!shuttingDown) {
-      console.error("[dev:api] failed to start API child process");
-      console.error(error);
-      process.exit(1);
+  function getState() {
+    return {
+      child,
+      shuttingDown,
+      currentShutdownSignal,
+      pendingRestart,
+      restartInProgress: restartLoopPromise !== null
+    };
+  }
+
+  function finishRestart(exitingChild) {
+    if (restartingChild !== exitingChild) {
+      return false;
     }
-  });
 
-  child.on("exit", (code, signal) => {
-    child = null;
+    restartingChild = null;
+    const resolveRestart = restartCompletionResolver;
+    restartCompletionResolver = null;
+    startChild();
+    resolveRestart?.();
+    return true;
+  }
+
+  function startChild() {
+    const startedChild = spawnChildProcess();
+    child = startedChild;
+
+    startedChild.on("error", (error) => {
+      if (!shuttingDown) {
+        logError("[dev:api] failed to start API child process");
+        logError(error);
+        exitProcess(1);
+      }
+    });
+
+    startedChild.on("exit", (code, signal) => {
+      if (child === startedChild) {
+        child = null;
+      }
+
+      if (shuttingDown) {
+        exitForShutdownSignal(currentShutdownSignal ?? signal, exitProcess);
+        return;
+      }
+
+      if (ignoredRestartExitChildren.has(startedChild)) {
+        ignoredRestartExitChildren.delete(startedChild);
+        return;
+      }
+
+      if (finishRestart(startedChild)) {
+        return;
+      }
+
+      if (signal) {
+        exitProcess(128 + (signalNumbers[signal] ?? 0));
+        return;
+      }
+
+      exitProcess(code ?? 0);
+    });
+
+    return startedChild;
+  }
+
+  async function restartOnce() {
+    try {
+      await refreshWatchersFn();
+    } catch (error) {
+      logError("[dev:api] failed to refresh watcher directories");
+      logError(error);
+    }
 
     if (shuttingDown) {
-      exitForShutdownSignal(currentShutdownSignal ?? signal);
       return;
     }
 
-    if (restartRequested) {
-      restartRequested = false;
+    if (!child) {
       startChild();
       return;
     }
 
-    if (signal) {
-      process.exit(128 + (signalNumbers[signal] ?? 0));
+    const childToRestart = child;
+    await new Promise((resolve) => {
+      restartingChild = childToRestart;
+      restartCompletionResolver = resolve;
+
+      if (childToRestart.kill("SIGTERM")) {
+        return;
+      }
+
+      ignoredRestartExitChildren.add(childToRestart);
+      if (child === childToRestart) {
+        child = null;
+      }
+      finishRestart(childToRestart);
+    });
+  }
+
+  async function restartChild() {
+    if (shuttingDown) {
       return;
     }
 
-    process.exit(code ?? 0);
+    pendingRestart = true;
+
+    if (restartLoopPromise) {
+      await restartLoopPromise;
+      return;
+    }
+
+    restartLoopPromise = (async () => {
+      while (pendingRestart && !shuttingDown) {
+        pendingRestart = false;
+        await restartOnce();
+      }
+    })().finally(() => {
+      restartLoopPromise = null;
+    });
+
+    await restartLoopPromise;
+  }
+
+  function scheduleRestart() {
+    if (shuttingDown) {
+      return;
+    }
+
+    if (restartTimer) {
+      clearScheduledTimer(restartTimer);
+    }
+
+    restartTimer = scheduleTimer(() => {
+      restartTimer = null;
+      void restartChild();
+    }, restartDebounceMs);
+  }
+
+  function shutdown(signal) {
+    shuttingDown = true;
+    currentShutdownSignal = signal;
+
+    if (restartTimer) {
+      clearScheduledTimer(restartTimer);
+      restartTimer = null;
+    }
+
+    closeWatchersFn();
+
+    if (!child) {
+      exitForShutdownSignal(signal, exitProcess);
+      return;
+    }
+
+    child.kill(signal);
+  }
+
+  return {
+    getState,
+    restartChild,
+    scheduleRestart,
+    shutdown,
+    startChild
+  };
+}
+
+let runtime = null;
+
+function spawnDevApiChildProcess() {
+  return spawn(childCommand, childArgs, {
+    cwd: rootDir,
+    env: process.env,
+    stdio: "inherit"
   });
 }
 
-function exitForShutdownSignal(signal) {
-  if (signal && signalNumbers[signal]) {
-    process.exit(128 + signalNumbers[signal]);
-    return;
-  }
-  process.exit(0);
+runtime = createWatcherRuntime({
+  spawnChildProcess: spawnDevApiChildProcess,
+  refreshWatchersFn: () => refreshWatchers(() => {
+    runtime.scheduleRestart();
+  }),
+  closeWatchersFn: closeWatchers
+});
+
+function createMockChild(id, events) {
+  const listeners = {
+    error: [],
+    exit: []
+  };
+
+  return {
+    id,
+    on(event, listener) {
+      listeners[event].push(listener);
+      return this;
+    },
+    kill(signal) {
+      events.push({ type: "kill", id, signal });
+      queueMicrotask(() => {
+        for (const listener of listeners.exit) {
+          listener(null, signal);
+        }
+      });
+      return true;
+    }
+  };
 }
 
-async function restartChild() {
-  if (shuttingDown) {
-    return;
-  }
+async function runRestartSelfTest() {
+  /** @type {number | null} */
+  let activeChildId = null;
+  /** @type {{ type: string; id?: number; signal?: NodeJS.Signals }[]} */
+  const events = [];
+  /** @type {number[]} */
+  const exitCalls = [];
+  let nextChildId = 0;
+  let refreshCount = 0;
 
-  restartRequested = true;
+  const selfTestRuntime = createWatcherRuntime({
+    spawnChildProcess: () => {
+      const childId = nextChildId + 1;
+      nextChildId = childId;
+      activeChildId = childId;
+      events.push({ type: "start", id: childId });
+      return createMockChild(childId, events);
+    },
+    refreshWatchersFn: async () => {
+      refreshCount += 1;
+      events.push({ type: "refresh", id: refreshCount });
+    },
+    closeWatchersFn: () => {
+      events.push({ type: "close-watchers" });
+    },
+    exitProcess: (code) => {
+      exitCalls.push(code);
+    },
+    logError: () => {}
+  });
 
-  try {
-    await refreshWatchers();
-  } catch (error) {
-    console.error("[dev:api] failed to refresh watcher directories");
-    console.error(error);
-  }
+  selfTestRuntime.startChild();
+  const firstRestart = selfTestRuntime.restartChild();
+  const secondRestart = selfTestRuntime.restartChild();
+  await Promise.all([firstRestart, secondRestart]);
 
-  if (!child) {
-    restartRequested = false;
-    startChild();
-    return;
-  }
+  const startIds = events.filter((event) => event.type === "start").map((event) => event.id);
+  const killIds = events.filter((event) => event.type === "kill").map((event) => event.id);
 
-  child.kill("SIGTERM");
+  return {
+    ok:
+      exitCalls.length === 0 &&
+      refreshCount === 2 &&
+      startIds.length === 3 &&
+      killIds.length === 2 &&
+      activeChildId === 3,
+    scenario: "restart",
+    startCount: startIds.length,
+    killCount: killIds.length,
+    refreshCount,
+    startIds,
+    killIds,
+    exitCalls,
+    activeChildId
+  };
 }
 
-function scheduleRestart() {
-  if (shuttingDown) {
-    return;
+async function runSelfTest() {
+  const scenario = process.env.DEV_API_WATCH_SELF_TEST;
+  if (scenario !== "restart") {
+    throw new Error(`Unknown DEV_API_WATCH_SELF_TEST scenario: ${scenario}`);
   }
 
-  if (restartTimer) {
-    clearTimeout(restartTimer);
-  }
-
-  restartTimer = setTimeout(() => {
-    restartTimer = null;
-    void restartChild();
-  }, debounceMs);
-}
-
-function shutdown(signal) {
-  shuttingDown = true;
-  currentShutdownSignal = signal;
-
-  if (restartTimer) {
-    clearTimeout(restartTimer);
-    restartTimer = null;
-  }
-
-  closeWatchers();
-
-  if (!child) {
-    exitForShutdownSignal(signal);
-    return;
-  }
-
-  child.kill(signal);
+  process.stdout.write(`${JSON.stringify(await runRestartSelfTest(), null, 2)}\n`);
 }
 
 async function main() {
-  const watchDirs = await refreshWatchers();
+  if (process.env.DEV_API_WATCH_SELF_TEST) {
+    await runSelfTest();
+    return;
+  }
+
+  const watchDirs = await refreshWatchers(() => {
+    runtime.scheduleRestart();
+  });
 
   if (process.env.DEV_API_WATCH_DRY_RUN === "1") {
     process.stdout.write(
@@ -200,13 +409,13 @@ async function main() {
   }
 
   process.on("SIGINT", () => {
-    shutdown("SIGINT");
+    runtime.shutdown("SIGINT");
   });
   process.on("SIGTERM", () => {
-    shutdown("SIGTERM");
+    runtime.shutdown("SIGTERM");
   });
 
-  startChild();
+  runtime.startChild();
 }
 
 main().catch((error) => {

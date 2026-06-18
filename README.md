@@ -109,6 +109,7 @@ Linux 辅助脚本：
 ./tools/sqlite-service.sh init
 ./tools/sqlite-service.sh migrate
 ./tools/sqlite-service.sh backup
+./tools/sqlite-service.sh restore <backup-file>
 ./tools/sqlite-service.sh status
 ./tools/sqlite-service.sh check
 ```

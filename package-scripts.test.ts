@@ -25,6 +25,28 @@ function runDevApiWatchDryRun(): Promise<{ code: number; stdout: string; stderr:
   });
 }
 
+function runDevApiWatchSelfTest(): Promise<{ code: number; stdout: string; stderr: string }> {
+  return new Promise((resolveResult) => {
+    execFile(
+      process.execPath,
+      [resolve(process.cwd(), "server/dev-api-watch.mjs")],
+      {
+        env: {
+          ...process.env,
+          DEV_API_WATCH_SELF_TEST: "restart"
+        }
+      },
+      (error: ExecFileException | null, stdout, stderr) => {
+        resolveResult({
+          code: typeof error?.code === "number" ? error.code : error ? 1 : 0,
+          stdout,
+          stderr
+        });
+      }
+    );
+  });
+}
+
 describe("package scripts", () => {
   it("binds the Vite dev server to all interfaces by default", async () => {
     const packageJson = JSON.parse(await readFile(resolve(process.cwd(), "package.json"), "utf8")) as {
@@ -65,6 +87,35 @@ describe("package scripts", () => {
     expect(dryRun.watchDirs.some((dir) => dir === resolve(process.cwd(), "server"))).toBe(true);
     expect(dryRun.watchDirs.some((dir) => dir.includes("node_modules"))).toBe(false);
     expect(dryRun.watchDirs.some((dir) => dir.endsWith("/dist"))).toBe(false);
+  });
+
+  it("serializes overlapping API watcher restarts in self-test mode", async () => {
+    const result = await runDevApiWatchSelfTest();
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stderr).toBe("");
+
+    const selfTest = JSON.parse(result.stdout) as {
+      ok: boolean;
+      scenario: string;
+      startCount: number;
+      killCount: number;
+      refreshCount: number;
+      startIds: number[];
+      killIds: number[];
+      exitCalls: number[];
+      activeChildId: number | null;
+    };
+
+    expect(selfTest.ok).toBe(true);
+    expect(selfTest.scenario).toBe("restart");
+    expect(selfTest.startCount).toBe(3);
+    expect(selfTest.killCount).toBe(2);
+    expect(selfTest.refreshCount).toBe(2);
+    expect(selfTest.startIds).toEqual([1, 2, 3]);
+    expect(selfTest.killIds).toEqual([1, 2]);
+    expect(selfTest.exitCalls).toEqual([]);
+    expect(selfTest.activeChildId).toBe(3);
   });
 
   it("exposes SQLite data maintenance scripts", async () => {
