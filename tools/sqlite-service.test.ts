@@ -188,7 +188,12 @@ describe("tools/sqlite-service.sh", () => {
       {
         name: "restore",
         args: ["restore", "backup file with spaces.db"],
-        expectedNpmArgs: ["run", "data:restore", "--", "backup file with spaces.db"],
+        expectedNpmArgs: (backupPath: string) => [
+          "run",
+          "data:restore",
+          "--",
+          join(backupPath, "backup file with spaces.db")
+        ],
         preserveSystemPath: true,
         confirmRestore: true
       }
@@ -213,15 +218,50 @@ describe("tools/sqlite-service.sh", () => {
 
       expect(result.code, `${testCase.name} stderr: ${result.stderr}`).toBe(0);
       const log = await readLog(logPath);
+      const expectedNpmArgs =
+        typeof testCase.expectedNpmArgs === "function" ? testCase.expectedNpmArgs(backupPath) : testCase.expectedNpmArgs;
+
       expect(log.trimEnd().split("\n")).toEqual([
         `cwd=${process.cwd()}`,
         `SCHEDULE_DATA_PATH=${dataPath}`,
         `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
         `SCHEDULE_BACKUP_PATH=${backupPath}`,
-        `argc=${testCase.expectedNpmArgs.length}`,
-        ...testCase.expectedNpmArgs.map((arg, index) => `arg${index + 1}=${arg}`)
+        `argc=${expectedNpmArgs.length}`,
+        ...expectedNpmArgs.map((arg, index) => `arg${index + 1}=${arg}`)
       ]);
     }
+  });
+
+  it("passes absolute restore backup paths through unchanged", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const logPath = join(dir, "restore-absolute.log");
+    const dataPath = join(dir, "data", "app-data.local.json");
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+    const backupFile = join(dir, "absolute backup file.db");
+
+    const result = await runTool(["restore", backupFile], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      NPM_LOG: logPath,
+      SCHEDULE_DATA_PATH: dataPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath,
+      CONFIRM_RESTORE: "yes"
+    });
+
+    expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_DATA_PATH=${dataPath}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${backupPath}`,
+      "argc=4",
+      "arg1=run",
+      "arg2=data:restore",
+      "arg3=--",
+      `arg4=${backupFile}`
+    ]);
   });
 
   it("does not invoke npm or create dirs for restore without confirmation", async () => {

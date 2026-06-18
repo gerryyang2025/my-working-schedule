@@ -83,8 +83,16 @@ case "$COMMAND" in
     if [ "${CONFIRM_RESTORE:-}" != "yes" ]; then
       exit 1
     fi
+    case "$BACKUP_FILE" in
+      /*)
+        RESTORE_BACKUP_FILE="$BACKUP_FILE"
+        ;;
+      *)
+        RESTORE_BACKUP_FILE="${BACKUP_PATH%/}/$BACKUP_FILE"
+        ;;
+    esac
     ensure_dirs
-    run_npm_command data:restore -- "$BACKUP_FILE"
+    run_npm_command data:restore -- "$RESTORE_BACKUP_FILE"
     ;;
   status)
     status
