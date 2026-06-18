@@ -1,0 +1,119 @@
+import type Database from "better-sqlite3";
+
+export const SQLITE_SCHEMA_VERSION = 1;
+
+export function initializeSqliteSchema(db: Database.Database): void {
+  db.pragma("foreign_keys = ON");
+  db.exec(`
+    create table if not exists schema_migrations (
+      version integer primary key,
+      applied_at text not null
+    );
+
+    create table if not exists staff (
+      id text primary key,
+      job_id text not null unique,
+      name text not null,
+      type text not null check (type in ('nurse', 'clerk', 'head_nurse')),
+      is_admin integer not null check (is_admin in (0, 1)),
+      enabled integer not null check (enabled in (0, 1)),
+      sort_order integer not null
+    );
+
+    create table if not exists shifts (
+      id text primary key,
+      name text not null,
+      short_name text not null,
+      color text not null,
+      counts_attendance integer not null check (counts_attendance in (0, 1)),
+      coefficient real not null,
+      enabled integer not null check (enabled in (0, 1)),
+      sort_order integer not null
+    );
+
+    create table if not exists holidays (
+      id text primary key,
+      date text not null unique,
+      name text not null,
+      affects_required_attendance integer not null check (affects_required_attendance in (0, 1))
+    );
+
+    create table if not exists schedule_entries (
+      id text primary key,
+      date text not null,
+      staff_id text not null references staff(id),
+      note text not null,
+      unique(date, staff_id)
+    );
+
+    create table if not exists schedule_entry_shifts (
+      entry_id text not null references schedule_entries(id) on delete cascade,
+      shift_id text not null references shifts(id),
+      position integer not null,
+      primary key(entry_id, position)
+    );
+
+    create table if not exists monthly_settlements (
+      id text primary key,
+      month text not null unique,
+      month_start text not null,
+      month_end text not null,
+      total_days integer not null,
+      bonus_pool real not null,
+      coefficient_total real not null,
+      settled_at text not null
+    );
+
+    create table if not exists monthly_settlement_rows (
+      settlement_id text not null references monthly_settlements(id) on delete cascade,
+      position integer not null,
+      staff_id text not null,
+      staff_name text not null,
+      staff_job_id text not null,
+      staff_type text not null check (staff_type in ('nurse', 'clerk', 'head_nurse')),
+      attendance_shifts integer not null,
+      overtime_shifts integer not null,
+      coefficient_total real,
+      coefficient_excluded_reason text not null,
+      bonus_amount real not null,
+      bonus_excluded_reason text not null,
+      primary key(settlement_id, position),
+      unique(settlement_id, staff_id)
+    );
+
+    create table if not exists app_settings (
+      key text primary key,
+      value text not null
+    );
+  `);
+
+  const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
+  if (!migration) {
+    db.prepare("insert into schema_migrations (version, applied_at) values (?, ?)").run(
+      SQLITE_SCHEMA_VERSION,
+      new Date().toISOString()
+    );
+  }
+}
+
+export function checkSqliteIntegrity(db: Database.Database): string {
+  const row = db.prepare("pragma integrity_check").get() as { integrity_check: string };
+  return row.integrity_check;
+}
+
+export function listMissingCoreTables(db: Database.Database): string[] {
+  const expected = [
+    "app_settings",
+    "holidays",
+    "monthly_settlement_rows",
+    "monthly_settlements",
+    "schedule_entries",
+    "schedule_entry_shifts",
+    "schema_migrations",
+    "shifts",
+    "staff"
+  ];
+  const rows = db.prepare("select name from sqlite_master where type = 'table'").all() as Array<{ name: string }>;
+  const names = new Set(rows.map((row) => row.name));
+  return expected.filter((name) => !names.has(name));
+}
