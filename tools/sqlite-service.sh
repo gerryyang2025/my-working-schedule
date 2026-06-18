@@ -24,11 +24,11 @@ Usage:
 USAGE
 }
 
-ensure_sqlite3() {
+warn_sqlite3() {
   if ! command -v sqlite3 >/dev/null 2>&1; then
     printf 'sqlite3 command is missing\n' >&2
+    printf 'sqlite3 is optional and only needed for manual inspection/debugging flows\n' >&2
     printf 'Ubuntu/Debian install command: sudo apt install -y sqlite3\n' >&2
-    return 1
   fi
 }
 
@@ -84,9 +84,9 @@ case "$COMMAND" in
     usage
     ;;
   install)
-    ensure_sqlite3
     ensure_node
     ensure_npm
+    warn_sqlite3
     run_npm_command data:preflight
     status
     ;;

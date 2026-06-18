@@ -152,7 +152,7 @@ tools/
 
 | 命令 | 职责 |
 | --- | --- |
-| `install` | 执行非写入式预检，检查 `sqlite3`、`node`、`npm` 以及当前 `npm run data:*` 所需的本地 npm 依赖（至少 `node_modules/.bin/tsx`）可用性；如缺失则给出安装提示，并输出状态 |
+| `install` | 执行非写入式预检，强制检查 `node`、`npm` 以及当前 `npm run data:*` 所需的本地 npm 依赖（至少 `node_modules/.bin/tsx`）可用性；`sqlite3` 如缺失仅给出手工排查用途的安装提示，不阻塞预检，并输出状态 |
 | `init` | 初始化 SQLite 数据库文件和基础表结构；不从 JSON 隐式迁移数据 |
 | `migrate` | 调用 JSON 到 SQLite 迁移能力，并输出迁移校验报告 |
 | `backup` | 调用 SQLite 备份能力，生成带时间戳的备份文件 |
@@ -176,7 +176,7 @@ tools/
 权限要求：
 
 - 数据库文件和备份目录应由运行 Web/API 服务的 Linux 用户可读写。
-- `install` 可以只给出 `sudo apt install sqlite3` 提示，不应在未确认的情况下自动执行提权安装。
+- `install` 可以只给出 `sudo apt install sqlite3` 提示，说明其仅用于手工排查/查看；不应在未确认的情况下自动执行提权安装，也不应因缺失 `sqlite3` 阻塞预检。
 - `restore` 属于高风险操作，必须要求显式确认，且恢复前自动创建当前数据库备份。
 
 `tools/README.md` 需要说明：

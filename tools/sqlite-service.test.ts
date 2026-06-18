@@ -148,18 +148,19 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stdout).toMatch(/^sqlite modified time: .+$/m);
   });
 
-  it("prints install guidance when sqlite3 is missing", async () => {
+  it("warns but does not fail install when sqlite3 is missing", async () => {
     const dir = await createTempDir();
-    const fakeBin = join(dir, "bin");
-    await mkdir(fakeBin);
+    const fakeBin = await createFakeNpmBin(dir);
+    await createFakeExecutable(join(fakeBin, "node"), "exit 0\n");
 
     const result = await runTool(["install"], {
       PATH: fakeBin,
+      NPM_LOG: join(dir, "install.log"),
       SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
       SCHEDULE_BACKUP_PATH: join(dir, "backups")
     });
 
-    expect(result.code).toBe(1);
+    expect(result.code).toBe(0);
     expect(result.stderr).toContain("sqlite3 command is missing");
     expect(result.stderr).toContain("sudo apt install -y sqlite3");
   });
