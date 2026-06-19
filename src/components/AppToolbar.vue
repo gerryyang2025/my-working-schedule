@@ -37,6 +37,11 @@ const roleLabel = computed(() => {
   }
   return "只读查看";
 });
+const userIdentityLabel = computed(() => {
+  const displayName = props.currentUser.displayName.trim();
+  const fallbackName = displayName && displayName !== roleLabel.value ? displayName : props.currentUser.username;
+  return `${fallbackName} · ${roleLabel.value}`;
+});
 
 function moveWeek(offset: number): void {
   emit("update:selectedDate", addWeeks(props.selectedDate, offset));
@@ -71,7 +76,7 @@ function moveToCurrentWeek(): void {
     </div>
 
     <div class="toolbar-actions">
-      <span class="toolbar-user">{{ currentUser.displayName }} · {{ roleLabel }}</span>
+      <span class="toolbar-user">{{ userIdentityLabel }}</span>
       <el-button :icon="KeyRound" data-testid="open-password-change" @click="emit('openPasswordChange')">修改密码</el-button>
       <el-button :icon="Settings" :disabled="!canManageConfig" @click="emit('openManagement')">配置</el-button>
       <el-button :icon="CalendarDays" @click="emit('printWeek')">打印周表</el-button>

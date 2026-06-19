@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AppToolbar from "./AppToolbar.vue";
+import type { AuthUser } from "@/api/client";
 import { getWeekRange, toDateKey } from "@/lib/date";
 
 const ElButtonStub = defineComponent({
@@ -51,18 +52,21 @@ const ElTooltipStub = defineComponent({
   template: "<span><slot /></span>"
 });
 
-function mountToolbar(selectedDate = "2026-06-17") {
+function mountToolbar(
+  selectedDate = "2026-06-17",
+  currentUser: AuthUser = {
+    id: "user-admin",
+    username: "admin",
+    displayName: "系统管理员",
+    role: "admin" as const
+  }
+) {
   return mount(AppToolbar, {
     props: {
       selectedDate,
       adminMode: true,
       canManageConfig: true,
-      currentUser: {
-        id: "user-admin",
-        username: "admin",
-        displayName: "系统管理员",
-        role: "admin"
-      }
+      currentUser
     },
     global: {
       stubs: {
@@ -126,5 +130,27 @@ describe("AppToolbar", () => {
     await wrapper.get('[data-testid="open-password-change"]').trigger("click");
 
     expect(wrapper.emitted("openPasswordChange")).toEqual([[]]);
+  });
+
+  it("uses username when display name duplicates the role label", () => {
+    const wrapper = mountToolbar("2026-06-17", {
+      id: "user-admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin"
+    });
+
+    expect(wrapper.get(".toolbar-user").text()).toBe("admin · 系统管理员");
+  });
+
+  it("uses display name when it differs from the role label", () => {
+    const wrapper = mountToolbar("2026-06-17", {
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班负责人",
+      role: "scheduler"
+    });
+
+    expect(wrapper.get(".toolbar-user").text()).toBe("排班负责人 · 排班管理员");
   });
 });
