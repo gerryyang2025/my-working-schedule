@@ -12,6 +12,7 @@ export interface AuthUser {
   username: string;
   displayName: string;
   role: UserRole;
+  staffId: string | null;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +23,7 @@ export interface PublicAuthUser {
   username: string;
   displayName: string;
   role: UserRole;
+  staffId: string | null;
 }
 
 export interface AuthSession {
@@ -69,6 +71,7 @@ export function toPublicAuthUser(user: AuthUser): PublicAuthUser {
     id: user.id,
     username: user.username,
     displayName: user.displayName,
-    role: user.role
+    role: user.role,
+    staffId: user.staffId
   };
 }

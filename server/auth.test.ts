@@ -27,7 +27,8 @@ describe("memory auth store", () => {
         username: "admin",
         displayName: "系统管理员",
         role: "admin",
-        enabled: true
+        enabled: true,
+        staffId: null
       })
     );
     await expect(store.authenticate("admin", "wrong-password")).resolves.toBeNull();
@@ -144,5 +145,60 @@ describe("memory auth store", () => {
         summary: "用户 scheduler 修改密码"
       })
     ]);
+  });
+
+  it("stores optional staff bindings and prevents duplicate staff bindings", async () => {
+    const store = createMemoryAuthStore();
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password",
+      staffId: "staff-nurse-001"
+    });
+
+    expect(viewer).toEqual(
+      expect.objectContaining({
+        id: "user-viewer",
+        username: "viewer",
+        staffId: "staff-nurse-001"
+      })
+    );
+    await expect(store.authenticate("viewer", "viewer-password")).resolves.toEqual(
+      expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
+    );
+    await expect(store.listUsers()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ username: "admin", staffId: null }),
+        expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
+      ])
+    );
+
+    await expect(
+      store.saveUser({
+        id: "user-second-viewer",
+        username: "viewer2",
+        displayName: "只读用户2",
+        role: "viewer",
+        enabled: true,
+        password: "viewer2-password",
+        staffId: "staff-nurse-001"
+      })
+    ).rejects.toThrow("该人员已绑定其他账号");
+
+    await expect(
+      store.saveUser({
+        id: "user-viewer",
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        staffId: null
+      })
+    ).resolves.toEqual(expect.objectContaining({ username: "viewer", staffId: null }));
   });
 });

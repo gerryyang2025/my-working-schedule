@@ -48,6 +48,7 @@ export interface SaveAuthUserInput {
   role: UserRole;
   enabled: boolean;
   password?: string | null;
+  staffId?: string | null;
 }
 
 export interface ChangePasswordInput {
@@ -100,6 +101,7 @@ function createUser(username: string, password: string, role: UserRole): StoredU
     username,
     displayName: username === "admin" ? "系统管理员" : username,
     role,
+    staffId: null,
     enabled: true,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -153,6 +155,15 @@ export function createMemoryAuthStore(): AuthStore {
     return users.get(id) ?? null;
   }
 
+  function getUserByStaffId(staffId: string): StoredUser | null {
+    for (const user of users.values()) {
+      if (user.staffId === staffId) {
+        return user;
+      }
+    }
+    return null;
+  }
+
   function resolveUserForSave(id: string, username: string): StoredUser | null {
     return getStoredUserById(id) ?? getUserByUsername(username);
   }
@@ -199,12 +210,21 @@ export function createMemoryAuthStore(): AuthStore {
         throw new AuthStoreError(400, "账号名不能重复");
       }
 
+      const staffId = input.staffId?.trim() || null;
+      if (staffId) {
+        const duplicateStaffUser = getUserByStaffId(staffId);
+        if (duplicateStaffUser && duplicateStaffUser.id !== existingUser?.id) {
+          throw new AuthStoreError(400, "该人员已绑定其他账号");
+        }
+      }
+
       assertCanSaveUser(existingUser, input.role, input.enabled);
       const timestamp = nowIso();
       if (existingUser) {
         existingUser.username = username;
         existingUser.displayName = displayName;
         existingUser.role = input.role;
+        existingUser.staffId = staffId;
         existingUser.enabled = input.enabled;
         existingUser.updatedAt = timestamp;
         if (input.password) {
@@ -222,6 +242,7 @@ export function createMemoryAuthStore(): AuthStore {
         username,
         displayName,
         role: input.role,
+        staffId,
         enabled: input.enabled,
         createdAt: timestamp,
         updatedAt: timestamp,
