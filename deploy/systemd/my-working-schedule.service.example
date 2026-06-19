@@ -14,7 +14,7 @@ Environment=SCHEDULE_STORAGE_DRIVER=sqlite
 Environment=SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
 Environment=SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
 Environment=SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
-Environment=SCHEDULE_ADMIN_PASSWORD=change-me-before-start
+Environment=SCHEDULE_ADMIN_PASSWORD=123456
 ExecStart=/usr/bin/npm run start:api
 Restart=on-failure
 RestartSec=5
