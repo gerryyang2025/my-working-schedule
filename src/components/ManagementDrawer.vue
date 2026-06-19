@@ -63,6 +63,7 @@ const userDraft = reactive<SaveAuthUserInput>({
   displayName: "",
   role: "viewer",
   enabled: true,
+  staffId: null,
   password: ""
 });
 
@@ -75,6 +76,8 @@ const auditFilters = reactive<Required<AuditLogQuery>>({
 
 const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
 const isExistingUserDraft = computed(() => props.users.some((user) => user.id === userDraft.id));
+const staffById = computed(() => new Map(props.data.staff.map((staff) => [staff.id, staff])));
+const bindableStaff = computed(() => props.data.staff.filter((staff) => staff.enabled || staff.id === userDraft.staffId));
 
 function roleLabel(role: UserRole): string {
   if (role === "admin") {
@@ -96,6 +99,19 @@ function staffTypeLabel(type: StaffMember["type"]): string {
   }
 
   return "护士";
+}
+
+function staffBindingLabel(staffId: string | null | undefined): string {
+  if (!staffId) {
+    return "未绑定";
+  }
+
+  const staff = staffById.value.get(staffId);
+  if (!staff) {
+    return `未知人员 / ${staffId}`;
+  }
+
+  return `${staff.name} / ${staff.jobId}${staff.enabled ? "" : "（已停用）"}`;
 }
 
 function resetStaffDraft(): void {
@@ -139,6 +155,7 @@ function resetUserDraft(): void {
     displayName: "",
     role: "viewer",
     enabled: true,
+    staffId: null,
     password: ""
   });
 }
@@ -185,6 +202,7 @@ function loadUserDraft(user: ManagedAuthUser): void {
     displayName: user.displayName,
     role: user.role,
     enabled: user.enabled,
+    staffId: user.staffId,
     password: ""
   });
 }
@@ -195,7 +213,8 @@ function emitSaveUser(): void {
     username: userDraft.username,
     displayName: userDraft.displayName,
     role: userDraft.role,
-    enabled: userDraft.enabled
+    enabled: userDraft.enabled,
+    staffId: userDraft.staffId || null
   };
 
   if (userDraft.password) {
@@ -422,6 +441,11 @@ watch(
         <el-table :data="users" size="small" @row-click="loadUserDraft">
           <el-table-column prop="username" label="账号" width="110" />
           <el-table-column prop="displayName" label="显示名" />
+          <el-table-column label="绑定人员" width="150">
+            <template #default="{ row }">
+              {{ staffBindingLabel(row.staffId) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="role" label="角色" width="110" />
           <el-table-column prop="enabled" label="启用" width="80" />
         </el-table>
@@ -441,6 +465,7 @@ watch(
             </span>
             <span class="management-mobile-meta">
               <span>{{ roleLabel(user.role) }}</span>
+              <span>{{ staffBindingLabel(user.staffId) }}</span>
               <span>{{ user.enabled ? "启用" : "停用" }}</span>
             </span>
           </button>
@@ -449,6 +474,16 @@ watch(
         <div class="management-form">
           <el-input v-model="userDraft.username" placeholder="账号" :disabled="userSaving || isExistingUserDraft" />
           <el-input v-model="userDraft.displayName" placeholder="显示名" :disabled="userSaving" />
+          <el-select v-model="userDraft.staffId" placeholder="绑定人员" clearable :disabled="userSaving">
+            <el-option label="未绑定" :value="null" />
+            <el-option
+              v-for="staff in bindableStaff"
+              :key="staff.id"
+              :label="`${staff.name} / ${staff.jobId} / ${staffTypeLabel(staff.type)}${staff.enabled ? '' : '（已停用）'}`"
+              :value="staff.id"
+            />
+          </el-select>
+          <p class="management-help-text">当前仅建立身份绑定，不会改变账号权限。</p>
           <el-select v-model="userDraft.role" placeholder="角色" :disabled="userSaving">
             <el-option label="系统管理员" value="admin" />
             <el-option label="排班管理员" value="scheduler" />
@@ -519,3 +554,12 @@ watch(
     </el-tabs>
   </el-drawer>
 </template>
+
+<style scoped>
+.management-help-text {
+  margin: -4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+</style>

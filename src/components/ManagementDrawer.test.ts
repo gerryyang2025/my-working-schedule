@@ -48,15 +48,15 @@ const InputStub = defineComponent({
 
 const ElSelectStub = defineComponent({
   name: "ElSelect",
-  props: ["modelValue"],
+  props: ["modelValue", "placeholder", "disabled"],
   emits: ["update:modelValue"],
-  template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>'
+  template: '<select :data-placeholder="placeholder" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>'
 });
 
 const ElOptionStub = defineComponent({
   name: "ElOption",
   props: ["label", "value"],
-  template: "<option>{{ label }}</option>"
+  template: '<option :value="value">{{ label }}</option>'
 });
 
 const ElCheckboxStub = defineComponent({
@@ -87,6 +87,15 @@ const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
       isAdmin: true,
       enabled: true,
       sortOrder: 1
+    },
+    {
+      id: "staff-disabled",
+      jobId: "100002",
+      name: "停用护士",
+      type: "nurse",
+      isAdmin: false,
+      enabled: false,
+      sortOrder: 2
     }
   ],
   shifts: [
@@ -117,6 +126,7 @@ const users: ManagedAuthUser[] = [
     username: "admin",
     displayName: "系统管理员",
     role: "admin",
+    staffId: null,
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -126,6 +136,27 @@ const users: ManagedAuthUser[] = [
     username: "scheduler",
     displayName: "排班管理员",
     role: "scheduler",
+    staffId: "staff-head",
+    enabled: true,
+    createdAt: "2026-06-19T00:00:00.000Z",
+    updatedAt: "2026-06-19T00:00:00.000Z"
+  },
+  {
+    id: "user-disabled-staff",
+    username: "disabled-staff",
+    displayName: "停用绑定账号",
+    role: "viewer",
+    staffId: "staff-disabled",
+    enabled: true,
+    createdAt: "2026-06-19T00:00:00.000Z",
+    updatedAt: "2026-06-19T00:00:00.000Z"
+  },
+  {
+    id: "user-unknown-staff",
+    username: "unknown-staff",
+    displayName: "未知绑定账号",
+    role: "viewer",
+    staffId: "staff-missing",
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -217,6 +248,36 @@ describe("ManagementDrawer", () => {
           displayName: "系统管理员",
           role: "admin",
           enabled: true
+        })
+      ]
+    ]);
+  });
+
+  it("shows account staff bindings and emits selected staff ids", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.text()).toContain("段鸿露 / 000228");
+    expect(wrapper.text()).toContain("未绑定");
+    expect(wrapper.text()).toContain("停用护士 / 100002（已停用）");
+    expect(wrapper.text()).toContain("未知人员 / staff-missing");
+
+    await wrapper
+      .findAll(".management-mobile-user")
+      .find((item) => item.text().includes("系统管理员"))!
+      .trigger("click");
+
+    const bindingSelect = wrapper.get('select[data-placeholder="绑定人员"]');
+    await bindingSelect.setValue("staff-head");
+    await wrapper.get('[data-testid="save-user-button"]').trigger("click");
+
+    expect(wrapper.emitted("saveUser")).toEqual([
+      [
+        expect.objectContaining({
+          username: "admin",
+          displayName: "系统管理员",
+          role: "admin",
+          enabled: true,
+          staffId: "staff-head"
         })
       ]
     ]);
