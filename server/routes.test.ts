@@ -11,6 +11,7 @@ import { createSeedData } from "./seed";
 import { replaceAppDataInSqlite } from "./sqlite/mapper";
 import { initializeSqliteSchema } from "./sqlite/schema";
 import { createSqliteStorage } from "./sqlite/storage";
+import type { StorageAdapter } from "./storage";
 
 const TEST_ADMIN_PASSWORD = "123456";
 
@@ -36,6 +37,13 @@ function createTestApp(initialData: AppData = createSeedData(), adminPassword = 
       return run;
     }
   };
+  app.use(express.json());
+  app.use("/api", createRoutes(storage, { adminPassword }));
+  return app;
+}
+
+function createTestAppWithStorage(storage: StorageAdapter, adminPassword = TEST_ADMIN_PASSWORD) {
+  const app = express();
   app.use(express.json());
   app.use("/api", createRoutes(storage, { adminPassword }));
   return app;
@@ -270,6 +278,34 @@ describe.sequential("API routes", () => {
       .expect(200);
 
     expect(response.body.user).toEqual(expect.objectContaining({ username: "viewer", staffId: null }));
+  });
+
+  it("validates staffId against the queued app-data snapshot when saving accounts", async () => {
+    const enabledSnapshot = createSeedData();
+    const disabledSnapshot = createSeedData();
+    disabledSnapshot.staff = disabledSnapshot.staff.map((staff) =>
+      staff.id === "staff-nurse-001" ? { ...staff, enabled: false } : staff
+    );
+    const storage: StorageAdapter = {
+      load: async () => structuredClone(enabledSnapshot),
+      save: async () => undefined,
+      update: async (mutate) => mutate(structuredClone(disabledSnapshot))
+    };
+    const app = createTestAppWithStorage(storage);
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(400, { message: "只能绑定启用人员" });
   });
 
   it("rejects account bindings to missing, disabled, or already-bound staff records", async () => {

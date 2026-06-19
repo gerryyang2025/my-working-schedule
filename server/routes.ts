@@ -267,16 +267,15 @@ function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null): strin
     : `保存账号：${user.username}，绑定人员：${user.staffId}`;
 }
 
-async function validateUserStaffBinding(
-  storage: StorageAdapter,
-  authStore: AuthStore,
+function validateUserStaffBinding(
+  data: AppData,
+  users: AuthUser[],
   payload: SaveAuthUserInput
-): Promise<StaffMember | null> {
+): StaffMember | null {
   if (!payload.staffId) {
     return null;
   }
 
-  const [data, users] = await Promise.all([storage.load(), authStore.listUsers()]);
   const staff = data.staff.find((item) => item.id === payload.staffId);
   if (!staff) {
     throw new HttpResponseError(400, "绑定人员不存在");
@@ -639,9 +638,19 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         return;
       }
 
-      const bindingStaff = await validateUserStaffBinding(storage, authStore, payload);
-      const user = await authStore.saveUser(payload);
-      await recordAudit(request, "user.save", "user", user.id, formatUserSaveSummary(user, bindingStaff));
+      const saveResult: { bindingStaff: StaffMember | null; user: AuthUser | null } = { bindingStaff: null, user: null };
+      await storage.update(async (data) => {
+        const users = await authStore.listUsers();
+        saveResult.bindingStaff = validateUserStaffBinding(data, users, payload);
+        saveResult.user = await authStore.saveUser(payload);
+        return data;
+      });
+      const user = saveResult.user;
+      if (!user) {
+        throw new Error("账号保存失败");
+      }
+
+      await recordAudit(request, "user.save", "user", user.id, formatUserSaveSummary(user, saveResult.bindingStaff));
       response.json({ user: toManagedAuthUser(user) });
     } catch (error) {
       handleRouteError(error, response, next);
