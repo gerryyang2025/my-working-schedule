@@ -14,6 +14,11 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 ./optools.sh nginx status
 ./optools.sh nginx test
 ./optools.sh nginx reload
+./optools.sh logrotate install
+./optools.sh logrotate status
+./optools.sh logrotate test
+./optools.sh firewall status
+./optools.sh firewall guide
 ./optools.sh app init
 ./optools.sh app doctor
 ./optools.sh app status
@@ -101,6 +106,7 @@ Use the Nginx helper from the project root when debugging below the `optools.sh 
 ```bash
 ./tools/nginx-service.sh install
 ./tools/nginx-service.sh configure --no-reload
+./tools/nginx-service.sh configure-https --no-reload
 ./tools/nginx-service.sh test
 ./tools/nginx-service.sh reload
 ./tools/nginx-service.sh status
@@ -113,6 +119,44 @@ Useful overrides:
 ```bash
 NGINX_CONF_DIR=/etc/nginx/conf.d
 NGINX_CONF_FILE=/etc/nginx/conf.d/my-working-schedule.conf
+NGINX_TARGET_CONF=/etc/nginx/conf.d/my-working-schedule.conf
 NGINX_SOURCE_CONF=/opt/my-working-schedule/deploy/nginx/my-working-schedule.conf.example
+NGINX_HTTPS_SOURCE_CONF=/opt/my-working-schedule/deploy/nginx/my-working-schedule-https.conf.example
+NGINX_SERVER_NAME=schedule.example.com
+NGINX_SSL_CERTIFICATE=/etc/letsencrypt/live/schedule.example.com/fullchain.pem
+NGINX_SSL_CERTIFICATE_KEY=/etc/letsencrypt/live/schedule.example.com/privkey.pem
 NGINX_SERVICE_NAME=nginx
 ```
+
+`configure-https` does not request certificates. It renders the HTTPS template with the supplied server name, certificate path, and key path; then it runs `nginx -t` before reloading unless `--no-reload` is set.
+
+## Logrotate Helper
+
+Use the logrotate helper from the project root when debugging below the `optools.sh logrotate` wrapper:
+
+```bash
+./tools/logrotate-service.sh install
+./tools/logrotate-service.sh status
+./tools/logrotate-service.sh test
+```
+
+`install` copies `deploy/logrotate/my-working-schedule.example` to `/etc/logrotate.d/my-working-schedule`. `test` runs `logrotate -d` as a dry-run.
+
+Useful overrides:
+
+```bash
+LOGROTATE_CONF_DIR=/etc/logrotate.d
+LOGROTATE_CONF_FILE=/etc/logrotate.d/my-working-schedule
+LOGROTATE_SOURCE_CONF=/opt/my-working-schedule/deploy/logrotate/my-working-schedule.example
+```
+
+## Firewall Helper
+
+Use the firewall helper from the project root when debugging below the `optools.sh firewall` wrapper:
+
+```bash
+./tools/firewall-service.sh status
+./tools/firewall-service.sh guide
+```
+
+The firewall helper is read-only. It detects common tools such as `firewall-cmd`, `ufw`, `nft`, and `iptables`, then prints guidance for opening TCP 80/443 while keeping API port 3001 private behind Nginx.

@@ -22,6 +22,13 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("OPTOOLS_NPM_BIN");
     expect(runbook).toContain("./optools.sh app status");
     expect(runbook).toContain("./optools.sh nginx install");
+    expect(runbook).toContain("./optools.sh nginx configure-https");
+    expect(runbook).toContain("NGINX_SERVER_NAME");
+    expect(runbook).toContain("NGINX_SSL_CERTIFICATE");
+    expect(runbook).toContain("./optools.sh logrotate install");
+    expect(runbook).toContain("./optools.sh logrotate test");
+    expect(runbook).toContain("./optools.sh firewall status");
+    expect(runbook).toContain("./optools.sh firewall guide");
     expect(runbook).toContain("./optools.sh data backup");
     expect(runbook).toContain("./optools.sh data check");
     expect(runbook).toContain("./optools.sh app status");
@@ -46,9 +53,11 @@ describe("production deployment docs and examples", () => {
     expect(JSON.stringify(config)).not.toContain("123456");
   });
 
-  it("provides systemd, nginx, and backup schedule examples wired to production commands", async () => {
+  it("provides systemd, nginx, logrotate, and backup schedule examples wired to production commands", async () => {
     const service = await readProjectFile("deploy/systemd/my-working-schedule.service.example");
     const nginx = await readProjectFile("deploy/nginx/my-working-schedule.conf.example");
+    const nginxHttps = await readProjectFile("deploy/nginx/my-working-schedule-https.conf.example");
+    const logrotate = await readProjectFile("deploy/logrotate/my-working-schedule.example");
     const cron = await readProjectFile("deploy/cron/my-working-schedule-backup.cron.example");
 
     expect(service).toContain("WorkingDirectory=/opt/my-working-schedule");
@@ -60,6 +69,14 @@ describe("production deployment docs and examples", () => {
     expect(nginx).toContain("root /opt/my-working-schedule/dist");
     expect(nginx).toContain("proxy_pass http://127.0.0.1:3001/api/");
     expect(nginx).toContain("try_files $uri $uri/ /index.html");
+
+    expect(nginxHttps).toContain("listen 443 ssl http2");
+    expect(nginxHttps).toContain("ssl_certificate __SSL_CERTIFICATE__");
+    expect(nginxHttps).toContain("ssl_certificate_key __SSL_CERTIFICATE_KEY__");
+    expect(nginxHttps).toContain("return 301 https://$host$request_uri");
+
+    expect(logrotate).toContain("/var/log/my-working-schedule-backup.log");
+    expect(logrotate).toContain("copytruncate");
 
     expect(cron).toContain("SCHEDULE_STORAGE_DRIVER=sqlite");
     expect(cron).toContain("/opt/my-working-schedule/tools/sqlite-service.sh backup");

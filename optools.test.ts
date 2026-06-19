@@ -91,7 +91,10 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh build");
     expect(result.stdout).toContain("./optools.sh deploy");
     expect(result.stdout).toContain("./optools.sh nginx install");
+    expect(result.stdout).toContain("./optools.sh nginx configure-https");
     expect(result.stdout).toContain("./optools.sh nginx status");
+    expect(result.stdout).toContain("./optools.sh logrotate install");
+    expect(result.stdout).toContain("./optools.sh firewall status");
     expect(result.stdout).toContain("./optools.sh data check");
     expect(result.stdout).toContain("./optools.sh app init");
     expect(result.stdout).toContain("./optools.sh app doctor");
@@ -103,6 +106,8 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("OPTOOLS_INSTALL_DIR");
     expect(result.stdout).toContain("OPTOOLS_NGINX_SERVICE_SCRIPT");
     expect(result.stdout).toContain("OPTOOLS_SQLITE_SERVICE_SCRIPT");
+    expect(result.stdout).toContain("OPTOOLS_LOGROTATE_SERVICE_SCRIPT");
+    expect(result.stdout).toContain("OPTOOLS_FIREWALL_SERVICE_SCRIPT");
     expect(result.stdout).toContain("OPTOOLS_APP_SERVICE_NAME");
     expect(result.stdout).toContain("OPTOOLS_APP_USER");
     expect(result.stdout).toContain("OPTOOLS_APP_GROUP");
@@ -114,6 +119,7 @@ describe("optools.sh", () => {
 
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("./optools.sh config");
+    expect(result.stdout).not.toContain("./optools.sh config show");
     expect(result.stdout).toContain("./optools.sh config paths");
     expect(result.stdout).toContain("./optools.sh config server");
   });
@@ -126,6 +132,8 @@ describe("optools.sh", () => {
     const systemdFile = join(stateDir, "etc", "systemd", "system", "schedule-api.service");
     const fakeNginxHelper = join(stateDir, "tools", "nginx-service.sh");
     const fakeSqliteHelper = join(stateDir, "tools", "sqlite-service.sh");
+    const fakeLogrotateHelper = join(stateDir, "tools", "logrotate-service.sh");
+    const fakeFirewallHelper = join(stateDir, "tools", "firewall-service.sh");
 
     const result = await runOptools(["config"], {
       OPTOOLS_INSTALL_DIR: installDir,
@@ -134,6 +142,8 @@ describe("optools.sh", () => {
       OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
       OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
       OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeSqliteHelper,
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
+      OPTOOLS_FIREWALL_SERVICE_SCRIPT: fakeFirewallHelper,
       OPTOOLS_APP_SERVICE_NAME: "schedule-api",
       OPTOOLS_API_HEALTH_URL: "http://127.0.0.1:3901/api/health"
     });
@@ -148,6 +158,8 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain(`systemd file: ${systemdFile}`);
     expect(result.stdout).toContain(`nginx helper: ${fakeNginxHelper}`);
     expect(result.stdout).toContain(`sqlite helper: ${fakeSqliteHelper}`);
+    expect(result.stdout).toContain(`logrotate helper: ${fakeLogrotateHelper}`);
+    expect(result.stdout).toContain(`firewall helper: ${fakeFirewallHelper}`);
     expect(result.stdout).toContain("api health url: http://127.0.0.1:3901/api/health");
   });
 
@@ -156,12 +168,16 @@ describe("optools.sh", () => {
     const installDir = join(stateDir, "install");
     const configPath = join(stateDir, "server.local.json");
     const systemdFile = join(stateDir, "schedule-api.service");
+    const fakeLogrotateHelper = join(stateDir, "logrotate-service.sh");
+    const fakeFirewallHelper = join(stateDir, "firewall-service.sh");
 
     const result = await runOptools(["config", "paths"], {
       OPTOOLS_INSTALL_DIR: installDir,
       OPTOOLS_STATE_DIR: join(stateDir, "tmp"),
       OPTOOLS_LOG_DIR: join(stateDir, "logs"),
       OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
+      OPTOOLS_FIREWALL_SERVICE_SCRIPT: fakeFirewallHelper,
       SCHEDULE_CONFIG_PATH: configPath
     });
 
@@ -174,6 +190,8 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain(`log dir: ${join(stateDir, "logs")}`);
     expect(result.stdout).toContain(`server config path: ${configPath}`);
     expect(result.stdout).toContain(`systemd file: ${systemdFile}`);
+    expect(result.stdout).toContain(`logrotate helper: ${fakeLogrotateHelper}`);
+    expect(result.stdout).toContain(`firewall helper: ${fakeFirewallHelper}`);
   });
 
   it("shows redacted effective server config", async () => {
@@ -293,6 +311,15 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh config");
   });
 
+  it("rejects the duplicate config show subcommand", async () => {
+    const result = await runOptools(["config", "show"]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown config command: show");
+    expect(result.stdout).toContain("./optools.sh config");
+    expect(result.stdout).not.toContain("./optools.sh config show");
+  });
+
   it("builds frontend assets and installs the API runtime files to the configured deployment directory", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");
@@ -327,6 +354,14 @@ printf 'asset\\n' > dist/assets/app.js
     expect(await readFile(join(installDir, "package-lock.json"), "utf8")).toContain('"lockfileVersion"');
     expect(await readFile(join(installDir, "server", "index.ts"), "utf8")).toContain("Schedule API");
     expect(await readFile(join(installDir, "src", "types", "domain.ts"), "utf8")).toContain("export interface StaffMember");
+    expect(await readFile(join(installDir, "tools", "sqlite-service.sh"), "utf8")).toContain("sqlite-service.sh");
+    expect(await readFile(join(installDir, "tools", "nginx-service.sh"), "utf8")).toContain("nginx-service.sh");
+    expect(await readFile(join(installDir, "deploy", "nginx", "my-working-schedule.conf.example"), "utf8")).toContain(
+      "proxy_pass http://127.0.0.1:3001/api/"
+    );
+    expect(
+      await readFile(join(installDir, "deploy", "nginx", "my-working-schedule-https.conf.example"), "utf8")
+    ).toContain("listen 443 ssl http2");
     expect(await readFile(join(installDir, "tsconfig.node.json"), "utf8")).toContain('"compilerOptions"');
     expect(await readFile(join(installDir, "config", "server.production.example.json"), "utf8")).toContain(
       '"storageDriver"'
@@ -376,6 +411,42 @@ printf 'asset\\n' > dist/assets/app.js
     );
   });
 
+  it("delegates HTTPS nginx operations to the nginx helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const logPath = join(stateDir, "nginx.log");
+
+    await createExecutable(
+      fakeNginxHelper,
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$NGINX_LOG"
+`
+    );
+
+    const result = await runOptools(["nginx", "configure-https", "--no-reload"], {
+      OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      NGINX_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        `cwd=${process.cwd()}`,
+        "argc=2",
+        "arg1=configure-https",
+        "arg2=--no-reload",
+        ""
+      ].join("\n")
+    );
+  });
+
   it("delegates SQLite data operations to the data helper script", async () => {
     const stateDir = await createStateDir();
     const fakeDataHelper = join(stateDir, "sqlite-service.sh");
@@ -409,6 +480,66 @@ printf 'asset\\n' > dist/assets/app.js
         "arg2=schedule.db",
         ""
       ].join("\n")
+    );
+  });
+
+  it("delegates logrotate operations to the logrotate helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeLogrotateHelper = join(stateDir, "logrotate-service.sh");
+    const logPath = join(stateDir, "logrotate.log");
+
+    await createExecutable(
+      fakeLogrotateHelper,
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$LOGROTATE_LOG"
+`
+    );
+
+    const result = await runOptools(["logrotate", "test"], {
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
+      LOGROTATE_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [`cwd=${process.cwd()}`, "argc=1", "arg1=test", ""].join("\n")
+    );
+  });
+
+  it("delegates firewall operations to the firewall helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeFirewallHelper = join(stateDir, "firewall-service.sh");
+    const logPath = join(stateDir, "firewall.log");
+
+    await createExecutable(
+      fakeFirewallHelper,
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$FIREWALL_LOG"
+`
+    );
+
+    const result = await runOptools(["firewall", "guide"], {
+      OPTOOLS_FIREWALL_SERVICE_SCRIPT: fakeFirewallHelper,
+      FIREWALL_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [`cwd=${process.cwd()}`, "argc=1", "arg1=guide", ""].join("\n")
     );
   });
 
@@ -888,6 +1019,8 @@ exit 7
     const fakeBinDir = join(stateDir, "bin");
     const fakeDataHelper = join(stateDir, "sqlite-service.sh");
     const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const fakeLogrotateHelper = join(stateDir, "logrotate-service.sh");
+    const fakeFirewallHelper = join(stateDir, "firewall-service.sh");
     const logPath = join(stateDir, "doctor.log");
 
     await mkdir(join(installDir, "dist"), { recursive: true });
@@ -903,12 +1036,16 @@ fi
 `
     );
     await createExecutable(fakeNginxHelper, `printf 'nginx %s\\n' "$*" >> "$DOCTOR_LOG"\n`);
+    await createExecutable(fakeLogrotateHelper, `printf 'logrotate %s\\n' "$*" >> "$DOCTOR_LOG"\n`);
+    await createExecutable(fakeFirewallHelper, `printf 'firewall %s\\n' "$*" >> "$DOCTOR_LOG"\n`);
 
     const result = await runOptools(["doctor"], {
       DOCTOR_LOG: logPath,
       OPTOOLS_INSTALL_DIR: installDir,
       OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
       OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
+      OPTOOLS_FIREWALL_SERVICE_SCRIPT: fakeFirewallHelper,
       OPTOOLS_API_HEALTH_URL: "disabled",
       PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
     });
@@ -917,8 +1054,13 @@ fi
     expect(result.stdout).toContain("[ok] node");
     expect(result.stdout).toContain("[ok] static dist");
     expect(result.stdout).toContain("[fail] data check");
+    expect(result.stdout).toContain("[skip] nginx https config");
+    expect(result.stdout).toContain("[ok] logrotate status");
+    expect(result.stdout).toContain("[ok] firewall status");
     expect(result.stdout).toContain("doctor: failed");
     expect(await readFile(logPath, "utf8")).toContain("data check");
+    expect(await readFile(logPath, "utf8")).toContain("logrotate status");
+    expect(await readFile(logPath, "utf8")).toContain("firewall status");
   });
 
   it("reports stopped when no dev pid exists", async () => {

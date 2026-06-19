@@ -40,6 +40,8 @@ BUILD_SOURCE_DIR="${OPTOOLS_BUILD_SOURCE_DIR:-"$ROOT_DIR/dist"}"
 INSTALL_DIST_DIR="${OPTOOLS_INSTALL_DIST_DIR:-"$INSTALL_DIR/dist"}"
 NGINX_SERVICE_SCRIPT="${OPTOOLS_NGINX_SERVICE_SCRIPT:-"$ROOT_DIR/tools/nginx-service.sh"}"
 SQLITE_SERVICE_SCRIPT="${OPTOOLS_SQLITE_SERVICE_SCRIPT:-"$ROOT_DIR/tools/sqlite-service.sh"}"
+LOGROTATE_SERVICE_SCRIPT="${OPTOOLS_LOGROTATE_SERVICE_SCRIPT:-"$ROOT_DIR/tools/logrotate-service.sh"}"
+FIREWALL_SERVICE_SCRIPT="${OPTOOLS_FIREWALL_SERVICE_SCRIPT:-"$ROOT_DIR/tools/firewall-service.sh"}"
 APP_SERVICE_NAME="${OPTOOLS_APP_SERVICE_NAME:-my-working-schedule}"
 APP_USER="${OPTOOLS_APP_USER:-my-working-schedule}"
 APP_GROUP="${OPTOOLS_APP_GROUP:-my-working-schedule}"
@@ -75,14 +77,19 @@ Usage:
   ./optools.sh build          Build frontend assets and install production runtime files
   ./optools.sh deploy         Build, install dependencies, check services, and restart production app
   ./optools.sh config         Show key production operations config
-  ./optools.sh config show    Show key production operations config
   ./optools.sh config paths   Show important local and production paths
   ./optools.sh config server  Show effective server config with secrets redacted
   ./optools.sh nginx install  Install/configure nginx and reload
   ./optools.sh nginx configure [--no-reload]
+  ./optools.sh nginx configure-https [--no-reload]
   ./optools.sh nginx test     Run nginx -t through the helper
   ./optools.sh nginx reload   Reload nginx through the helper
   ./optools.sh nginx status   Show nginx helper status
+  ./optools.sh logrotate install Install logrotate config
+  ./optools.sh logrotate status  Show logrotate helper status
+  ./optools.sh logrotate test    Dry-run logrotate config
+  ./optools.sh firewall status   Inspect firewall status and print access guidance
+  ./optools.sh firewall guide    Print firewall and security group guidance
   ./optools.sh data status    Show SQLite storage status
   ./optools.sh data check     Check SQLite storage integrity
   ./optools.sh data backup    Back up SQLite storage
@@ -111,6 +118,8 @@ Environment:
   OPTOOLS_INSTALL_DIST_DIR    Static asset install dir (default: OPTOOLS_INSTALL_DIR/dist)
   OPTOOLS_NGINX_SERVICE_SCRIPT Nginx helper script (default: tools/nginx-service.sh)
   OPTOOLS_SQLITE_SERVICE_SCRIPT SQLite helper script (default: tools/sqlite-service.sh)
+  OPTOOLS_LOGROTATE_SERVICE_SCRIPT logrotate helper script (default: tools/logrotate-service.sh)
+  OPTOOLS_FIREWALL_SERVICE_SCRIPT Firewall helper script (default: tools/firewall-service.sh)
   OPTOOLS_APP_SERVICE_NAME    systemd service name (default: my-working-schedule)
   OPTOOLS_APP_USER            systemd service user (default: my-working-schedule)
   OPTOOLS_APP_GROUP           systemd service group (default: my-working-schedule)
@@ -508,7 +517,7 @@ install_runtime_files() {
 
   mkdir -p "$INSTALL_DIR"
 
-  for runtime_path in package.json package-lock.json server src tsconfig.json tsconfig.node.json; do
+  for runtime_path in package.json package-lock.json server src tools deploy tsconfig.json tsconfig.node.json; do
     copy_runtime_path "$runtime_path"
   done
 
@@ -537,7 +546,7 @@ run_nginx_helper() {
   fi
 
   case "$command" in
-    install|configure|test|reload|status|help|-h|--help)
+    install|configure|configure-https|test|reload|status|help|-h|--help)
       (
         cd "$ROOT_DIR"
         bash "$NGINX_SERVICE_SCRIPT" "$command" "$@"
@@ -545,6 +554,54 @@ run_nginx_helper() {
       ;;
     *)
       echo "Unknown nginx command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
+run_logrotate_helper() {
+  local command="${1:-help}"
+  shift || true
+
+  if [[ ! -f "$LOGROTATE_SERVICE_SCRIPT" ]]; then
+    echo "logrotate helper script not found: $LOGROTATE_SERVICE_SCRIPT" >&2
+    return 1
+  fi
+
+  case "$command" in
+    install|status|test|help|-h|--help)
+      (
+        cd "$ROOT_DIR"
+        bash "$LOGROTATE_SERVICE_SCRIPT" "$command" "$@"
+      )
+      ;;
+    *)
+      echo "Unknown logrotate command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
+run_firewall_helper() {
+  local command="${1:-help}"
+  shift || true
+
+  if [[ ! -f "$FIREWALL_SERVICE_SCRIPT" ]]; then
+    echo "firewall helper script not found: $FIREWALL_SERVICE_SCRIPT" >&2
+    return 1
+  fi
+
+  case "$command" in
+    status|guide|help|-h|--help)
+      (
+        cd "$ROOT_DIR"
+        bash "$FIREWALL_SERVICE_SCRIPT" "$command" "$@"
+      )
+      ;;
+    *)
+      echo "Unknown firewall command: $command" >&2
       usage
       return 1
       ;;
@@ -979,6 +1036,8 @@ run_config_show() {
   echo "systemd file: $SYSTEMD_SERVICE_FILE"
   echo "nginx helper: $NGINX_SERVICE_SCRIPT"
   echo "sqlite helper: $SQLITE_SERVICE_SCRIPT"
+  echo "logrotate helper: $LOGROTATE_SERVICE_SCRIPT"
+  echo "firewall helper: $FIREWALL_SERVICE_SCRIPT"
   echo "api health url: $API_HEALTH_URL"
 }
 
@@ -996,6 +1055,8 @@ run_config_paths() {
   echo "systemd file: $SYSTEMD_SERVICE_FILE"
   echo "nginx helper: $NGINX_SERVICE_SCRIPT"
   echo "sqlite helper: $SQLITE_SERVICE_SCRIPT"
+  echo "logrotate helper: $LOGROTATE_SERVICE_SCRIPT"
+  echo "firewall helper: $FIREWALL_SERVICE_SCRIPT"
 }
 
 run_config_server() {
@@ -1035,10 +1096,10 @@ run_config_server() {
 }
 
 run_config_helper() {
-  local command="${1:-show}"
+  local command="${1:-}"
 
   case "$command" in
-    show|"")
+    "")
       run_config_show
       ;;
     paths)
@@ -1085,6 +1146,25 @@ doctor_check_api_health() {
   doctor_check "api health" curl -fsS --max-time 2 "$API_HEALTH_URL"
 }
 
+doctor_check_https_config() {
+  local server_name="${NGINX_SERVER_NAME:-}"
+  local certificate="${NGINX_SSL_CERTIFICATE:-}"
+  local certificate_key="${NGINX_SSL_CERTIFICATE_KEY:-}"
+
+  if [[ -z "$server_name" && -z "$certificate" && -z "$certificate_key" ]]; then
+    printf '[skip] nginx https config\n'
+    return 0
+  fi
+
+  if [[ -n "$server_name" && -f "$certificate" && -f "$certificate_key" ]]; then
+    printf '[ok] nginx https config\n'
+    return 0
+  fi
+
+  printf '[fail] nginx https config\n'
+  return 1
+}
+
 run_doctor() {
   local failed=0
 
@@ -1100,6 +1180,9 @@ run_doctor() {
   doctor_check "data check" run_data_helper check || failed=1
   doctor_check "nginx status" run_nginx_helper status || failed=1
   doctor_check "nginx test" run_nginx_helper test || failed=1
+  doctor_check_https_config || failed=1
+  doctor_check "logrotate status" run_logrotate_helper status || failed=1
+  doctor_check "firewall status" run_firewall_helper status || failed=1
   doctor_check "app status" run_app_systemctl status || failed=1
   doctor_check_api_health || failed=1
 
@@ -1133,6 +1216,14 @@ main() {
     nginx)
       shift || true
       run_nginx_helper "$@"
+      ;;
+    logrotate)
+      shift || true
+      run_logrotate_helper "$@"
+      ;;
+    firewall)
+      shift || true
+      run_firewall_helper "$@"
       ;;
     data)
       shift || true

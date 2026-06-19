@@ -63,7 +63,9 @@ describe("tools/nginx-service.sh", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("./tools/nginx-service.sh install");
     expect(result.stdout).toContain("./tools/nginx-service.sh configure");
+    expect(result.stdout).toContain("./tools/nginx-service.sh configure-https");
     expect(result.stdout).toContain("./tools/nginx-service.sh test");
+    expect(result.stdout).toContain("NGINX_SERVER_NAME");
   });
 
   it("installs nginx when missing, creates conf.d, copies config, tests, and reloads", async () => {
@@ -173,5 +175,64 @@ exit 0
     expect(result.code, result.stderr).toBe(0);
     expect(await readFile(confFile, "utf8")).toContain("root /opt/my-working-schedule/dist");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual(["nginx -t"]);
+  });
+
+  it("supports HTTPS configure without reloading services", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "commands.log");
+    const confFile = join(dir, "conf.d", "my-working-schedule.conf");
+    const certFile = join(dir, "certs", "fullchain.pem");
+    const keyFile = join(dir, "certs", "privkey.pem");
+    await mkdir(fakeBin, { recursive: true });
+    await mkdir(join(dir, "certs"), { recursive: true });
+    await writeFile(certFile, "cert\n", "utf8");
+    await writeFile(keyFile, "key\n", "utf8");
+    await createFakeExecutable(join(fakeBin, "nginx"), `printf 'nginx %s\\n' "$*" >> "$COMMAND_LOG"\nexit 0\n`);
+    await createFakeExecutable(join(fakeBin, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$COMMAND_LOG"\nexit 0\n`);
+
+    const result = await runTool(["configure-https", "--no-reload"], {
+      PATH: `${fakeBin}:/usr/bin:/bin`,
+      COMMAND_LOG: logPath,
+      NGINX_CONF_DIR: join(dir, "conf.d"),
+      NGINX_CONF_FILE: confFile,
+      NGINX_SERVER_NAME: "schedule.example.test",
+      NGINX_SSL_CERTIFICATE: certFile,
+      NGINX_SSL_CERTIFICATE_KEY: keyFile
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    const conf = await readFile(confFile, "utf8");
+    expect(conf).toContain("listen 443 ssl http2;");
+    expect(conf).toContain("server_name schedule.example.test;");
+    expect(conf).toContain(`ssl_certificate ${certFile};`);
+    expect(conf).toContain(`ssl_certificate_key ${keyFile};`);
+    expect(conf).toContain("proxy_pass http://127.0.0.1:3001/api/");
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual(["nginx -t"]);
+    expect(result.stdout).toContain("nginx HTTPS configure completed");
+  });
+
+  it("fails HTTPS configure when certificate files are missing", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    const logPath = join(dir, "commands.log");
+    const confFile = join(dir, "conf.d", "my-working-schedule.conf");
+    await mkdir(fakeBin, { recursive: true });
+    await createFakeExecutable(join(fakeBin, "nginx"), `printf 'nginx %s\\n' "$*" >> "$COMMAND_LOG"\nexit 0\n`);
+
+    const result = await runTool(["configure-https", "--no-reload"], {
+      PATH: `${fakeBin}:/usr/bin:/bin`,
+      COMMAND_LOG: logPath,
+      NGINX_CONF_DIR: join(dir, "conf.d"),
+      NGINX_CONF_FILE: confFile,
+      NGINX_SERVER_NAME: "schedule.example.test",
+      NGINX_SSL_CERTIFICATE: join(dir, "missing-fullchain.pem"),
+      NGINX_SSL_CERTIFICATE_KEY: join(dir, "missing-privkey.pem")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("NGINX_SSL_CERTIFICATE does not exist");
+    expect(existsSync(confFile)).toBe(false);
+    expect(existsSync(logPath)).toBe(false);
   });
 });
