@@ -19,6 +19,10 @@ interface RunOptoolsOptions {
 const tempDirs: string[] = [];
 const scriptPath = resolve(process.cwd(), "optools.sh");
 
+function isRunOptoolsOptions(value: Record<string, string> | RunOptoolsOptions): value is RunOptoolsOptions {
+  return Object.prototype.hasOwnProperty.call(value, "cwd") || Object.prototype.hasOwnProperty.call(value, "env");
+}
+
 async function createStateDir(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), "optools-test-"));
   tempDirs.push(dir);
@@ -29,8 +33,7 @@ function runOptools(
   args: string[],
   envOrOptions: Record<string, string> | RunOptoolsOptions = {}
 ): Promise<CommandResult> {
-  const options: RunOptoolsOptions =
-    "cwd" in envOrOptions || "env" in envOrOptions ? envOrOptions : { env: envOrOptions };
+  const options: RunOptoolsOptions = isRunOptoolsOptions(envOrOptions) ? envOrOptions : { env: envOrOptions };
 
   return new Promise((resolveResult) => {
     execFile(
