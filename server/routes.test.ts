@@ -174,7 +174,7 @@ describe.sequential("API routes", () => {
     const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
     expect(usersResponse.body.rows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "user-scheduler", username: "scheduler", role: "scheduler", enabled: true })
+        expect.objectContaining({ id: "user-scheduler", username: "scheduler", role: "scheduler", staffId: null, enabled: true })
       ])
     );
     expect(JSON.stringify(usersResponse.body.rows)).not.toContain("password");
@@ -184,6 +184,168 @@ describe.sequential("API routes", () => {
       .send({ username: "scheduler", password: "scheduler-password" })
       .expect(200);
     expect(loginResponse.body.user.role).toBe("scheduler");
+    expect(loginResponse.body.user.staffId).toBeNull();
+  });
+
+  it("lets admins bind accounts to enabled staff records and returns the binding in auth responses", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(200);
+
+    const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+    expect(usersResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ username: "viewer", role: "viewer", staffId: "staff-nurse-001" })
+      ])
+    );
+
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .send({ username: "viewer", password: "viewer-password" })
+      .expect(200);
+    expect(loginResponse.body.user).toEqual(
+      expect.objectContaining({ username: "viewer", role: "viewer", staffId: "staff-nurse-001" })
+    );
+
+    const meResponse = await request(app)
+      .get("/api/auth/me")
+      .set({ Authorization: `Bearer ${loginResponse.body.token}` })
+      .expect(200);
+    expect(meResponse.body.user).toEqual(expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" }));
+
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .query({ action: "user.save", keyword: "李护士", limit: "20" })
+      .set(headers)
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "user.save",
+          summary: "保存账号：viewer，绑定人员：李护士(100001)"
+        })
+      ])
+    );
+  });
+
+  it("rejects account bindings to missing, disabled, or already-bound staff records", async () => {
+    const data = createSeedData();
+    data.staff = data.staff.map((staff) => (staff.id === "staff-clerk-001" ? { ...staff, enabled: false } : staff));
+    const app = createTestApp(data);
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "missing-staff"
+      })
+      .expect(400, { message: "绑定人员不存在" });
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-clerk-001"
+      })
+      .expect(400, { message: "只能绑定启用人员" });
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(200);
+
+    await request(app)
+      .put("/api/users/user-second-viewer")
+      .set(headers)
+      .send({
+        username: "viewer2",
+        displayName: "只读用户2",
+        role: "viewer",
+        enabled: true,
+        password: "viewer2-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(400, { message: "该人员已绑定其他账号" });
+  });
+
+  it("allows an account to keep its original staff binding after that staff record is disabled", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(200);
+
+    await request(app)
+      .put("/api/data/staff/staff-nurse-001")
+      .set(headers)
+      .send(createStaffPayload({ jobId: "100001", name: "李护士", enabled: false }))
+      .expect(200);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        staffId: "staff-nurse-001"
+      })
+      .expect(200);
+
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .query({ action: "user.save", keyword: "已停用", limit: "20" })
+      .set(headers)
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          summary: "保存账号：viewer，绑定人员：李护士(100001，已停用)"
+        })
+      ])
+    );
   });
 
   it("lets a logged-in user change their own password and requires re-login", async () => {
@@ -266,7 +428,7 @@ describe.sequential("API routes", () => {
         action: "user.save",
         targetType: "user",
         targetId: "user-audit",
-        summary: "保存账号：audit-user"
+        summary: "保存账号：audit-user，未绑定人员"
       })
     ]);
   });

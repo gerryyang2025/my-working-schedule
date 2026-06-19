@@ -173,6 +173,7 @@ function toManagedAuthUser(user: AuthUser) {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
+    staffId: user.staffId,
     enabled: user.enabled,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -214,7 +215,7 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     return null;
   }
 
-  const { username, displayName, role, enabled, password } = body;
+  const { username, displayName, role, enabled, password, staffId } = body;
   if (!isNonEmptyString(username) || !isNonEmptyString(displayName) || !isUserRole(role) || !isBoolean(enabled)) {
     return null;
   }
@@ -231,14 +232,63 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     return null;
   }
 
+  let parsedStaffId: string | null;
+  if (staffId === undefined || staffId === null || staffId === "") {
+    parsedStaffId = null;
+  } else if (isString(staffId) && staffId.trim().length > 0) {
+    parsedStaffId = staffId.trim();
+  } else {
+    return null;
+  }
+
   return {
     id,
     username: username.trim(),
     displayName: displayName.trim(),
     role,
     enabled,
-    password: parsedPassword
+    password: parsedPassword,
+    staffId: parsedStaffId
   };
+}
+
+function formatStaffBindingLabel(staff: StaffMember): string {
+  const disabledSuffix = staff.enabled ? "" : "，已停用";
+  return `${staff.name}(${staff.jobId}${disabledSuffix})`;
+}
+
+function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null): string {
+  if (!user.staffId) {
+    return `保存账号：${user.username}，未绑定人员`;
+  }
+
+  return staff
+    ? `保存账号：${user.username}，绑定人员：${formatStaffBindingLabel(staff)}`
+    : `保存账号：${user.username}，绑定人员：${user.staffId}`;
+}
+
+async function validateUserStaffBinding(
+  storage: StorageAdapter,
+  authStore: AuthStore,
+  payload: SaveAuthUserInput
+): Promise<StaffMember | null> {
+  if (!payload.staffId) {
+    return null;
+  }
+
+  const [data, users] = await Promise.all([storage.load(), authStore.listUsers()]);
+  const staff = data.staff.find((item) => item.id === payload.staffId);
+  if (!staff) {
+    throw new HttpResponseError(400, "绑定人员不存在");
+  }
+
+  const existingUser = users.find((user) => user.id === payload.id || user.username === payload.username);
+  const keepsOriginalBinding = existingUser?.staffId === payload.staffId;
+  if (!staff.enabled && !keepsOriginalBinding) {
+    throw new HttpResponseError(400, "只能绑定启用人员");
+  }
+
+  return staff;
 }
 
 function parsePasswordChangePayload(body: unknown): { currentPassword: string; newPassword: string } | null {
@@ -589,8 +639,9 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         return;
       }
 
+      const bindingStaff = await validateUserStaffBinding(storage, authStore, payload);
       const user = await authStore.saveUser(payload);
-      await recordAudit(request, "user.save", "user", user.id, `保存账号：${user.username}`);
+      await recordAudit(request, "user.save", "user", user.id, formatUserSaveSummary(user, bindingStaff));
       response.json({ user: toManagedAuthUser(user) });
     } catch (error) {
       handleRouteError(error, response, next);
