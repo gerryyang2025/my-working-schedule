@@ -7,9 +7,50 @@ function tableHasColumn(db: Database.Database, tableName: string, columnName: st
   return rows.some((row) => row.name === columnName);
 }
 
+function usersStaffIdReferencesStaff(db: Database.Database): boolean {
+  const rows = db.prepare("pragma foreign_key_list(users)").all() as Array<{ table: string; from: string; to: string }>;
+  return rows.some((row) => row.table === "staff" && row.from === "staff_id" && row.to === "id");
+}
+
+function rebuildUsersTableWithStaffForeignKey(db: Database.Database): void {
+  const foreignKeysWereEnabled = db.pragma("foreign_keys", { simple: true }) === 1;
+  db.pragma("foreign_keys = OFF");
+
+  try {
+    db.transaction(() => {
+      db.exec(`
+        create table users_with_staff_fk (
+          id text primary key,
+          username text not null unique,
+          display_name text not null,
+          role text not null check (role in ('admin', 'scheduler', 'viewer')),
+          staff_id text references staff(id),
+          password_hash text not null,
+          enabled integer not null check (enabled in (0, 1)),
+          created_at text not null,
+          updated_at text not null
+        );
+
+        insert into users_with_staff_fk (
+          id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
+        )
+        select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
+        from users;
+
+        drop table users;
+        alter table users_with_staff_fk rename to users;
+      `);
+    })();
+  } finally {
+    db.pragma(`foreign_keys = ${foreignKeysWereEnabled ? "ON" : "OFF"}`);
+  }
+}
+
 function ensureUsersStaffBindingSchema(db: Database.Database): void {
   if (!tableHasColumn(db, "users", "staff_id")) {
     db.prepare("alter table users add column staff_id text references staff(id)").run();
+  } else if (!usersStaffIdReferencesStaff(db)) {
+    rebuildUsersTableWithStaffForeignKey(db);
   }
 
   db.prepare(

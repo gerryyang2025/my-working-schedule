@@ -65,6 +65,19 @@ function mapUser(row: UserRow): AuthUser {
   };
 }
 
+function sanitizeUser(user: AuthUser & { passwordHash: string }): AuthUser {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    staffId: user.staffId,
+    enabled: user.enabled,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
+}
+
 function mapAuditLog(row: AuditLogRow): AuditLogEntry {
   return {
     id: row.id,
@@ -276,12 +289,13 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
             `
           ).run(username, displayName, input.role, staffId, passwordHash, input.enabled ? 1 : 0, timestamp, existingUser.id);
           return {
-            ...existingUser,
+            id: existingUser.id,
             username,
             displayName,
             role: input.role,
             staffId,
             enabled: input.enabled,
+            createdAt: existingUser.createdAt,
             updatedAt: timestamp
           };
         }
@@ -330,7 +344,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           return null;
         }
 
-        return user;
+        return sanitizeUser(user);
       } finally {
         db.close();
       }

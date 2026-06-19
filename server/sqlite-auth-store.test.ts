@@ -37,6 +37,79 @@ function createLegacyVersion2AuthSchema(db: Database.Database): void {
   `);
 }
 
+function createVersion3AuthSchemaWithStaffIdWithoutForeignKey(db: Database.Database): void {
+  db.exec(`
+    create table schema_migrations (
+      version integer primary key,
+      applied_at text not null
+    );
+
+    create table staff (
+      id text primary key,
+      job_id text not null unique,
+      name text not null,
+      type text not null check (type in ('nurse', 'clerk', 'head_nurse')),
+      is_admin integer not null check (is_admin in (0, 1)),
+      enabled integer not null check (enabled in (0, 1)),
+      sort_order integer not null
+    );
+
+    create table users (
+      id text primary key,
+      username text not null unique,
+      display_name text not null,
+      role text not null check (role in ('admin', 'scheduler', 'viewer')),
+      staff_id text,
+      password_hash text not null,
+      enabled integer not null check (enabled in (0, 1)),
+      created_at text not null,
+      updated_at text not null
+    );
+
+    create unique index idx_users_staff_id_unique
+    on users(staff_id)
+    where staff_id is not null;
+
+    create table user_sessions (
+      id text primary key,
+      user_id text not null references users(id),
+      token_hash text not null unique,
+      created_at text not null,
+      expires_at text not null,
+      revoked_at text
+    );
+
+    insert into schema_migrations (version, applied_at)
+    values (3, '2026-06-19T00:00:00.000Z');
+
+    insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
+    values ('staff-nurse-003', '100003', '赵护士', 'nurse', 0, 1, 1);
+
+    insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+    values (
+      'user-viewer',
+      'viewer',
+      '只读用户',
+      'viewer',
+      'staff-nurse-003',
+      'hash',
+      1,
+      '2026-06-19T00:00:00.000Z',
+      '2026-06-19T00:00:00.000Z'
+    );
+
+    insert into user_sessions (id, user_id, token_hash, created_at, expires_at, revoked_at)
+    values (
+      'session-viewer',
+      'user-viewer',
+      'session-hash',
+      '2026-06-19T00:00:00.000Z',
+      '2026-06-20T00:00:00.000Z',
+      null
+    );
+  `);
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
@@ -69,6 +142,54 @@ describe("SQLite auth store", () => {
 
       const migration = db.prepare("select version from schema_migrations where version = 3").get();
       expect(migration).toEqual(expect.objectContaining({ version: 3 }));
+    } finally {
+      db.close();
+    }
+  });
+
+  it("repairs existing staff binding columns that are missing the foreign key", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+
+    try {
+      createVersion3AuthSchemaWithStaffIdWithoutForeignKey(db);
+      initializeSqliteSchema(db);
+
+      const foreignKeys = db.prepare("pragma foreign_key_list(users)").all() as Array<{
+        table: string;
+        from: string;
+        to: string;
+      }>;
+      expect(foreignKeys).toEqual(
+        expect.arrayContaining([expect.objectContaining({ table: "staff", from: "staff_id", to: "id" })])
+      );
+
+      expect(db.prepare("select staff_id from users where id = ?").get("user-viewer")).toEqual({
+        staff_id: "staff-nurse-003"
+      });
+      expect(db.prepare("select user_id from user_sessions where id = ?").get("session-viewer")).toEqual({
+        user_id: "user-viewer"
+      });
+      expect(() =>
+        db
+          .prepare(
+            `
+              insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `
+          )
+          .run(
+            "user-invalid-staff",
+            "invalid-staff",
+            "无效人员",
+            "viewer",
+            "missing-staff",
+            "hash",
+            1,
+            "2026-06-19T00:00:00.000Z",
+            "2026-06-19T00:00:00.000Z"
+          )
+      ).toThrow("FOREIGN KEY constraint failed");
     } finally {
       db.close();
     }
@@ -212,9 +333,9 @@ describe("SQLite auth store", () => {
     });
 
     expect(viewer.staffId).toBe("staff-nurse-001");
-    await expect(store.authenticate("viewer", "viewer-password")).resolves.toEqual(
-      expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
-    );
+    const authenticatedViewer = await store.authenticate("viewer", "viewer-password");
+    expect(authenticatedViewer).toEqual(expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" }));
+    expect(authenticatedViewer).not.toHaveProperty("passwordHash");
     await expect(
       store.saveUser({
         id: "user-second-viewer",
@@ -226,6 +347,31 @@ describe("SQLite auth store", () => {
         staffId: "staff-nurse-001"
       })
     ).rejects.toThrow("该人员已绑定其他账号");
+  });
+
+  it("returns sanitized users when saving an existing SQLite user", async () => {
+    const sqlitePath = await createTempDbPath();
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password"
+    });
+
+    const updatedViewer = await store.saveUser({
+      id: viewer.id,
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true
+    });
+
+    expect(updatedViewer).toEqual(expect.objectContaining({ username: "viewer", role: "viewer" }));
+    expect(updatedViewer).not.toHaveProperty("passwordHash");
   });
 
   it("unbinds staff bindings and allows the staff member to be rebound", async () => {
