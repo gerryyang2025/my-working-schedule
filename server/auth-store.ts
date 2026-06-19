@@ -126,6 +126,19 @@ function sortUsers(users: AuthUser[]): AuthUser[] {
   return [...users].sort((left, right) => left.username.localeCompare(right.username));
 }
 
+function toAuthUser(user: StoredUser): AuthUser {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    staffId: user.staffId,
+    enabled: user.enabled,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
+}
+
 export function createMemoryAuthStore(): AuthStore {
   const users = new Map<string, StoredUser>();
   const sessions = new Map<string, StoredSession>();
@@ -187,6 +200,7 @@ export function createMemoryAuthStore(): AuthStore {
       if (existingUser) {
         existingUser.displayName = username.trim() === "admin" ? "系统管理员" : username.trim();
         existingUser.role = "admin";
+        existingUser.staffId = null;
         existingUser.enabled = true;
         existingUser.updatedAt = nowIso();
         existingUser.passwordHash = hashPassword(password);
@@ -198,7 +212,7 @@ export function createMemoryAuthStore(): AuthStore {
     },
 
     async listUsers() {
-      return sortUsers(Array.from(users.values()));
+      return sortUsers(Array.from(users.values()).map(toAuthUser));
     },
 
     async saveUser(input) {
@@ -230,7 +244,7 @@ export function createMemoryAuthStore(): AuthStore {
         if (input.password) {
           existingUser.passwordHash = hashPassword(input.password);
         }
-        return existingUser;
+        return toAuthUser(existingUser);
       }
 
       if (!input.password) {
@@ -249,7 +263,7 @@ export function createMemoryAuthStore(): AuthStore {
         passwordHash: hashPassword(input.password)
       };
       users.set(user.id, user);
-      return user;
+      return toAuthUser(user);
     },
 
     async authenticate(username, password) {
@@ -258,7 +272,7 @@ export function createMemoryAuthStore(): AuthStore {
         return null;
       }
 
-      return user;
+      return toAuthUser(user);
     },
 
     async changePassword({ userId, currentPassword, newPassword }) {
@@ -292,7 +306,7 @@ export function createMemoryAuthStore(): AuthStore {
         revokedAt: null
       });
 
-      return { token, user, expiresAt };
+      return { token, user: toAuthUser(user), expiresAt };
     },
 
     async getSession(token) {
@@ -302,7 +316,7 @@ export function createMemoryAuthStore(): AuthStore {
       }
 
       const user = getUserById(session.userId);
-      return user ? { token, user, expiresAt: session.expiresAt } : null;
+      return user ? { token, user: toAuthUser(user), expiresAt: session.expiresAt } : null;
     },
 
     async revokeSession(token) {

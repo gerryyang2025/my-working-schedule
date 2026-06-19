@@ -31,12 +31,16 @@ describe("memory auth store", () => {
         staffId: null
       })
     );
+    expect(authenticated).not.toHaveProperty("passwordHash");
     await expect(store.authenticate("admin", "wrong-password")).resolves.toBeNull();
 
     const session = await store.createSession(authenticated!.id);
     expect(session.token.length).toBeGreaterThan(20);
     expect(session.user.username).toBe("admin");
-    await expect(store.getSession(session.token)).resolves.toEqual(expect.objectContaining({ user: session.user }));
+    expect(session.user).not.toHaveProperty("passwordHash");
+    const storedSession = await store.getSession(session.token);
+    expect(storedSession).toEqual(expect.objectContaining({ user: session.user }));
+    expect(storedSession?.user).not.toHaveProperty("passwordHash");
 
     await store.revokeSession(session.token);
     await expect(store.getSession(session.token)).resolves.toBeNull();
@@ -84,9 +88,10 @@ describe("memory auth store", () => {
         enabled: true
       })
     );
-    await expect(store.authenticate("scheduler", "scheduler-password")).resolves.toEqual(
-      expect.objectContaining({ username: "scheduler", role: "scheduler" })
-    );
+    expect(scheduler).not.toHaveProperty("passwordHash");
+    const authenticatedScheduler = await store.authenticate("scheduler", "scheduler-password");
+    expect(authenticatedScheduler).toEqual(expect.objectContaining({ username: "scheduler", role: "scheduler" }));
+    expect(authenticatedScheduler).not.toHaveProperty("passwordHash");
 
     await expect(
       store.changePassword({ userId: scheduler.id, currentPassword: "wrong-password", newPassword: "new-password" })
@@ -99,9 +104,9 @@ describe("memory auth store", () => {
       })
     ).resolves.toBe(true);
     await expect(store.authenticate("scheduler", "scheduler-password")).resolves.toBeNull();
-    await expect(store.authenticate("scheduler", "new-password")).resolves.toEqual(
-      expect.objectContaining({ username: "scheduler" })
-    );
+    const schedulerWithNewPassword = await store.authenticate("scheduler", "new-password");
+    expect(schedulerWithNewPassword).toEqual(expect.objectContaining({ username: "scheduler" }));
+    expect(schedulerWithNewPassword).not.toHaveProperty("passwordHash");
 
     await expect(
       store.saveUser({
@@ -132,12 +137,16 @@ describe("memory auth store", () => {
       userAgent: "vitest"
     });
 
-    await expect(store.listUsers()).resolves.toEqual(
+    const users = await store.listUsers();
+    expect(users).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ username: "admin", role: "admin" }),
         expect.objectContaining({ username: "scheduler", role: "scheduler" })
       ])
     );
+    for (const user of users) {
+      expect(user).not.toHaveProperty("passwordHash");
+    }
     await expect(store.listAuditLogs({ action: "auth.password.change", keyword: "scheduler", limit: 10 })).resolves.toEqual([
       expect.objectContaining({
         action: "auth.password.change",
@@ -168,15 +177,20 @@ describe("memory auth store", () => {
         staffId: "staff-nurse-001"
       })
     );
-    await expect(store.authenticate("viewer", "viewer-password")).resolves.toEqual(
-      expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
-    );
-    await expect(store.listUsers()).resolves.toEqual(
+    expect(viewer).not.toHaveProperty("passwordHash");
+    const authenticatedViewer = await store.authenticate("viewer", "viewer-password");
+    expect(authenticatedViewer).toEqual(expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" }));
+    expect(authenticatedViewer).not.toHaveProperty("passwordHash");
+    const users = await store.listUsers();
+    expect(users).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ username: "admin", staffId: null }),
         expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
       ])
     );
+    for (const user of users) {
+      expect(user).not.toHaveProperty("passwordHash");
+    }
 
     await expect(
       store.saveUser({
@@ -190,15 +204,39 @@ describe("memory auth store", () => {
       })
     ).rejects.toThrow("该人员已绑定其他账号");
 
+    const unboundViewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      staffId: null
+    });
+    expect(unboundViewer).toEqual(expect.objectContaining({ username: "viewer", staffId: null }));
+    expect(unboundViewer).not.toHaveProperty("passwordHash");
+  });
+
+  it("resets an existing bootstrap admin to unbound", async () => {
+    const store = createMemoryAuthStore();
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+
     await expect(
       store.saveUser({
-        id: "user-viewer",
-        username: "viewer",
-        displayName: "只读用户",
-        role: "viewer",
+        id: admin!.id,
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin",
         enabled: true,
-        staffId: null
+        staffId: "staff-admin-001"
       })
-    ).resolves.toEqual(expect.objectContaining({ username: "viewer", staffId: null }));
+    ).resolves.toEqual(expect.objectContaining({ username: "admin", staffId: "staff-admin-001" }));
+
+    await store.ensureBootstrapAdmin({ username: "admin", password: "new-admin-password" });
+
+    await expect(store.authenticate("admin", "admin-password")).resolves.toBeNull();
+    await expect(store.authenticate("admin", "new-admin-password")).resolves.toEqual(
+      expect.objectContaining({ username: "admin", staffId: null })
+    );
   });
 });

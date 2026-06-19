@@ -57,6 +57,7 @@ function mapUser(row: UserRow): AuthUser {
     username: row.username,
     displayName: row.display_name,
     role: row.role,
+    staffId: null,
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -286,6 +287,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           username,
           displayName,
           role: input.role,
+          staffId: null,
           enabled: input.enabled,
           createdAt: timestamp,
           updatedAt: timestamp
