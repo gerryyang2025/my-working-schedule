@@ -4,23 +4,39 @@ import { computed, onMounted, ref, watch } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
+import LoginPage from "@/components/LoginPage.vue";
 import ManagementDrawer from "@/components/ManagementDrawer.vue";
+import PasswordChangeDialog from "@/components/PasswordChangeDialog.vue";
 import PrintViews from "@/components/PrintViews.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
 import {
+  changePassword,
   deleteHoliday,
   deleteMonthlySettlement,
-  enterAdminMode,
+  getCurrentUser,
+  listAuditLogs,
+  listUsers,
   loadData,
+  login,
+  logout,
   saveHoliday,
   saveMonthlySettlement,
   saveScheduleEntry,
   saveShift,
-  saveStaff
+  saveStaff,
+  saveUser
 } from "@/api/client";
-import type { PublicAppData } from "@/api/client";
+import type {
+  AuditLogEntry,
+  AuditLogQuery,
+  AuthUser,
+  ManagedAuthUser,
+  PasswordChangeInput,
+  PublicAppData,
+  SaveAuthUserInput
+} from "@/api/client";
 import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/domain";
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
@@ -33,10 +49,12 @@ type WorkbenchTab = "schedule" | "weekly" | "bonus";
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
 const error = ref("");
-const adminMode = ref(false);
-const adminLoginOpen = ref(false);
-const adminPassword = ref("");
-const adminSubmitting = ref(false);
+const currentUser = ref<AuthUser | null>(null);
+const users = ref<ManagedAuthUser[]>([]);
+const auditLogs = ref<AuditLogEntry[]>([]);
+const authChecking = ref(true);
+const loginSubmitting = ref(false);
+const loginError = ref("");
 const selectedDate = ref(today);
 const managementOpen = ref(false);
 const selectedShiftId = ref("");
@@ -49,6 +67,8 @@ const holidaySaveVersion = ref(0);
 const staffSaving = ref(false);
 const shiftSaving = ref(false);
 const holidaySaving = ref(false);
+const userSaving = ref(false);
+const auditLoading = ref(false);
 const settlementSaving = ref(false);
 const settlementCanceling = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
@@ -58,6 +78,9 @@ const pdfDownloadUrl = ref("");
 const pdfDownloadName = ref("");
 const printPdfStatus = ref("");
 const activeWorkbenchTab = ref<WorkbenchTab>("schedule");
+const passwordDialogOpen = ref(false);
+const passwordChanging = ref(false);
+const passwordChangeError = ref("");
 
 const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
@@ -116,7 +139,10 @@ const shiftCoefficientDescriptions = computed(() =>
     .map((shift) => `${shift.name} ${shift.countsAttendance ? shift.coefficient.toFixed(2) : "不计出勤"}`)
     .join("；")
 );
-const canSubmitAdminPassword = computed(() => adminPassword.value.trim().length > 0 && !adminSubmitting.value);
+const canEditSchedule = computed(
+  () => currentUser.value?.role === "admin" || currentUser.value?.role === "scheduler"
+);
+const canManageConfig = computed(() => currentUser.value?.role === "admin");
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
   set: (isOpen: boolean) => {
@@ -147,32 +173,90 @@ async function refreshData(): Promise<void> {
   data.value = await loadData();
 }
 
-async function handleEnterAdmin(): Promise<void> {
-  if (adminMode.value) {
-    return;
-  }
-
-  adminPassword.value = "";
-  adminLoginOpen.value = true;
+async function refreshUsers(): Promise<void> {
+  users.value = (await listUsers()).rows;
 }
 
-async function handleSubmitAdminPassword(): Promise<void> {
-  if (!canSubmitAdminPassword.value) {
+async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<void> {
+  auditLoading.value = true;
+  try {
+    auditLogs.value = (await listAuditLogs(query)).rows;
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "审计日志加载失败");
+  } finally {
+    auditLoading.value = false;
+  }
+}
+
+async function refreshManagementData(): Promise<void> {
+  if (!canManageConfig.value) {
     return;
   }
 
-  adminSubmitting.value = true;
+  auditLoading.value = true;
   try {
-    await enterAdminMode(adminPassword.value);
-    adminMode.value = true;
-    adminLoginOpen.value = false;
-    adminPassword.value = "";
-    ElMessage.success("编辑模式已开启");
+    const [usersResponse, auditResponse] = await Promise.all([listUsers(), listAuditLogs({ limit: 100 })]);
+    users.value = usersResponse.rows;
+    auditLogs.value = auditResponse.rows;
   } catch (caughtError) {
-    adminMode.value = false;
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "管理密码验证失败");
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
   } finally {
-    adminSubmitting.value = false;
+    auditLoading.value = false;
+  }
+}
+
+async function openManagementDrawer(): Promise<void> {
+  managementOpen.value = true;
+  await refreshManagementData();
+}
+
+async function handleLogin(payload: { username: string; password: string }): Promise<void> {
+  if (loginSubmitting.value) {
+    return;
+  }
+
+  loginSubmitting.value = true;
+  loginError.value = "";
+  try {
+    currentUser.value = await login(payload.username, payload.password);
+    await refreshData();
+    ElMessage.success("登录成功");
+  } catch (caughtError) {
+    loginError.value = caughtError instanceof Error ? caughtError.message : "登录失败";
+  } finally {
+    loginSubmitting.value = false;
+  }
+}
+
+async function handleLogout(): Promise<void> {
+  await logout();
+  currentUser.value = null;
+  data.value = null;
+  users.value = [];
+  auditLogs.value = [];
+  ElMessage.success("已退出登录");
+}
+
+async function handleChangePassword(payload: PasswordChangeInput): Promise<void> {
+  if (passwordChanging.value) {
+    return;
+  }
+
+  passwordChanging.value = true;
+  passwordChangeError.value = "";
+  try {
+    await changePassword(payload);
+    passwordDialogOpen.value = false;
+    await logout();
+    currentUser.value = null;
+    data.value = null;
+    users.value = [];
+    auditLogs.value = [];
+    ElMessage.success("密码已修改，请重新登录");
+  } catch (caughtError) {
+    passwordChangeError.value = caughtError instanceof Error ? caughtError.message : "密码修改失败";
+  } finally {
+    passwordChanging.value = false;
   }
 }
 
@@ -328,7 +412,7 @@ async function saveEntry(staffId: string, date: string, shiftIds: string[], note
 }
 
 async function handleQuickFill(staffId: string, date: string): Promise<void> {
-  if (!selectedShiftId.value) {
+  if (!canEditSchedule.value || !selectedShiftId.value) {
     return;
   }
 
@@ -411,13 +495,31 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
   }
 }
 
+async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
+  if (userSaving.value) {
+    return;
+  }
+
+  userSaving.value = true;
+  try {
+    await saveUser(user);
+    await refreshUsers();
+    await refreshAuditLogs({ limit: 100 });
+    ElMessage.success("账号已保存");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号保存失败");
+  } finally {
+    userSaving.value = false;
+  }
+}
+
 async function handleConfirmSettlement(payload: { month: string; bonusPool: number }): Promise<void> {
   if (settlementSaving.value || settlementCanceling.value) {
     return;
   }
 
-  if (!adminMode.value) {
-    ElMessage.warning("请先进入编辑模式");
+  if (!canEditSchedule.value) {
+    ElMessage.warning("当前账号没有月结权限");
     return;
   }
 
@@ -452,8 +554,8 @@ async function handleCancelSettlement(month: string): Promise<void> {
     return;
   }
 
-  if (!adminMode.value) {
-    ElMessage.warning("请先进入编辑模式");
+  if (!canEditSchedule.value) {
+    ElMessage.warning("当前账号没有月结权限");
     return;
   }
 
@@ -470,15 +572,22 @@ async function handleCancelSettlement(month: string): Promise<void> {
 
 onMounted(async () => {
   try {
-    await refreshData();
+    currentUser.value = await getCurrentUser();
+    if (currentUser.value) {
+      await refreshData();
+    }
   } catch (caughtError) {
     error.value = caughtError instanceof Error ? caughtError.message : "系统加载失败";
+  } finally {
+    authChecking.value = false;
   }
 });
 </script>
 
 <template>
-  <main class="app-shell">
+  <section v-if="authChecking" class="state-message">正在检查登录状态...</section>
+  <LoginPage v-else-if="!currentUser" :loading="loginSubmitting" :error="loginError" @login="handleLogin" />
+  <main v-else class="app-shell">
     <header class="app-header">
       <div>
         <p class="eyebrow">国际医学部</p>
@@ -504,48 +613,27 @@ onMounted(async () => {
 
     <AppToolbar
       v-model:selected-date="selectedDate"
-      :admin-mode="adminMode"
-      @enter-admin="handleEnterAdmin"
-      @open-management="managementOpen = true"
+      :admin-mode="canEditSchedule"
+      :can-manage-config="canManageConfig"
+      :current-user="currentUser"
+      @open-management="openManagementDrawer"
+      @open-password-change="passwordDialogOpen = true"
       @print-month="printWithMode('month')"
       @print-week="printWithMode('week')"
       @fullscreen="handleFullscreen"
+      @logout="handleLogout"
     />
 
-    <section v-if="adminMode" class="admin-mode-banner" role="status">
-      编辑模式已开启，可以维护排班、人员、班次和节假日。
-    </section>
+    <PasswordChangeDialog
+      v-model="passwordDialogOpen"
+      :loading="passwordChanging"
+      :error="passwordChangeError"
+      @change-password="handleChangePassword"
+    />
 
-    <el-dialog
-      v-model="adminLoginOpen"
-      class="admin-login-dialog"
-      title="进入编辑模式"
-      width="420px"
-      :close-on-click-modal="!adminSubmitting"
-      :close-on-press-escape="!adminSubmitting"
-    >
-      <p class="admin-login-tip">请输入服务端配置的管理密码，验证通过后即可编辑排班和系统配置。</p>
-      <el-input
-        v-model="adminPassword"
-        type="password"
-        placeholder="管理密码"
-        show-password
-        :disabled="adminSubmitting"
-        @keyup.enter="handleSubmitAdminPassword"
-      />
-      <template #footer>
-        <el-button :disabled="adminSubmitting" @click="adminLoginOpen = false">取消</el-button>
-        <el-button
-          type="primary"
-          data-testid="admin-submit-button"
-          :disabled="!canSubmitAdminPassword"
-          :loading="adminSubmitting"
-          @click="handleSubmitAdminPassword"
-        >
-          进入编辑模式
-        </el-button>
-      </template>
-    </el-dialog>
+    <section v-if="canEditSchedule" class="admin-mode-banner" role="status">
+      当前账号可维护排班{{ canManageConfig ? "、人员、班次和节假日" : "" }}。
+    </section>
 
     <el-dialog
       v-model="printPreviewOpen"
@@ -605,17 +693,23 @@ onMounted(async () => {
           v-if="data"
           v-model="managementOpen"
           :data="data"
-          :admin-mode="adminMode"
+          :users="users"
+          :audit-logs="auditLogs"
+          :admin-mode="canManageConfig"
           :staff-save-version="staffSaveVersion"
           :shift-save-version="shiftSaveVersion"
           :holiday-save-version="holidaySaveVersion"
           :staff-saving="staffSaving"
           :shift-saving="shiftSaving"
           :holiday-saving="holidaySaving"
+          :user-saving="userSaving"
+          :audit-loading="auditLoading"
           @save-staff="handleSaveStaff"
           @save-shift="handleSaveShift"
           @save-holiday="handleSaveHoliday"
           @delete-holiday="handleDeleteHoliday"
+          @save-user="handleSaveUser"
+          @refresh-audit-logs="refreshAuditLogs"
         />
 
         <nav class="workbench-tabs" aria-label="工作台分区">
@@ -645,7 +739,7 @@ onMounted(async () => {
               :shifts="data.shifts"
               :entries="data.scheduleEntries"
               :selected-shift-id="selectedShiftId"
-              :admin-mode="adminMode"
+              :admin-mode="canEditSchedule"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
             />
@@ -658,7 +752,7 @@ onMounted(async () => {
               v-if="displayedBonusSummary"
               v-model:start-month="bonusStartMonth"
               v-model:end-month="bonusEndMonth"
-              :admin-mode="adminMode"
+              :admin-mode="canEditSchedule"
               :month="bonusStartMonth"
               :monthly-summary="displayedBonusSummary"
               :settlement="isBonusRangeMode ? null : currentBonusMonthlySettlement"

@@ -55,7 +55,14 @@ function mountToolbar(selectedDate = "2026-06-17") {
   return mount(AppToolbar, {
     props: {
       selectedDate,
-      adminMode: false
+      adminMode: true,
+      canManageConfig: true,
+      currentUser: {
+        id: "user-admin",
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin"
+      }
     },
     global: {
       stubs: {
@@ -111,5 +118,13 @@ describe("AppToolbar", () => {
     await buttons[2].trigger("click");
 
     expect(wrapper.emitted("update:selectedDate")).toEqual([["2026-06-08"], ["2026-06-22"]]);
+  });
+
+  it("emits a password-change action from the user toolbar", async () => {
+    const wrapper = mountToolbar("2026-06-17");
+
+    await wrapper.get('[data-testid="open-password-change"]').trigger("click");
+
+    expect(wrapper.emitted("openPasswordChange")).toEqual([[]]);
   });
 });

@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, reactive, watch } from "vue";
-import type { PublicAppData } from "@/api/client";
+import type { AuditLogEntry, AuditLogQuery, ManagedAuthUser, PublicAppData, SaveAuthUserInput, UserRole } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
 const props = defineProps<{
   modelValue: boolean;
   data: Pick<PublicAppData, "staff" | "shifts" | "holidays">;
+  users: ManagedAuthUser[];
+  auditLogs: AuditLogEntry[];
   adminMode: boolean;
   staffSaveVersion: number;
   shiftSaveVersion: number;
@@ -13,6 +15,8 @@ const props = defineProps<{
   staffSaving: boolean;
   shiftSaving: boolean;
   holidaySaving: boolean;
+  userSaving: boolean;
+  auditLoading: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +25,8 @@ const emit = defineEmits<{
   saveShift: [shift: Shift];
   saveHoliday: [holiday: Holiday];
   deleteHoliday: [holidayId: string];
+  saveUser: [user: SaveAuthUserInput];
+  refreshAuditLogs: [query: AuditLogQuery];
 }>();
 
 const staffDraft = reactive<StaffMember>({
@@ -51,7 +57,34 @@ const holidayDraft = reactive<Holiday>({
   affectsRequiredAttendance: true
 });
 
+const userDraft = reactive<SaveAuthUserInput>({
+  id: "",
+  username: "",
+  displayName: "",
+  role: "viewer",
+  enabled: true,
+  password: ""
+});
+
+const auditFilters = reactive<Required<AuditLogQuery>>({
+  username: "",
+  action: "",
+  keyword: "",
+  limit: 100
+});
+
 const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
+const isExistingUserDraft = computed(() => props.users.some((user) => user.id === userDraft.id));
+
+function roleLabel(role: UserRole): string {
+  if (role === "admin") {
+    return "系统管理员";
+  }
+  if (role === "scheduler") {
+    return "排班管理员";
+  }
+  return "只读查看";
+}
 
 function staffTypeLabel(type: StaffMember["type"]): string {
   if (type === "head_nurse") {
@@ -99,10 +132,22 @@ function resetHolidayDraft(): void {
   });
 }
 
+function resetUserDraft(): void {
+  Object.assign(userDraft, {
+    id: `user-${Date.now()}`,
+    username: "",
+    displayName: "",
+    role: "viewer",
+    enabled: true,
+    password: ""
+  });
+}
+
 function resetDrafts(): void {
   resetStaffDraft();
   resetShiftDraft();
   resetHolidayDraft();
+  resetUserDraft();
 }
 
 function loadStaffDraft(staff: StaffMember): void {
@@ -127,6 +172,41 @@ function loadHolidayDraft(holiday: Holiday): void {
   }
 
   Object.assign(holidayDraft, holiday);
+}
+
+function loadUserDraft(user: ManagedAuthUser): void {
+  if (props.userSaving) {
+    return;
+  }
+
+  Object.assign(userDraft, {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    enabled: user.enabled,
+    password: ""
+  });
+}
+
+function emitSaveUser(): void {
+  const payload: SaveAuthUserInput = {
+    id: userDraft.id,
+    username: userDraft.username,
+    displayName: userDraft.displayName,
+    role: userDraft.role,
+    enabled: userDraft.enabled
+  };
+
+  if (userDraft.password) {
+    payload.password = userDraft.password;
+  }
+
+  emit("saveUser", payload);
+}
+
+function emitRefreshAuditLogs(): void {
+  emit("refreshAuditLogs", { ...auditFilters });
 }
 
 watch(
@@ -335,6 +415,105 @@ watch(
               </template>
             </el-popconfirm>
           </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="账号">
+        <el-table :data="users" size="small" @row-click="loadUserDraft">
+          <el-table-column prop="username" label="账号" width="110" />
+          <el-table-column prop="displayName" label="显示名" />
+          <el-table-column prop="role" label="角色" width="110" />
+          <el-table-column prop="enabled" label="启用" width="80" />
+        </el-table>
+
+        <div class="management-mobile-list">
+          <button
+            v-for="user in users"
+            :key="user.id"
+            class="management-mobile-item management-mobile-user"
+            type="button"
+            :disabled="userSaving"
+            @click="loadUserDraft(user)"
+          >
+            <span class="management-mobile-main">
+              <strong>{{ user.displayName }}</strong>
+              <span>{{ user.username }}</span>
+            </span>
+            <span class="management-mobile-meta">
+              <span>{{ roleLabel(user.role) }}</span>
+              <span>{{ user.enabled ? "启用" : "停用" }}</span>
+            </span>
+          </button>
+        </div>
+
+        <div class="management-form">
+          <el-input v-model="userDraft.username" placeholder="账号" :disabled="userSaving || isExistingUserDraft" />
+          <el-input v-model="userDraft.displayName" placeholder="显示名" :disabled="userSaving" />
+          <el-select v-model="userDraft.role" placeholder="角色" :disabled="userSaving">
+            <el-option label="系统管理员" value="admin" />
+            <el-option label="排班管理员" value="scheduler" />
+            <el-option label="只读查看" value="viewer" />
+          </el-select>
+          <el-checkbox v-model="userDraft.enabled" :disabled="userSaving">启用</el-checkbox>
+          <el-input
+            v-model="userDraft.password"
+            type="password"
+            placeholder="新账号初始密码 / 留空则不重置"
+            show-password
+            :disabled="userSaving"
+          />
+          <div class="management-actions">
+            <el-button :disabled="userSaving" @click="resetUserDraft">新增账号</el-button>
+            <el-button
+              type="primary"
+              data-testid="save-user-button"
+              :disabled="userSaving || !adminMode || !userDraft.username || !userDraft.displayName || (!isExistingUserDraft && !userDraft.password)"
+              :loading="userSaving"
+              @click="emitSaveUser"
+            >
+              保存账号
+            </el-button>
+          </div>
+        </div>
+      </el-tab-pane>
+
+      <el-tab-pane label="审计">
+        <div class="management-form audit-filter-form">
+          <el-input v-model="auditFilters.username" placeholder="账号筛选" :disabled="auditLoading" />
+          <el-input v-model="auditFilters.action" placeholder="操作类型" :disabled="auditLoading" />
+          <el-input v-model="auditFilters.keyword" placeholder="关键词" :disabled="auditLoading" />
+          <el-input-number v-model="auditFilters.limit" :min="1" :max="200" :step="10" :disabled="auditLoading" />
+          <div class="management-actions">
+            <el-button
+              type="primary"
+              data-testid="refresh-audit-logs"
+              :loading="auditLoading"
+              @click="emitRefreshAuditLogs"
+            >
+              查询审计
+            </el-button>
+          </div>
+        </div>
+
+        <el-table :data="auditLogs" size="small">
+          <el-table-column prop="occurredAt" label="时间" width="170" />
+          <el-table-column prop="username" label="账号" width="100" />
+          <el-table-column prop="action" label="操作" width="150" />
+          <el-table-column prop="summary" label="摘要" />
+        </el-table>
+
+        <div class="management-mobile-list">
+          <article v-for="entry in auditLogs" :key="entry.id" class="management-mobile-item management-mobile-audit">
+            <span class="management-mobile-main">
+              <strong>{{ entry.summary }}</strong>
+              <span>{{ entry.occurredAt }}</span>
+            </span>
+            <span class="management-mobile-meta">
+              <span>{{ entry.username }}</span>
+              <span>{{ entry.action }}</span>
+              <span>{{ entry.ip }}</span>
+            </span>
+          </article>
         </div>
       </el-tab-pane>
     </el-tabs>

@@ -1,9 +1,60 @@
 import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
 
 export type PublicAppData = AppData;
+export type UserRole = "admin" | "scheduler" | "viewer";
+
+export interface AuthUser {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+}
+
+export interface ManagedAuthUser extends AuthUser {
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SaveAuthUserInput {
+  id: string;
+  username: string;
+  displayName: string;
+  role: UserRole;
+  enabled: boolean;
+  password?: string;
+}
+
+export interface PasswordChangeInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface AuditLogEntry {
+  id: string;
+  occurredAt: string;
+  userId: string | null;
+  username: string;
+  action: string;
+  targetType: string;
+  targetId: string;
+  summary: string;
+  ip: string;
+  userAgent: string;
+}
+
+export interface AuditLogQuery {
+  username?: string;
+  action?: string;
+  keyword?: string;
+  limit?: number;
+}
+
+const AUTH_TOKEN_STORAGE_KEY = "schedule-auth-token";
 
 let adminMode = false;
-let adminToken: string | null = null;
+let adminToken: string | null = readStoredAuthToken();
+let currentUser: AuthUser | null = null;
 
 interface ApiErrorResponse {
   message?: string;
@@ -13,7 +64,7 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   const headers = new Headers(options.headers);
   headers.set("Content-Type", "application/json");
 
-  if (adminMode && adminToken) {
+  if (adminToken) {
     headers.set("Authorization", `Bearer ${adminToken}`);
   }
 
@@ -37,10 +88,46 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
   return (await response.json()) as T;
 }
 
+function readStoredAuthToken(): string | null {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredAuthToken(token: string | null): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    if (token) {
+      window.localStorage.setItem(AUTH_TOKEN_STORAGE_KEY, token);
+      return;
+    }
+
+    window.localStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
+  } catch {
+    // Browsers can block storage in private contexts; in-memory auth still works.
+  }
+}
+
+function setAuthSession(token: string | null, user: AuthUser | null): void {
+  adminToken = token;
+  currentUser = user;
+  adminMode = Boolean(token && user && (user.role === "admin" || user.role === "scheduler"));
+  writeStoredAuthToken(token);
+}
+
 export function setAdminMode(enabled: boolean): void {
   adminMode = enabled;
   if (!enabled) {
-    adminToken = null;
+    setAuthSession(null, null);
   }
 }
 
@@ -59,12 +146,89 @@ function authHeaders(): HeadersInit {
 }
 
 export async function enterAdminMode(password: string): Promise<void> {
-  const session = await requestJson<{ ok: true; token: string }>("/api/admin/session", {
+  const session = await requestJson<{ ok: true; token: string; user: AuthUser }>("/api/admin/session", {
     method: "POST",
     body: JSON.stringify({ password })
   });
-  adminToken = session.token;
-  setAdminMode(true);
+  setAuthSession(session.token, session.user);
+}
+
+export async function login(username: string, password: string): Promise<AuthUser> {
+  const session = await requestJson<{ ok: true; token: string; user: AuthUser }>("/api/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password })
+  });
+  setAuthSession(session.token, session.user);
+  return session.user;
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  if (!adminToken) {
+    return null;
+  }
+
+  try {
+    const session = await requestJson<{ user: AuthUser }>("/api/auth/me");
+    currentUser = session.user;
+    adminMode = currentUser.role === "admin" || currentUser.role === "scheduler";
+    return currentUser;
+  } catch {
+    setAuthSession(null, null);
+    return null;
+  }
+}
+
+export async function logout(): Promise<void> {
+  try {
+    if (adminToken) {
+      await requestJson<{ ok: true }>("/api/auth/logout", { method: "POST" });
+    }
+  } catch {
+    // The session may already be revoked, for example after a password change.
+  } finally {
+    setAuthSession(null, null);
+  }
+}
+
+export function getCachedCurrentUser(): AuthUser | null {
+  return currentUser;
+}
+
+export function listUsers(): Promise<{ rows: ManagedAuthUser[] }> {
+  return requestJson<{ rows: ManagedAuthUser[] }>("/api/users");
+}
+
+export function saveUser(user: SaveAuthUserInput): Promise<{ user: ManagedAuthUser }> {
+  return requestJson<{ user: ManagedAuthUser }>(`/api/users/${encodeURIComponent(user.id)}`, {
+    method: "PUT",
+    body: JSON.stringify(user)
+  });
+}
+
+export function changePassword(payload: PasswordChangeInput): Promise<{ ok: true }> {
+  return requestJson<{ ok: true }>("/api/auth/password", {
+    method: "PUT",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function listAuditLogs(query: AuditLogQuery = {}): Promise<{ rows: AuditLogEntry[] }> {
+  const params = new URLSearchParams();
+  if (query.username) {
+    params.set("username", query.username);
+  }
+  if (query.action) {
+    params.set("action", query.action);
+  }
+  if (query.keyword) {
+    params.set("keyword", query.keyword);
+  }
+  if (query.limit) {
+    params.set("limit", String(query.limit));
+  }
+
+  const suffix = params.toString() ? `?${params.toString()}` : "";
+  return requestJson<{ rows: AuditLogEntry[] }>(`/api/audit-logs${suffix}`);
 }
 
 export function saveStaff(staff: StaffMember): Promise<PublicAppData> {

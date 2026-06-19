@@ -1,16 +1,21 @@
-import { randomBytes } from "node:crypto";
-import { Router, type NextFunction, type Response } from "express";
+import { Router, type NextFunction, type Request, type Response } from "express";
 import { createMonthlySettlement } from "../src/lib/bonus";
 import { calculateMonthlySummary } from "../src/lib/calculation";
 import { getMonthDays } from "../src/lib/date";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
+import { AuthStoreError, type AuditLogQuery, type AuthStore, type SaveAuthUserInput } from "./auth-store";
+import { createMemoryAuthStore } from "./auth-store";
+import type { AuthUser, PublicAuthUser, UserRole } from "./auth";
+import { toPublicAuthUser } from "./auth";
 
 type PublicAppData = AppData;
 
 interface RouteOptions {
   adminPassword: string;
+  authStore?: AuthStore;
+  bootstrapAdminUsername?: string;
 }
 
 interface ScheduleEntryPayload {
@@ -21,8 +26,10 @@ interface ScheduleEntryPayload {
 }
 
 type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
+type AuthenticatedRequest = Request & { authUser?: AuthUser; authToken?: string };
 
 const staffTypes = new Set(["nurse", "clerk", "head_nurse"]);
+const userRoles = new Set<UserRole>(["admin", "scheduler", "viewer"]);
 const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 class HttpResponseError extends Error {
@@ -36,6 +43,10 @@ class HttpResponseError extends Error {
 
 function handleRouteError(error: unknown, response: Response, next: NextFunction): void {
   if (error instanceof HttpResponseError) {
+    response.status(error.status).json({ message: error.message });
+    return;
+  }
+  if (error instanceof AuthStoreError) {
     response.status(error.status).json({ message: error.message });
     return;
   }
@@ -115,10 +126,6 @@ function isHexColor(value: unknown): value is string {
   return isString(value) && /^#[0-9a-fA-F]{6}$/.test(value);
 }
 
-function createAdminToken(): string {
-  return randomBytes(32).toString("base64url");
-}
-
 function parseBearerToken(header: string | undefined): string | null {
   if (!header?.startsWith("Bearer ")) {
     return null;
@@ -126,6 +133,125 @@ function parseBearerToken(header: string | undefined): string | null {
 
   const token = header.slice("Bearer ".length).trim();
   return token.length > 0 ? token : null;
+}
+
+function parseLoginPayload(body: unknown): { username: string; password: string } | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { username, password } = body;
+  if (!isNonEmptyString(username) || !isNonEmptyString(password)) {
+    return null;
+  }
+
+  return {
+    username: username.trim(),
+    password
+  };
+}
+
+function getRequestIp(request: Request): string {
+  return request.ip || request.socket.remoteAddress || "";
+}
+
+function getRequestUserAgent(request: Request): string {
+  return request.header("user-agent") ?? "";
+}
+
+function canRoleAccess(userRole: UserRole, allowedRoles: UserRole[]): boolean {
+  return allowedRoles.includes(userRole);
+}
+
+function isUserRole(value: unknown): value is UserRole {
+  return isString(value) && userRoles.has(value as UserRole);
+}
+
+function toManagedAuthUser(user: AuthUser) {
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.displayName,
+    role: user.role,
+    enabled: user.enabled,
+    createdAt: user.createdAt,
+    updatedAt: user.updatedAt
+  };
+}
+
+function getRouteParam(request: Request, name: string): string {
+  const value = request.params[name];
+  if (Array.isArray(value)) {
+    return value[0] ?? "";
+  }
+
+  return value ?? "";
+}
+
+function getQueryParam(request: Request, name: string): string {
+  const value = request.query[name];
+  if (Array.isArray(value)) {
+    const firstValue = value[0];
+    return typeof firstValue === "string" ? firstValue : "";
+  }
+
+  return typeof value === "string" ? value : "";
+}
+
+function parseAuditQuery(request: Request): AuditLogQuery {
+  const limitText = getQueryParam(request, "limit");
+  const parsedLimit = limitText ? Number(limitText) : 100;
+  return {
+    username: getQueryParam(request, "username"),
+    action: getQueryParam(request, "action"),
+    keyword: getQueryParam(request, "keyword"),
+    limit: Number.isFinite(parsedLimit) ? parsedLimit : 100
+  };
+}
+
+function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { username, displayName, role, enabled, password } = body;
+  if (!isNonEmptyString(username) || !isNonEmptyString(displayName) || !isUserRole(role) || !isBoolean(enabled)) {
+    return null;
+  }
+
+  let parsedPassword: string | null | undefined;
+  if (password === undefined || password === null || password === "") {
+    parsedPassword = undefined;
+  } else if (isString(password)) {
+    if (password.trim().length < 6) {
+      return null;
+    }
+    parsedPassword = password;
+  } else {
+    return null;
+  }
+
+  return {
+    id,
+    username: username.trim(),
+    displayName: displayName.trim(),
+    role,
+    enabled,
+    password: parsedPassword
+  };
+}
+
+function parsePasswordChangePayload(body: unknown): { currentPassword: string; newPassword: string } | null {
+  if (!isRecord(body)) {
+    return null;
+  }
+
+  const { currentPassword, newPassword } = body;
+  if (!isNonEmptyString(currentPassword) || !isNonEmptyString(newPassword) || newPassword.trim().length < 6) {
+    return null;
+  }
+
+  return { currentPassword, newPassword };
 }
 
 function parseStaffPayload(body: unknown, id: string): StaffMember | null {
@@ -240,7 +366,70 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
   }
 
   const router = Router();
-  const adminTokens = new Set<string>();
+  const authStore = options.authStore ?? createMemoryAuthStore();
+  const bootstrapAdminUsername = options.bootstrapAdminUsername ?? "admin";
+
+  async function ensureBootstrapAdmin() {
+    await authStore.ensureBootstrapAdmin({ username: bootstrapAdminUsername, password: adminPassword });
+  }
+
+  async function recordAudit(
+    request: Request,
+    action: string,
+    targetType: string,
+    targetId: string,
+    summary: string,
+    actor: AuthUser | null = (request as AuthenticatedRequest).authUser ?? null
+  ) {
+    await authStore.recordAudit({
+      action,
+      actor,
+      targetType,
+      targetId,
+      summary,
+      ip: getRequestIp(request),
+      userAgent: getRequestUserAgent(request)
+    });
+  }
+
+  async function authenticateRequest(request: AuthenticatedRequest): Promise<boolean> {
+    const token = parseBearerToken(request.header("Authorization"));
+    if (!token) {
+      return false;
+    }
+
+    const session = await authStore.getSession(token);
+    if (!session) {
+      return false;
+    }
+
+    request.authUser = session.user;
+    request.authToken = token;
+    return true;
+  }
+
+  function requireRoles(allowedRoles: UserRole[]) {
+    return async (request: AuthenticatedRequest, response: Response, next: NextFunction) => {
+      try {
+        if (!(await authenticateRequest(request))) {
+          response.status(401).json({ message: "请先登录" });
+          return;
+        }
+
+        if (!request.authUser || !canRoleAccess(request.authUser.role, allowedRoles)) {
+          response.status(403).json({ message: "当前账号没有操作权限" });
+          return;
+        }
+
+        next();
+      } catch (error) {
+        handleRouteError(error, response, next);
+      }
+    };
+  }
+
+  const requireAdmin = requireRoles(["admin"]);
+  const requireScheduler = requireRoles(["admin", "scheduler"]);
 
   router.get("/health", (_request, response) => {
     response.json({ ok: true });
@@ -255,34 +444,171 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
     }
   });
 
-  router.post("/admin/session", async (request, response, next) => {
+  async function respondWithSession(
+    request: Request,
+    response: Response,
+    user: AuthUser
+  ): Promise<Response<{ ok: true; token: string; user: PublicAuthUser; expiresAt: string }>> {
+    const session = await authStore.createSession(user.id);
+    await recordAudit(request, "auth.login.success", "user", user.id, `用户 ${user.username} 登录成功`, user);
+    return response.json({
+      ok: true,
+      token: session.token,
+      user: toPublicAuthUser(user),
+      expiresAt: session.expiresAt
+    });
+  }
+
+  router.post("/auth/login", async (request, response, next) => {
     try {
-      if (request.body?.password === adminPassword) {
-        const token = createAdminToken();
-        adminTokens.add(token);
-        response.json({ ok: true, token });
+      await ensureBootstrapAdmin();
+      const payload = parseLoginPayload(request.body);
+      if (!payload) {
+        response.status(401).json({ ok: false, message: "用户名或密码不正确" });
         return;
       }
 
+      const user = await authStore.authenticate(payload.username, payload.password);
+      if (!user) {
+        await recordAudit(
+          request,
+          "auth.login.failure",
+          "user",
+          payload.username,
+          `用户 ${payload.username} 登录失败`,
+          null
+        );
+        response.status(401).json({ ok: false, message: "用户名或密码不正确" });
+        return;
+      }
+
+      await respondWithSession(request, response, user);
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/admin/session", async (request, response, next) => {
+    try {
+      await ensureBootstrapAdmin();
+      if (request.body?.password === adminPassword) {
+        const user = await authStore.authenticate(bootstrapAdminUsername, adminPassword);
+        if (user) {
+          await respondWithSession(request, response, user);
+          return;
+        }
+      }
+
+      await recordAudit(request, "auth.login.failure", "user", bootstrapAdminUsername, "管理密码登录失败", null);
       response.status(401).json({ ok: false, message: "管理密码不正确" });
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.use("/data", (request, response, next) => {
-    const token = parseBearerToken(request.header("Authorization"));
-    if (token && adminTokens.has(token)) {
-      next();
-      return;
-    }
+  router.get("/auth/me", async (request: AuthenticatedRequest, response, next) => {
+    try {
+      if (!(await authenticateRequest(request)) || !request.authUser) {
+        response.status(401).json({ message: "请先登录" });
+        return;
+      }
 
-    response.status(401).json({ message: "请先进入编辑模式" });
+      response.json({ user: toPublicAuthUser(request.authUser) });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
   });
 
-  router.put("/data/staff/:id", async (request, response, next) => {
+  router.post("/auth/logout", async (request: AuthenticatedRequest, response, next) => {
     try {
-      const staffMember = parseStaffPayload(request.body, request.params.id);
+      if (!(await authenticateRequest(request)) || !request.authToken || !request.authUser) {
+        response.status(401).json({ message: "请先登录" });
+        return;
+      }
+
+      const user = request.authUser;
+      await authStore.revokeSession(request.authToken);
+      await recordAudit(request, "auth.logout", "user", user.id, `用户 ${user.username} 退出登录`, user);
+      response.json({ ok: true });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.put("/auth/password", async (request: AuthenticatedRequest, response, next) => {
+    try {
+      if (!(await authenticateRequest(request)) || !request.authUser) {
+        response.status(401).json({ message: "请先登录" });
+        return;
+      }
+
+      const payload = parsePasswordChangePayload(request.body);
+      if (!payload) {
+        response.status(400).json({ message: "密码信息不完整" });
+        return;
+      }
+
+      const passwordChanged = await authStore.changePassword({
+        userId: request.authUser.id,
+        currentPassword: payload.currentPassword,
+        newPassword: payload.newPassword
+      });
+      if (!passwordChanged) {
+        response.status(400).json({ message: "当前密码不正确" });
+        return;
+      }
+
+      await recordAudit(
+        request,
+        "auth.password.change",
+        "user",
+        request.authUser.id,
+        `用户 ${request.authUser.username} 修改密码`
+      );
+      response.json({ ok: true });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.get("/users", requireAdmin, async (_request, response, next) => {
+    try {
+      const users = await authStore.listUsers();
+      response.json({ rows: users.map(toManagedAuthUser) });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.put("/users/:id", requireAdmin, async (request, response, next) => {
+    try {
+      const userId = getRouteParam(request, "id");
+      const payload = parseUserPayload(request.body, userId);
+      if (!payload) {
+        response.status(400).json({ message: "账号信息不完整" });
+        return;
+      }
+
+      const user = await authStore.saveUser(payload);
+      await recordAudit(request, "user.save", "user", user.id, `保存账号：${user.username}`);
+      response.json({ user: toManagedAuthUser(user) });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.get("/audit-logs", requireAdmin, async (request, response, next) => {
+    try {
+      response.json({ rows: await authStore.listAuditLogs(parseAuditQuery(request)) });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.put("/data/staff/:id", requireAdmin, async (request, response, next) => {
+    try {
+      const staffId = getRouteParam(request, "id");
+      const staffMember = parseStaffPayload(request.body, staffId);
       if (!staffMember) {
         response.status(400).json({ message: "人员信息不完整" });
         return;
@@ -292,15 +618,17 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         ...data,
         staff: upsertById(data.staff, staffMember)
       }));
+      await recordAudit(request, "data.staff.save", "staff", staffMember.id, `保存人员：${staffMember.name}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.put("/data/shift/:id", async (request, response, next) => {
+  router.put("/data/shift/:id", requireAdmin, async (request, response, next) => {
     try {
-      const shift = parseShiftPayload(request.body, request.params.id);
+      const shiftId = getRouteParam(request, "id");
+      const shift = parseShiftPayload(request.body, shiftId);
       if (!shift) {
         response.status(400).json({ message: "班次信息不完整" });
         return;
@@ -310,15 +638,17 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         ...data,
         shifts: upsertById(data.shifts, shift)
       }));
+      await recordAudit(request, "data.shift.save", "shift", shift.id, `保存班次：${shift.name}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.put("/data/holiday/:id", async (request, response, next) => {
+  router.put("/data/holiday/:id", requireAdmin, async (request, response, next) => {
     try {
-      const holiday = parseHolidayPayload(request.body, request.params.id);
+      const holidayId = getRouteParam(request, "id");
+      const holiday = parseHolidayPayload(request.body, holidayId);
       if (!holiday) {
         response.status(400).json({ message: "节假日信息不完整" });
         return;
@@ -339,16 +669,18 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
           holidays: upsertById(data.holidays, holiday)
         };
       });
+      await recordAudit(request, "data.holiday.save", "holiday", holiday.id, `保存节假日：${holiday.name}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.delete("/data/holiday/:id", async (request, response, next) => {
+  router.delete("/data/holiday/:id", requireAdmin, async (request, response, next) => {
     try {
+      const holidayId = getRouteParam(request, "id");
       const nextData = await storage.update((data) => {
-        const holidays = data.holidays.filter((holiday) => holiday.id !== request.params.id);
+        const holidays = data.holidays.filter((holiday) => holiday.id !== holidayId);
         if (holidays.length === data.holidays.length) {
           throw new HttpResponseError(404, "节假日不存在");
         }
@@ -358,13 +690,14 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
           holidays
         };
       });
+      await recordAudit(request, "data.holiday.delete", "holiday", holidayId, `删除节假日：${holidayId}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.put("/data/schedule-entry", async (request, response, next) => {
+  router.put("/data/schedule-entry", requireScheduler, async (request, response, next) => {
     try {
       const payload = parseScheduleEntryPayload(request.body);
       if (payload.ok === false) {
@@ -417,13 +750,20 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
           scheduleEntries
         };
       });
+      await recordAudit(
+        request,
+        "data.schedule_entry.save",
+        "schedule_entry",
+        `${date}__${staffId}`,
+        `保存排班：${date} ${staffId}`
+      );
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.put("/data/monthly-settlement", async (request, response, next) => {
+  router.put("/data/monthly-settlement", requireScheduler, async (request, response, next) => {
     try {
       const payload = parseMonthlySettlementPayload(request.body);
       const nextData = await storage.update((data) => {
@@ -457,15 +797,22 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         };
       });
 
+      await recordAudit(
+        request,
+        "data.monthly_settlement.create",
+        "monthly_settlement",
+        payload.month,
+        `确认月结：${payload.month}`
+      );
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }
   });
 
-  router.delete("/data/monthly-settlement/:month", async (request, response, next) => {
+  router.delete("/data/monthly-settlement/:month", requireScheduler, async (request, response, next) => {
     try {
-      const { month } = request.params;
+      const month = getRouteParam(request, "month");
       if (!MONTH_PATTERN.test(month)) {
         throw new HttpResponseError(400, "月结信息不完整");
       }
@@ -481,6 +828,13 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         };
       });
 
+      await recordAudit(
+        request,
+        "data.monthly_settlement.delete",
+        "monthly_settlement",
+        month,
+        `取消月结：${month}`
+      );
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);

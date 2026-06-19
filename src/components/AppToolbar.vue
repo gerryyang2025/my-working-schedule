@@ -1,16 +1,20 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { CalendarDays, ChevronLeft, ChevronRight, Expand, Printer, Settings, ShieldCheck } from "lucide-vue-next";
+import { CalendarDays, ChevronLeft, ChevronRight, Expand, KeyRound, LogOut, Printer, Settings } from "lucide-vue-next";
 import { addWeeks, getWeekRange, toDateKey } from "@/lib/date";
+import type { AuthUser } from "@/api/client";
 
 const props = defineProps<{
   selectedDate: string;
   adminMode: boolean;
+  canManageConfig: boolean;
+  currentUser: AuthUser;
 }>();
 
 const emit = defineEmits<{
   "update:selectedDate": [value: string];
-  enterAdmin: [];
+  logout: [];
+  openPasswordChange: [];
   openManagement: [];
   printMonth: [];
   printWeek: [];
@@ -24,6 +28,15 @@ function handleSelectedDateUpdate(value: unknown): void {
 }
 
 const selectedWeek = computed(() => getWeekRange(props.selectedDate));
+const roleLabel = computed(() => {
+  if (props.currentUser.role === "admin") {
+    return "系统管理员";
+  }
+  if (props.currentUser.role === "scheduler") {
+    return "排班管理员";
+  }
+  return "只读查看";
+});
 
 function moveWeek(offset: number): void {
   emit("update:selectedDate", addWeeks(props.selectedDate, offset));
@@ -58,13 +71,13 @@ function moveToCurrentWeek(): void {
     </div>
 
     <div class="toolbar-actions">
-      <el-button :type="adminMode ? 'success' : 'primary'" :icon="ShieldCheck" @click="emit('enterAdmin')">
-        {{ adminMode ? "编辑模式" : "输入管理密码" }}
-      </el-button>
-      <el-button :icon="Settings" @click="emit('openManagement')">配置</el-button>
+      <span class="toolbar-user">{{ currentUser.displayName }} · {{ roleLabel }}</span>
+      <el-button :icon="KeyRound" data-testid="open-password-change" @click="emit('openPasswordChange')">修改密码</el-button>
+      <el-button :icon="Settings" :disabled="!canManageConfig" @click="emit('openManagement')">配置</el-button>
       <el-button :icon="CalendarDays" @click="emit('printWeek')">打印周表</el-button>
       <el-button :icon="Printer" @click="emit('printMonth')">打印月表</el-button>
       <el-button :icon="Expand" @click="emit('fullscreen')">全屏</el-button>
+      <el-button :icon="LogOut" @click="emit('logout')">退出登录</el-button>
     </div>
   </section>
 </template>

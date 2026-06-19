@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const SQLITE_SCHEMA_VERSION = 1;
+export const SQLITE_SCHEMA_VERSION = 2;
 
 export function initializeSqliteSchema(db: Database.Database): void {
   db.pragma("foreign_keys = ON");
@@ -85,6 +85,39 @@ export function initializeSqliteSchema(db: Database.Database): void {
       key text primary key,
       value text not null
     );
+
+    create table if not exists users (
+      id text primary key,
+      username text not null unique,
+      display_name text not null,
+      role text not null check (role in ('admin', 'scheduler', 'viewer')),
+      password_hash text not null,
+      enabled integer not null check (enabled in (0, 1)),
+      created_at text not null,
+      updated_at text not null
+    );
+
+    create table if not exists user_sessions (
+      id text primary key,
+      user_id text not null references users(id),
+      token_hash text not null unique,
+      created_at text not null,
+      expires_at text not null,
+      revoked_at text
+    );
+
+    create table if not exists audit_logs (
+      id text primary key,
+      occurred_at text not null,
+      user_id text,
+      username text not null,
+      action text not null,
+      target_type text not null,
+      target_id text not null,
+      summary text not null,
+      ip text not null,
+      user_agent text not null
+    );
   `);
 
   const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
@@ -104,6 +137,7 @@ export function checkSqliteIntegrity(db: Database.Database): string {
 export function listMissingCoreTables(db: Database.Database): string[] {
   const expected = [
     "app_settings",
+    "audit_logs",
     "holidays",
     "monthly_settlement_rows",
     "monthly_settlements",
@@ -111,7 +145,9 @@ export function listMissingCoreTables(db: Database.Database): string[] {
     "schedule_entry_shifts",
     "schema_migrations",
     "shifts",
-    "staff"
+    "staff",
+    "user_sessions",
+    "users"
   ];
   const rows = db.prepare("select name from sqlite_master where type = 'table'").all() as Array<{ name: string }>;
   const names = new Set(rows.map((row) => row.name));

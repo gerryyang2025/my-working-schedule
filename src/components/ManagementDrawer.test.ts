@@ -2,7 +2,7 @@ import { mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { describe, expect, it } from "vitest";
 import ManagementDrawer from "./ManagementDrawer.vue";
-import type { PublicAppData } from "@/api/client";
+import type { AuditLogEntry, ManagedAuthUser, PublicAppData } from "@/api/client";
 
 const ElDrawerStub = defineComponent({
   name: "ElDrawer",
@@ -32,7 +32,7 @@ const ElTableStub = defineComponent({
   name: "ElTable",
   props: ["data", "size"],
   emits: ["rowClick"],
-  template: '<div class="el-table"><button v-for="item in data" :key="item.id" type="button" @click="$emit(\'rowClick\', item)">{{ item.name || item.shortName }}</button><slot /></div>'
+  template: '<div class="el-table"><button v-for="item in data" :key="item.id" type="button" @click="$emit(\'rowClick\', item)">{{ item.name || item.shortName || item.displayName || item.summary }}</button><slot /></div>'
 });
 
 const ElTableColumnStub = defineComponent({
@@ -43,12 +43,14 @@ const ElTableColumnStub = defineComponent({
 const InputStub = defineComponent({
   props: ["modelValue", "placeholder", "disabled"],
   emits: ["update:modelValue"],
-  template: '<input :placeholder="placeholder" :value="modelValue" />'
+  template: '<input :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
 });
 
 const ElSelectStub = defineComponent({
   name: "ElSelect",
-  template: '<select><slot /></select>'
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template: '<select :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>'
 });
 
 const ElOptionStub = defineComponent({
@@ -59,7 +61,9 @@ const ElOptionStub = defineComponent({
 
 const ElCheckboxStub = defineComponent({
   name: "ElCheckbox",
-  template: "<label><slot /></label>"
+  props: ["modelValue"],
+  emits: ["update:modelValue"],
+  template: '<label><input type="checkbox" :checked="modelValue" @change="$emit(\'update:modelValue\', $event.target.checked)" /><slot /></label>'
 });
 
 const ElButtonStub = defineComponent({
@@ -107,6 +111,42 @@ const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
   ]
 };
 
+const users: ManagedAuthUser[] = [
+  {
+    id: "user-admin",
+    username: "admin",
+    displayName: "系统管理员",
+    role: "admin",
+    enabled: true,
+    createdAt: "2026-06-19T00:00:00.000Z",
+    updatedAt: "2026-06-19T00:00:00.000Z"
+  },
+  {
+    id: "user-scheduler",
+    username: "scheduler",
+    displayName: "排班管理员",
+    role: "scheduler",
+    enabled: true,
+    createdAt: "2026-06-19T00:00:00.000Z",
+    updatedAt: "2026-06-19T00:00:00.000Z"
+  }
+];
+
+const auditLogs: AuditLogEntry[] = [
+  {
+    id: "audit-1",
+    occurredAt: "2026-06-19T00:00:00.000Z",
+    userId: "user-admin",
+    username: "admin",
+    action: "user.save",
+    targetType: "user",
+    targetId: "user-scheduler",
+    summary: "保存账号：scheduler",
+    ip: "127.0.0.1",
+    userAgent: "vitest"
+  }
+];
+
 function mountDrawer() {
   return mount(ManagementDrawer, {
     props: {
@@ -118,7 +158,11 @@ function mountDrawer() {
       holidaySaveVersion: 0,
       staffSaving: false,
       shiftSaving: false,
-      holidaySaving: false
+      holidaySaving: false,
+      users,
+      auditLogs,
+      userSaving: false,
+      auditLoading: false
     },
     global: {
       stubs: {
@@ -154,5 +198,44 @@ describe("ManagementDrawer", () => {
     expect(wrapper.get(".management-mobile-shift").text()).toContain("系数 1.5");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("2026-06-19");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("端午节");
+  });
+
+  it("renders account management and emits account saves", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.text()).toContain("账号");
+    expect(wrapper.text()).toContain("系统管理员");
+    expect(wrapper.text()).toContain("排班管理员");
+
+    await wrapper.get(".management-mobile-user").trigger("click");
+    await wrapper.get('[data-testid="save-user-button"]').trigger("click");
+
+    expect(wrapper.emitted("saveUser")).toEqual([
+      [
+        expect.objectContaining({
+          username: "admin",
+          displayName: "系统管理员",
+          role: "admin",
+          enabled: true
+        })
+      ]
+    ]);
+  });
+
+  it("renders audit logs and emits audit filter requests", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.text()).toContain("审计");
+    expect(wrapper.text()).toContain("保存账号：scheduler");
+
+    await wrapper.get('[data-testid="refresh-audit-logs"]').trigger("click");
+
+    expect(wrapper.emitted("refreshAuditLogs")).toEqual([
+      [
+        expect.objectContaining({
+          limit: 100
+        })
+      ]
+    ]);
   });
 });

@@ -50,6 +50,46 @@ body {
   color: #475569;
 }
 
+.login-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 18px;
+  background: #eef2f7;
+}
+
+.login-panel {
+  width: min(420px, 100%);
+  border: 1px solid #dbe3ef;
+  padding: 24px;
+  background: #ffffff;
+}
+
+.login-panel h1 {
+  margin: 4px 0 8px;
+  font-size: 24px;
+  letter-spacing: 0;
+}
+
+.login-subtitle {
+  margin: 0 0 18px;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.login-form {
+  display: grid;
+  gap: 12px;
+}
+
+.login-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 600;
+}
+
 .admin-mode-banner {
   margin-bottom: 12px;
   border: 1px solid #bbf7d0;
@@ -58,17 +98,6 @@ body {
   padding: 9px 12px;
   font-size: 13px;
   font-weight: 600;
-}
-
-.admin-login-dialog {
-  max-width: calc(100vw - 20px);
-}
-
-.admin-login-tip {
-  margin: 0 0 12px;
-  color: #475569;
-  font-size: 13px;
-  line-height: 1.55;
 }
 
 .toolbar {
@@ -103,6 +132,35 @@ body {
   white-space: nowrap;
   color: #475569;
   font-size: 13px;
+}
+
+.toolbar-user {
+  border: 1px solid #dbe3ef;
+  padding: 6px 9px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.password-change-form {
+  display: grid;
+  gap: 10px;
+}
+
+.form-error,
+.form-hint {
+  margin: 0;
+  font-size: 13px;
+}
+
+.form-error {
+  color: #dc2626;
+}
+
+.form-hint {
+  color: #64748b;
 }
 
 .week-chip {
@@ -437,6 +495,14 @@ body {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+}
+
+.audit-filter-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.audit-filter-form .management-actions {
+  grid-column: 1 / -1;
 }
 
 .management-mobile-list {
@@ -960,6 +1026,10 @@ body {
     gap: 8px;
     margin-top: 12px;
     padding-top: 12px;
+  }
+
+  .audit-filter-form {
+    grid-template-columns: 1fr;
   }
 
   .management-form .el-input,

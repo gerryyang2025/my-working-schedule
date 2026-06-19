@@ -6,7 +6,7 @@
 
 - 当前自然周排班表和自然周统计。
 - 日期选择和周范围定位。
-- 管理密码进入编辑模式。
+- 登录页面和基础角色权限。
 - 人员、班次、节假日维护。
 - 班次画笔快速填班。
 - 单元格弹窗支持每天最多两个班次。
@@ -42,7 +42,7 @@ npm run dev
 
 开发服务默认把运行时排班数据写入 `data/app-data.local.json`，该文件已被 `.gitignore` 忽略；`data/app-data.json` 只作为仓库种子数据保留。需要重置本地验证数据时，删除 `data/app-data.local.json` 后重新启动服务即可。也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。
 
-管理员密码只从服务端配置读取，不再保存在排班数据文件中。优先级如下：
+默认管理员账号为 `admin`。管理员初始密码只从服务端配置读取，不再保存在排班数据文件中。优先级如下：
 
 1. `SCHEDULE_ADMIN_PASSWORD` 环境变量
 2. `config/server.local.json` 或 `SCHEDULE_CONFIG_PATH` 指定的配置文件
@@ -53,7 +53,7 @@ npm run dev
 cp config/server.example.json config/server.local.json
 ```
 
-然后编辑 `config/server.local.json` 中的 `adminPassword`：
+然后编辑 `config/server.local.json` 中的 `adminPassword`，该密码用于登录页面的默认管理员账号：
 
 ```json
 {
@@ -69,6 +69,8 @@ cp config/server.example.json config/server.local.json
 ```bash
 ./optools.sh dev restart
 ```
+
+使用 SQLite 存储时，默认管理员密码会以哈希形式保存到 `users` 表；每次服务启动都会按当前配置刷新 `admin` 账号密码，便于部署阶段通过配置文件或环境变量统一调整。
 
 ## SQLite 存储与正式单机部署
 
@@ -218,7 +220,7 @@ PUBLIC_HOST=192.168.x.x ./optools.sh dev start
 
 如果启动提示缺少 `concurrently`、`vite`、`tsx` 或 `html2canvas`、`jspdf` 等依赖，说明当前环境没有安装完整依赖，请先执行 `npm ci --include=dev` 或 `npm install --include=dev`。
 
-对外访问会暴露排班管理界面到当前网络，请务必通过 `config/server.local.json` 或 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理密码；公网访问还需要额外配置防火墙、路由或反向代理。
+对外访问会暴露排班管理界面到当前网络，请务必通过 `config/server.local.json` 或 `SCHEDULE_ADMIN_PASSWORD` 设置实际管理员登录密码；公网访问还需要额外配置防火墙、路由或反向代理。
 
 ## 验证命令
 

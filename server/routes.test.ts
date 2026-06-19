@@ -107,6 +107,168 @@ describe.sequential("API routes", () => {
     expect(response.body.ok).toBe(true);
     expect(response.body.token).toEqual(expect.any(String));
     expect(response.body.token.length).toBeGreaterThan(20);
+    expect(response.body.user).toEqual(
+      expect.objectContaining({
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin"
+      })
+    );
+  });
+
+  it("logs in with username and password, returns the current user, and logs out", async () => {
+    const app = createTestApp();
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .send({ username: "admin", password: TEST_ADMIN_PASSWORD })
+      .expect(200);
+    const headers = { Authorization: `Bearer ${loginResponse.body.token}` };
+
+    const meResponse = await request(app).get("/api/auth/me").set(headers).expect(200);
+    expect(meResponse.body.user).toEqual(
+      expect.objectContaining({
+        username: "admin",
+        role: "admin"
+      })
+    );
+
+    await request(app).post("/api/auth/logout").set(headers).expect(200, { ok: true });
+    await request(app).get("/api/auth/me").set(headers).expect(401);
+  });
+
+  it("records audit logs for authentication and data writes", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/data/shift/shift-audit")
+      .set(headers)
+      .send(createShiftPayload({ id: "ignored-id", name: "审计班" }))
+      .expect(200);
+
+    const response = await request(app).get("/api/audit-logs").set(headers).expect(200);
+    expect(response.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ action: "auth.login.success", username: "admin" }),
+        expect.objectContaining({ action: "data.shift.save", targetId: "shift-audit", summary: "保存班次：审计班" })
+      ])
+    );
+  });
+
+  it("lets admins create accounts and list users without password hashes", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        password: "scheduler-password"
+      })
+      .expect(200);
+
+    const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+    expect(usersResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: "user-scheduler", username: "scheduler", role: "scheduler", enabled: true })
+      ])
+    );
+    expect(JSON.stringify(usersResponse.body.rows)).not.toContain("password");
+
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .send({ username: "scheduler", password: "scheduler-password" })
+      .expect(200);
+    expect(loginResponse.body.user.role).toBe("scheduler");
+  });
+
+  it("lets a logged-in user change their own password and requires re-login", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password"
+      })
+      .expect(200);
+
+    const loginResponse = await request(app).post("/api/auth/login").send({ username: "viewer", password: "viewer-password" }).expect(200);
+    const viewerHeaders = { Authorization: `Bearer ${loginResponse.body.token}` };
+
+    await request(app)
+      .put("/api/auth/password")
+      .set(viewerHeaders)
+      .send({ currentPassword: "wrong", newPassword: "new-viewer-password" })
+      .expect(400, { message: "当前密码不正确" });
+
+    await request(app)
+      .put("/api/auth/password")
+      .set(viewerHeaders)
+      .send({ currentPassword: "viewer-password", newPassword: "new-viewer-password" })
+      .expect(200, { ok: true });
+
+    await request(app).get("/api/auth/me").set(viewerHeaders).expect(401);
+    await request(app).post("/api/auth/login").send({ username: "viewer", password: "viewer-password" }).expect(401);
+    await request(app).post("/api/auth/login").send({ username: "viewer", password: "new-viewer-password" }).expect(200);
+  });
+
+  it("prevents admins from disabling or demoting the last enabled admin", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    const response = await request(app)
+      .put("/api/users/admin")
+      .set(headers)
+      .send({
+        username: "admin",
+        displayName: "系统管理员",
+        role: "viewer",
+        enabled: true
+      })
+      .expect(400);
+
+    expect(response.body.message).toBe("至少需要保留一个启用的系统管理员");
+  });
+
+  it("filters audit logs by username, action, and keyword", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+    await request(app)
+      .put("/api/users/user-audit")
+      .set(headers)
+      .send({
+        username: "audit-user",
+        displayName: "审计用户",
+        role: "viewer",
+        enabled: true,
+        password: "audit-password"
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .get("/api/audit-logs")
+      .query({ username: "admin", action: "user.save", keyword: "audit-user", limit: "20" })
+      .set(headers)
+      .expect(200);
+
+    expect(response.body.rows).toEqual([
+      expect.objectContaining({
+        username: "admin",
+        action: "user.save",
+        targetType: "user",
+        targetId: "user-audit",
+        summary: "保存账号：audit-user"
+      })
+    ]);
   });
 
   it("rejects admin mode with the wrong password", async () => {
@@ -153,7 +315,7 @@ describe.sequential("API routes", () => {
       .set("x-admin-mode", "true")
       .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
       .expect(401);
-    expect(response.body.message).toBe("请先进入编辑模式");
+    expect(response.body.message).toBe("请先登录");
   });
 
   it("rejects invalid bearer tokens", async () => {
@@ -162,7 +324,7 @@ describe.sequential("API routes", () => {
       .set("Authorization", "Bearer forged-token")
       .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
       .expect(401);
-    expect(response.body.message).toBe("请先进入编辑模式");
+    expect(response.body.message).toBe("请先登录");
   });
 
   it("upserts staff and returns public data", async () => {

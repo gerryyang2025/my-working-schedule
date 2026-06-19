@@ -8,12 +8,19 @@ const apiMocks = vi.hoisted(() => ({
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
+  getCurrentUser: vi.fn(),
+  listAuditLogs: vi.fn(),
+  listUsers: vi.fn(),
   loadData: vi.fn(),
+  login: vi.fn(),
+  logout: vi.fn(),
+  changePassword: vi.fn(),
   saveHoliday: vi.fn(),
   saveMonthlySettlement: vi.fn(),
   saveScheduleEntry: vi.fn(),
   saveShift: vi.fn(),
-  saveStaff: vi.fn()
+  saveStaff: vi.fn(),
+  saveUser: vi.fn()
 }));
 
 const pdfMocks = vi.hoisted(() => ({
@@ -78,14 +85,24 @@ const testData: PublicAppData = {
   }
 };
 
+const testAuthUser = {
+  id: "user-admin",
+  username: "admin",
+  displayName: "系统管理员",
+  role: "admin" as const
+};
+
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
-  props: ["selectedDate", "adminMode"],
-  emits: ["update:selectedDate", "enterAdmin", "printMonth", "printWeek"],
+  props: ["selectedDate", "adminMode", "currentUser"],
+  emits: ["update:selectedDate", "logout", "openManagement", "openPasswordChange", "printMonth", "printWeek"],
   template: `
     <section>
-      <button data-testid="admin-button" type="button" @click="$emit('enterAdmin')">
-        {{ adminMode ? "编辑模式" : "输入管理密码" }}
+      <span data-testid="current-user">{{ currentUser?.displayName }}</span>
+      <button data-testid="open-management" type="button" @click="$emit('openManagement')">配置</button>
+      <button data-testid="open-password-change" type="button" @click="$emit('openPasswordChange')">修改密码</button>
+      <button data-testid="logout-button" type="button" @click="$emit('logout')">
+        退出登录
       </button>
       <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
         jump
@@ -117,6 +134,49 @@ const WeeklySummaryStub = defineComponent({
 
 const EmptyStub = defineComponent({
   template: "<section />"
+});
+
+const ManagementDrawerStub = defineComponent({
+  name: "ManagementDrawer",
+  props: ["modelValue", "users", "auditLogs"],
+  emits: ["saveUser", "refreshAuditLogs"],
+  template: `
+    <section v-if="modelValue" data-testid="management-drawer">
+      <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
+      <span data-testid="drawer-audit">{{ auditLogs.map((entry) => entry.summary).join(",") }}</span>
+      <button
+        data-testid="drawer-save-user"
+        type="button"
+        @click="$emit('saveUser', { id: 'user-scheduler', username: 'scheduler', displayName: '排班管理员', role: 'scheduler', enabled: true, password: 'secret123' })"
+      >
+        save user
+      </button>
+      <button
+        data-testid="drawer-refresh-audit"
+        type="button"
+        @click="$emit('refreshAuditLogs', { username: 'admin', action: 'user.save', keyword: 'scheduler', limit: 50 })"
+      >
+        refresh audit
+      </button>
+    </section>
+  `
+});
+
+const PasswordChangeDialogStub = defineComponent({
+  name: "PasswordChangeDialog",
+  props: ["modelValue"],
+  emits: ["changePassword"],
+  template: `
+    <section v-if="modelValue" data-testid="password-dialog">
+      <button
+        data-testid="submit-password-change"
+        type="button"
+        @click="$emit('changePassword', { currentPassword: 'old-password', newPassword: 'new-password' })"
+      >
+        change password
+      </button>
+    </section>
+  `
 });
 
 const PrintViewsStub = defineComponent({
@@ -186,7 +246,37 @@ const ElButtonStub = defineComponent({
 });
 
 function mountApp(appData: PublicAppData = testData) {
+  apiMocks.getCurrentUser.mockResolvedValue(testAuthUser);
   apiMocks.loadData.mockResolvedValue(structuredClone(appData));
+  apiMocks.listUsers.mockResolvedValue({
+    rows: [
+      {
+        id: "user-admin",
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin",
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    ]
+  });
+  apiMocks.listAuditLogs.mockResolvedValue({
+    rows: [
+      {
+        id: "audit-1",
+        occurredAt: "2026-06-19T00:00:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "user.save",
+        targetType: "user",
+        targetId: "user-scheduler",
+        summary: "保存账号：scheduler",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ]
+  });
 
   return mount(App, {
     global: {
@@ -197,7 +287,9 @@ function mountApp(appData: PublicAppData = testData) {
         ElButton: ElButtonStub,
         ElDialog: ElDialogStub,
         ElInput: ElInputStub,
-        ManagementDrawer: EmptyStub,
+        LoginPage: EmptyStub,
+        ManagementDrawer: ManagementDrawerStub,
+        PasswordChangeDialog: PasswordChangeDialogStub,
         PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
         ShiftPalette: EmptyStub,
@@ -208,13 +300,8 @@ function mountApp(appData: PublicAppData = testData) {
 }
 
 async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
-  apiMocks.enterAdminMode.mockResolvedValue(undefined);
-
-  await wrapper.get('[data-testid="admin-button"]').trigger("click");
-  await nextTick();
-  await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
-  await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
   await flushPromises();
+  expect(wrapper.get('[data-testid="current-user"]').text()).toContain("系统管理员");
 }
 
 async function openBonusTab(wrapper: ReturnType<typeof mountApp>) {
@@ -379,28 +466,82 @@ describe("App", () => {
     expect(infoPanel.text()).toContain("休息 不计出勤");
   });
 
-  it("uses an in-page password dialog and shows clear feedback after entering admin mode", async () => {
-    apiMocks.enterAdminMode.mockResolvedValue(undefined);
-    const promptSpy = vi.spyOn(window, "prompt").mockReturnValue("legacy-password");
+  it("shows the current user and supports logging out", async () => {
+    apiMocks.logout.mockResolvedValue(undefined);
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="admin-button"]').trigger("click");
-    await nextTick();
+    expect(wrapper.get('[data-testid="current-user"]').text()).toContain("系统管理员");
+    expect(wrapper.get(".admin-mode-banner").text()).toContain("当前账号可维护排班");
 
-    expect(promptSpy).not.toHaveBeenCalled();
-    expect(wrapper.get(".admin-login-dialog").text()).toContain("进入编辑模式");
-
-    await wrapper.get('[data-testid="admin-password-input"]').setValue("admin-password");
-    await wrapper.get('[data-testid="admin-submit-button"]').trigger("click");
+    await wrapper.get('[data-testid="logout-button"]').trigger("click");
     await flushPromises();
 
-    expect(apiMocks.enterAdminMode).toHaveBeenCalledWith("admin-password");
-    expect(wrapper.get(".admin-mode-banner").text()).toContain("编辑模式已开启");
-    expect(wrapper.get('[data-testid="admin-button"]').text()).toContain("编辑模式");
-    expect(wrapper.find(".admin-login-dialog").exists()).toBe(false);
+    expect(apiMocks.logout).toHaveBeenCalled();
+    expect(wrapper.find(".app-shell").exists()).toBe(false);
+  });
 
-    promptSpy.mockRestore();
+  it("loads users and audit logs when opening system management", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.listUsers).toHaveBeenCalled();
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledWith({ limit: 100 });
+    expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("admin");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("保存账号：scheduler");
+  });
+
+  it("saves users from the management drawer and refreshes the user list", async () => {
+    apiMocks.saveUser.mockResolvedValue({
+      user: {
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    });
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-user"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveUser).toHaveBeenCalledWith({
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      enabled: true,
+      password: "secret123"
+    });
+    expect(apiMocks.listUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("changes the current password and returns to the login page", async () => {
+    apiMocks.changePassword.mockResolvedValue({ ok: true });
+    apiMocks.logout.mockResolvedValue(undefined);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-password-change"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="submit-password-change"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.changePassword).toHaveBeenCalledWith({
+      currentPassword: "old-password",
+      newPassword: "new-password"
+    });
+    expect(apiMocks.logout).toHaveBeenCalled();
+    expect(wrapper.find(".app-shell").exists()).toBe(false);
   });
 
   it("passes only the selected natural week to the schedule grid", async () => {

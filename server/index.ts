@@ -1,5 +1,6 @@
 import express from "express";
 import { resolveServerConfig } from "./config";
+import { createConfiguredAuthStore } from "./auth-store";
 import { createRoutes } from "./routes";
 import { createConfiguredStorage } from "./storage";
 
@@ -12,7 +13,7 @@ if (!adminPassword) {
 }
 
 app.use(express.json());
-app.use("/api", createRoutes(createConfiguredStorage(config), { adminPassword }));
+app.use("/api", createRoutes(createConfiguredStorage(config), { adminPassword, authStore: await createConfiguredAuthStore(config) }));
 
 app.listen(port, host, () => {
   console.log(`Schedule API listening at http://${host}:${port}`);
