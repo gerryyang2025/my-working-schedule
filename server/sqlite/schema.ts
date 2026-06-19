@@ -9,7 +9,7 @@ function tableHasColumn(db: Database.Database, tableName: string, columnName: st
 
 function ensureUsersStaffBindingSchema(db: Database.Database): void {
   if (!tableHasColumn(db, "users", "staff_id")) {
-    db.prepare("alter table users add column staff_id text").run();
+    db.prepare("alter table users add column staff_id text references staff(id)").run();
   }
 
   db.prepare(

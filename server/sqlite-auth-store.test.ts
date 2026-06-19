@@ -58,6 +58,15 @@ describe("SQLite auth store", () => {
         expect.arrayContaining([expect.objectContaining({ name: "idx_users_staff_id_unique", unique: 1 })])
       );
 
+      const foreignKeys = db.prepare("pragma foreign_key_list(users)").all() as Array<{
+        table: string;
+        from: string;
+        to: string;
+      }>;
+      expect(foreignKeys).toEqual(
+        expect.arrayContaining([expect.objectContaining({ table: "staff", from: "staff_id", to: "id" })])
+      );
+
       const migration = db.prepare("select version from schema_migrations where version = 3").get();
       expect(migration).toEqual(expect.objectContaining({ version: 3 }));
     } finally {
@@ -217,5 +226,94 @@ describe("SQLite auth store", () => {
         staffId: "staff-nurse-001"
       })
     ).rejects.toThrow("该人员已绑定其他账号");
+  });
+
+  it("unbinds staff bindings and allows the staff member to be rebound", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        `
+          insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
+          values (?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run("staff-nurse-002", "100002", "王护士", "nurse", 0, 1, 1);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password",
+      staffId: "staff-nurse-002"
+    });
+
+    const unboundViewer = await store.saveUser({
+      id: viewer.id,
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      staffId: null
+    });
+    expect(unboundViewer.staffId).toBeNull();
+    await expect(store.authenticate("viewer", "viewer-password")).resolves.toEqual(
+      expect.objectContaining({ username: "viewer", staffId: null })
+    );
+
+    const reboundViewer = await store.saveUser({
+      id: "user-second-viewer",
+      username: "viewer2",
+      displayName: "只读用户2",
+      role: "viewer",
+      enabled: true,
+      password: "viewer2-password",
+      staffId: "staff-nurse-002"
+    });
+    expect(reboundViewer.staffId).toBe("staff-nurse-002");
+  });
+
+  it("clears staff bindings when refreshing the bootstrap admin", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        `
+          insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
+          values (?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run("staff-admin-001", "900001", "管理员", "head_nurse", 1, 1, 1);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+
+    await expect(
+      store.saveUser({
+        id: admin!.id,
+        username: "admin",
+        displayName: "系统管理员",
+        role: "admin",
+        enabled: true,
+        staffId: "staff-admin-001"
+      })
+    ).resolves.toEqual(expect.objectContaining({ username: "admin", staffId: "staff-admin-001" }));
+
+    await store.ensureBootstrapAdmin({ username: "admin", password: "new-admin-password" });
+    await expect(store.authenticate("admin", "new-admin-password")).resolves.toEqual(
+      expect.objectContaining({ username: "admin", role: "admin", staffId: null })
+    );
   });
 });
