@@ -240,6 +240,38 @@ describe.sequential("API routes", () => {
     );
   });
 
+  it("normalizes whitespace-only staffId to null when saving accounts", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password",
+        staffId: "staff-nurse-001"
+      })
+      .expect(200);
+
+    const response = await request(app)
+      .put("/api/users/user-viewer")
+      .set(headers)
+      .send({
+        username: "viewer",
+        displayName: "只读用户",
+        role: "viewer",
+        enabled: true,
+        staffId: "   "
+      })
+      .expect(200);
+
+    expect(response.body.user).toEqual(expect.objectContaining({ username: "viewer", staffId: null }));
+  });
+
   it("rejects account bindings to missing, disabled, or already-bound staff records", async () => {
     const data = createSeedData();
     data.staff = data.staff.map((staff) => (staff.id === "staff-clerk-001" ? { ...staff, enabled: false } : staff));

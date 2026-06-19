@@ -233,10 +233,10 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
   }
 
   let parsedStaffId: string | null;
-  if (staffId === undefined || staffId === null || staffId === "") {
+  if (staffId === undefined || staffId === null) {
     parsedStaffId = null;
-  } else if (isString(staffId) && staffId.trim().length > 0) {
-    parsedStaffId = staffId.trim();
+  } else if (isString(staffId)) {
+    parsedStaffId = staffId.trim() || null;
   } else {
     return null;
   }
