@@ -1,6 +1,25 @@
 import type Database from "better-sqlite3";
 
-export const SQLITE_SCHEMA_VERSION = 2;
+export const SQLITE_SCHEMA_VERSION = 3;
+
+function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
+  const rows = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
+  return rows.some((row) => row.name === columnName);
+}
+
+function ensureUsersStaffBindingSchema(db: Database.Database): void {
+  if (!tableHasColumn(db, "users", "staff_id")) {
+    db.prepare("alter table users add column staff_id text").run();
+  }
+
+  db.prepare(
+    `
+      create unique index if not exists idx_users_staff_id_unique
+      on users(staff_id)
+      where staff_id is not null
+    `
+  ).run();
+}
 
 export function initializeSqliteSchema(db: Database.Database): void {
   db.pragma("foreign_keys = ON");
@@ -91,6 +110,7 @@ export function initializeSqliteSchema(db: Database.Database): void {
       username text not null unique,
       display_name text not null,
       role text not null check (role in ('admin', 'scheduler', 'viewer')),
+      staff_id text references staff(id),
       password_hash text not null,
       enabled integer not null check (enabled in (0, 1)),
       created_at text not null,
@@ -119,6 +139,8 @@ export function initializeSqliteSchema(db: Database.Database): void {
       user_agent text not null
     );
   `);
+
+  ensureUsersStaffBindingSchema(db);
 
   const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
   if (!migration) {

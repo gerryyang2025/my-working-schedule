@@ -21,6 +21,7 @@ type UserRow = {
   username: string;
   display_name: string;
   role: UserRole;
+  staff_id: string | null;
   password_hash: string;
   enabled: number;
   created_at: string;
@@ -57,7 +58,7 @@ function mapUser(row: UserRow): AuthUser {
     username: row.username,
     displayName: row.display_name,
     role: row.role,
-    staffId: null,
+    staffId: row.staff_id,
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -104,7 +105,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
     const row = db
       .prepare(
         `
-          select id, username, display_name, role, password_hash, enabled, created_at, updated_at
+          select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
           from users
           where username = ? and enabled = 1
         `
@@ -118,7 +119,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
     const row = db
       .prepare(
         `
-          select id, username, display_name, role, password_hash, enabled, created_at, updated_at
+          select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
           from users
           where username = ?
         `
@@ -132,7 +133,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
     const row = db
       .prepare(
         `
-          select id, username, display_name, role, password_hash, enabled, created_at, updated_at
+          select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
           from users
           where id = ?
         `
@@ -142,11 +143,25 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
     return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
   }
 
+  function readUserByStaffId(db: Database.Database, staffId: string): (AuthUser & { passwordHash: string }) | null {
+    const row = db
+      .prepare(
+        `
+          select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
+          from users
+          where staff_id = ?
+        `
+      )
+      .get(staffId) as UserRow | undefined;
+
+    return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
+  }
+
   function readEnabledUserById(db: Database.Database, id: string): AuthUser | null {
     const row = db
       .prepare(
         `
-          select id, username, display_name, role, password_hash, enabled, created_at, updated_at
+          select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
           from users
           where id = ? and enabled = 1
         `
@@ -194,7 +209,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           db.prepare(
             `
               update users
-              set display_name = ?, role = ?, password_hash = ?, enabled = 1, updated_at = ?
+              set display_name = ?, role = ?, staff_id = null, password_hash = ?, enabled = 1, updated_at = ?
               where username = ?
             `
           ).run(displayName, "admin", hashPassword(password), timestamp, normalizedUsername);
@@ -203,8 +218,8 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
 
         db.prepare(
           `
-            insert into users (id, username, display_name, role, password_hash, enabled, created_at, updated_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?)
+            insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+            values (?, ?, ?, ?, null, ?, ?, ?, ?)
           `
         ).run(randomUUID(), normalizedUsername, displayName, "admin", hashPassword(password), 1, timestamp, timestamp);
       } finally {
@@ -218,7 +233,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
         const rows = db
           .prepare(
             `
-              select id, username, display_name, role, password_hash, enabled, created_at, updated_at
+              select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
               from users
               order by username asc
             `
@@ -241,6 +256,14 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           throw new AuthStoreError(400, "账号名不能重复");
         }
 
+        const staffId = input.staffId?.trim() || null;
+        if (staffId) {
+          const duplicateStaffUser = readUserByStaffId(db, staffId);
+          if (duplicateStaffUser && duplicateStaffUser.id !== existingUser?.id) {
+            throw new AuthStoreError(400, "该人员已绑定其他账号");
+          }
+        }
+
         assertCanSaveUser(db, existingUser, input.role, input.enabled);
         const timestamp = nowIso();
         if (existingUser) {
@@ -248,15 +271,16 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           db.prepare(
             `
               update users
-              set username = ?, display_name = ?, role = ?, password_hash = ?, enabled = ?, updated_at = ?
+              set username = ?, display_name = ?, role = ?, staff_id = ?, password_hash = ?, enabled = ?, updated_at = ?
               where id = ?
             `
-          ).run(username, displayName, input.role, passwordHash, input.enabled ? 1 : 0, timestamp, existingUser.id);
+          ).run(username, displayName, input.role, staffId, passwordHash, input.enabled ? 1 : 0, timestamp, existingUser.id);
           return {
             ...existingUser,
             username,
             displayName,
             role: input.role,
+            staffId,
             enabled: input.enabled,
             updatedAt: timestamp
           };
@@ -268,14 +292,15 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
 
         db.prepare(
           `
-            insert into users (id, username, display_name, role, password_hash, enabled, created_at, updated_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?)
+            insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
           `
         ).run(
           input.id,
           username,
           displayName,
           input.role,
+          staffId,
           hashPassword(input.password),
           input.enabled ? 1 : 0,
           timestamp,
@@ -287,7 +312,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           username,
           displayName,
           role: input.role,
-          staffId: null,
+          staffId,
           enabled: input.enabled,
           createdAt: timestamp,
           updatedAt: timestamp

@@ -14,11 +14,57 @@ async function createTempDbPath() {
   return join(dir, "schedule.db");
 }
 
+function createLegacyVersion2AuthSchema(db: Database.Database): void {
+  db.exec(`
+    create table schema_migrations (
+      version integer primary key,
+      applied_at text not null
+    );
+
+    create table users (
+      id text primary key,
+      username text not null unique,
+      display_name text not null,
+      role text not null check (role in ('admin', 'scheduler', 'viewer')),
+      password_hash text not null,
+      enabled integer not null check (enabled in (0, 1)),
+      created_at text not null,
+      updated_at text not null
+    );
+
+    insert into schema_migrations (version, applied_at)
+    values (2, '2026-06-19T00:00:00.000Z');
+  `);
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
 describe("SQLite auth store", () => {
+  it("adds staff binding columns and indexes when migrating a version 2 auth schema", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+
+    try {
+      createLegacyVersion2AuthSchema(db);
+      initializeSqliteSchema(db);
+
+      const userColumns = db.prepare("pragma table_info(users)").all() as Array<{ name: string }>;
+      expect(userColumns.map((column) => column.name)).toContain("staff_id");
+
+      const indexes = db.prepare("pragma index_list(users)").all() as Array<{ name: string; unique: number }>;
+      expect(indexes).toEqual(
+        expect.arrayContaining([expect.objectContaining({ name: "idx_users_staff_id_unique", unique: 1 })])
+      );
+
+      const migration = db.prepare("select version from schema_migrations where version = 3").get();
+      expect(migration).toEqual(expect.objectContaining({ version: 3 }));
+    } finally {
+      db.close();
+    }
+  });
+
   it("initializes auth and audit tables as core SQLite tables", async () => {
     const sqlitePath = await createTempDbPath();
     const db = new Database(sqlitePath);
@@ -127,5 +173,49 @@ describe("SQLite auth store", () => {
         summary: "用户 scheduler 修改密码"
       })
     ]);
+  });
+
+  it("persists staff bindings and rejects duplicate staff bindings", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        `
+          insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
+          values (?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run("staff-nurse-001", "100001", "李护士", "nurse", 0, 1, 1);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password",
+      staffId: "staff-nurse-001"
+    });
+
+    expect(viewer.staffId).toBe("staff-nurse-001");
+    await expect(store.authenticate("viewer", "viewer-password")).resolves.toEqual(
+      expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
+    );
+    await expect(
+      store.saveUser({
+        id: "user-second-viewer",
+        username: "viewer2",
+        displayName: "只读用户2",
+        role: "viewer",
+        enabled: true,
+        password: "viewer2-password",
+        staffId: "staff-nurse-001"
+      })
+    ).rejects.toThrow("该人员已绑定其他账号");
   });
 });
