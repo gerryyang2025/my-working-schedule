@@ -39,6 +39,10 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("./optools.sh data check");
     expect(runbook).toContain("./optools.sh app status");
     expect(runbook).toContain("./optools.sh doctor");
+    expect(runbook).toContain("账号与人员档案绑定");
+    expect(runbook).toContain("系统配置 > 账号");
+    expect(runbook).toContain("绑定人员");
+    expect(runbook).toContain("本阶段不会改变账号角色权限");
     expect(runbook).toContain("EADDRINUSE");
     expect(runbook).toContain("ss -ltnp | grep ':3001'");
     expect(runbook).toContain("/api/health");
