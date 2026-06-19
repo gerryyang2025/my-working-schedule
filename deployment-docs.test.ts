@@ -22,6 +22,10 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("OPTOOLS_NPM_BIN");
     expect(runbook).toContain("./optools.sh app status");
     expect(runbook).toContain("./optools.sh nginx install");
+    expect(runbook).toContain("当前阶段尚未申请正式域名，推荐继续使用 **HTTP + 服务器公网 IP** 访问");
+    expect(runbook).toContain("当前 HTTP + IP 阶段");
+    expect(runbook).toContain("[skip] nginx https config");
+    expect(runbook).toContain("后续申请正式域名并完成 DNS 解析后，再启用 HTTPS");
     expect(runbook).toContain("./optools.sh nginx configure-https");
     expect(runbook).toContain("NGINX_SERVER_NAME");
     expect(runbook).toContain("NGINX_SSL_CERTIFICATE");

@@ -114,6 +114,8 @@ Use the Nginx helper from the project root when debugging below the `optools.sh 
 
 `install` handles the common failure where `nginx` is not installed and `/etc/nginx/conf.d` does not exist. It detects `dnf`, `yum`, or `apt-get`, installs nginx when needed, creates the config directory, copies `deploy/nginx/my-working-schedule.conf.example` to `/etc/nginx/conf.d/my-working-schedule.conf`, runs `nginx -t`, and reloads nginx through systemd when available.
 
+Current deployments without a formal domain should keep using HTTP + server IP with the normal `configure` command. Use `configure-https` later, after a formal domain and domain certificate are available.
+
 Useful overrides:
 
 ```bash
@@ -128,7 +130,7 @@ NGINX_SSL_CERTIFICATE_KEY=/etc/letsencrypt/live/schedule.example.com/privkey.pem
 NGINX_SERVICE_NAME=nginx
 ```
 
-`configure-https` does not request certificates. It renders the HTTPS template with the supplied server name, certificate path, and key path; then it runs `nginx -t` before reloading unless `--no-reload` is set.
+`configure-https` does not request certificates. It is intended for the later domain stage: it renders the HTTPS template with the supplied domain name, certificate path, and key path; then it runs `nginx -t` before reloading unless `--no-reload` is set.
 
 ## Logrotate Helper
 
