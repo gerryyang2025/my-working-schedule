@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import type { AppData, Holiday, Shift, StaffMember } from "../src/types/domain";
 import { createRoutes } from "./routes";
 import { createSeedData } from "./seed";
+import { createSqliteAuthStore } from "./sqlite/auth-store";
 import { replaceAppDataInSqlite } from "./sqlite/mapper";
 import { initializeSqliteSchema } from "./sqlite/schema";
 import { createSqliteStorage } from "./sqlite/storage";
@@ -676,6 +677,78 @@ describe.sequential("API routes", () => {
           })
         ])
       );
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("keeps SQLite account bindings valid across account saves and app-data writes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "schedule-routes-sqlite-binding-"));
+    try {
+      const dbPath = join(dir, "schedule.db");
+      const db = new Database(dbPath);
+      try {
+        initializeSqliteSchema(db);
+        replaceAppDataInSqlite(db, createSeedData());
+      } finally {
+        db.close();
+      }
+
+      const app = express();
+      app.use(express.json());
+      app.use(
+        "/api",
+        createRoutes(createSqliteStorage(dbPath), {
+          adminPassword: TEST_ADMIN_PASSWORD,
+          authStore: createSqliteAuthStore(dbPath)
+        })
+      );
+      const headers = await adminHeaders(app);
+
+      await request(app)
+        .put("/api/users/user-viewer")
+        .set(headers)
+        .send({
+          username: "viewer",
+          displayName: "只读用户",
+          role: "viewer",
+          enabled: true,
+          password: "viewer-password",
+          staffId: "staff-nurse-001"
+        })
+        .expect(200);
+
+      await request(app)
+        .put("/api/data/schedule-entry")
+        .set(headers)
+        .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "route write" })
+        .expect(200);
+
+      const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+      expect(usersResponse.body.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ username: "viewer", staffId: "staff-nurse-001" })
+        ])
+      );
+
+      const dataResponse = await request(app).get("/api/data").expect(200);
+      expect(dataResponse.body.scheduleEntries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2026-06-15__staff-nurse-001",
+            note: "route write",
+            shiftIds: ["shift-a1"]
+          })
+        ])
+      );
+
+      const verifyDb = new Database(dbPath);
+      try {
+        verifyDb.pragma("foreign_keys = ON");
+        expect(verifyDb.prepare("pragma foreign_key_check").all()).toEqual([]);
+      } finally {
+        verifyDb.close();
+      }
     } finally {
       await rm(dir, { recursive: true, force: true });
     }

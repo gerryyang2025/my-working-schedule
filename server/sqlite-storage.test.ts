@@ -254,6 +254,81 @@ describe("SQLite schema and mapper", () => {
     }
   });
 
+  it("preserves user staff bindings when replacement data keeps the staff member", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+      db.pragma("foreign_keys = ON");
+
+      const seed = createSeedData();
+      replaceAppDataInSqlite(db, seed);
+      db.prepare(
+        `
+          insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        "user-viewer",
+        "viewer",
+        "Viewer",
+        "viewer",
+        "staff-nurse-001",
+        "hash",
+        1,
+        "2026-06-20T00:00:00.000Z",
+        "2026-06-20T00:00:00.000Z"
+      );
+
+      const replacement = createReplacementData();
+      replacement.staff = [seed.staff.find((staff) => staff.id === "staff-nurse-001")!, ...replacement.staff];
+
+      replaceAppDataInSqlite(db, replacement);
+
+      expect(db.prepare("select staff_id from users where id = ?").get("user-viewer")).toEqual({
+        staff_id: "staff-nurse-001"
+      });
+      expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("clears user staff bindings when replacement data removes the staff member", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+      db.pragma("foreign_keys = ON");
+
+      const seed = createSeedData();
+      replaceAppDataInSqlite(db, seed);
+      db.prepare(
+        `
+          insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        "user-viewer",
+        "viewer",
+        "Viewer",
+        "viewer",
+        "staff-nurse-001",
+        "hash",
+        1,
+        "2026-06-20T00:00:00.000Z",
+        "2026-06-20T00:00:00.000Z"
+      );
+
+      replaceAppDataInSqlite(db, createReplacementData());
+
+      expect(db.prepare("select staff_id from users where id = ?").get("user-viewer")).toEqual({
+        staff_id: null
+      });
+      expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   it("rolls back the previous database state when constraints fail", async () => {
     const db = new Database(await createTempDbPath());
     try {

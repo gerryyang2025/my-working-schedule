@@ -7,9 +7,21 @@ const defaultSettings: Settings = {
   version: 1
 };
 
+type UserStaffBindingRow = {
+  id: string;
+  staff_id: string;
+};
+
 export function replaceAppDataInSqlite(db: Database.Database, data: AppData): void {
   assertAppData(data);
   const replace = db.transaction((next: AppData) => {
+    const userStaffBindings = db
+      .prepare("select id, staff_id from users where staff_id is not null")
+      .all() as UserStaffBindingRow[];
+    if (userStaffBindings.length > 0) {
+      db.prepare("update users set staff_id = null where staff_id is not null").run();
+    }
+
     db.exec(`
       delete from monthly_settlement_rows;
       delete from monthly_settlements;
@@ -27,6 +39,16 @@ export function replaceAppDataInSqlite(db: Database.Database, data: AppData): vo
     `);
     for (const staff of next.staff) {
       insertStaff.run({ ...staff, isAdmin: staff.isAdmin ? 1 : 0, enabled: staff.enabled ? 1 : 0 });
+    }
+
+    if (userStaffBindings.length > 0) {
+      const nextStaffIds = new Set(next.staff.map((staff) => staff.id));
+      const restoreUserStaffBinding = db.prepare("update users set staff_id = ? where id = ?");
+      for (const binding of userStaffBindings) {
+        if (nextStaffIds.has(binding.staff_id)) {
+          restoreUserStaffBinding.run(binding.staff_id, binding.id);
+        }
+      }
     }
 
     const insertShift = db.prepare(`

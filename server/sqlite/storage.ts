@@ -74,6 +74,9 @@ export function createSqliteStorage(path: string): StorageAdapter {
       const run = updateQueue.then(async () => {
         const current = await loadData();
         const next = await mutator(current);
+        if (next === current) {
+          return next;
+        }
         await saveData(next);
         return next;
       });
