@@ -94,6 +94,117 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("OPTOOLS_SYSTEMD_SERVICE_FILE");
   });
 
+  it("prints config command usage", async () => {
+    const result = await runOptools(["help"]);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("./optools.sh config");
+    expect(result.stdout).toContain("./optools.sh config paths");
+    expect(result.stdout).toContain("./optools.sh config server");
+  });
+
+  it("shows an operations config summary by default", async () => {
+    const stateDir = await createStateDir();
+    const installDir = join(stateDir, "opt", "my-working-schedule");
+    const dataDir = join(stateDir, "var", "lib", "my-working-schedule");
+    const backupDir = join(stateDir, "var", "backups", "my-working-schedule");
+    const systemdFile = join(stateDir, "etc", "systemd", "system", "schedule-api.service");
+    const fakeNginxHelper = join(stateDir, "tools", "nginx-service.sh");
+    const fakeSqliteHelper = join(stateDir, "tools", "sqlite-service.sh");
+
+    const result = await runOptools(["config"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_DATA_DIR: dataDir,
+      OPTOOLS_BACKUP_DIR: backupDir,
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeSqliteHelper,
+      OPTOOLS_APP_SERVICE_NAME: "schedule-api",
+      OPTOOLS_API_HEALTH_URL: "http://127.0.0.1:3901/api/health"
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("config: operations summary");
+    expect(result.stdout).toContain(`install dir: ${installDir}`);
+    expect(result.stdout).toContain(`static dist: ${join(installDir, "dist")}`);
+    expect(result.stdout).toContain(`data dir: ${dataDir}`);
+    expect(result.stdout).toContain(`backup dir: ${backupDir}`);
+    expect(result.stdout).toContain("systemd service: schedule-api");
+    expect(result.stdout).toContain(`systemd file: ${systemdFile}`);
+    expect(result.stdout).toContain(`nginx helper: ${fakeNginxHelper}`);
+    expect(result.stdout).toContain(`sqlite helper: ${fakeSqliteHelper}`);
+    expect(result.stdout).toContain("api health url: http://127.0.0.1:3901/api/health");
+  });
+
+  it("shows config paths for deployment troubleshooting", async () => {
+    const stateDir = await createStateDir();
+    const installDir = join(stateDir, "install");
+    const configPath = join(stateDir, "server.local.json");
+    const systemdFile = join(stateDir, "schedule-api.service");
+
+    const result = await runOptools(["config", "paths"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_STATE_DIR: join(stateDir, "tmp"),
+      OPTOOLS_LOG_DIR: join(stateDir, "logs"),
+      OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
+      SCHEDULE_CONFIG_PATH: configPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("config: paths");
+    expect(result.stdout).toContain(`source root: ${process.cwd()}`);
+    expect(result.stdout).toContain(`install dir: ${installDir}`);
+    expect(result.stdout).toContain(`static dist: ${join(installDir, "dist")}`);
+    expect(result.stdout).toContain(`state dir: ${join(stateDir, "tmp")}`);
+    expect(result.stdout).toContain(`log dir: ${join(stateDir, "logs")}`);
+    expect(result.stdout).toContain(`server config path: ${configPath}`);
+    expect(result.stdout).toContain(`systemd file: ${systemdFile}`);
+  });
+
+  it("shows redacted effective server config", async () => {
+    const stateDir = await createStateDir();
+    const configPath = join(stateDir, "server.local.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          host: "127.0.0.1",
+          port: 3999,
+          storageDriver: "sqlite",
+          storagePath: "data/app-data.local.json",
+          sqlitePath: "/var/lib/my-working-schedule/schedule.db",
+          backupPath: "/var/backups/my-working-schedule",
+          adminPassword: "super-secret-password"
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const result = await runOptools(["config", "server"], {
+      SCHEDULE_CONFIG_PATH: configPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("config: effective server config");
+    expect(result.stdout).toContain('"host": "127.0.0.1"');
+    expect(result.stdout).toContain('"port": 3999');
+    expect(result.stdout).toContain('"storageDriver": "sqlite"');
+    expect(result.stdout).toContain('"adminPasswordConfigured": true');
+    expect(result.stdout).not.toContain("super-secret-password");
+    expect(result.stdout).not.toContain('"adminPassword":');
+  });
+
+  it("rejects unknown config subcommands", async () => {
+    const result = await runOptools(["config", "unknown"]);
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown config command: unknown");
+    expect(result.stdout).toContain("./optools.sh config");
+  });
+
   it("builds frontend assets and installs the API runtime files to the configured deployment directory", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");
