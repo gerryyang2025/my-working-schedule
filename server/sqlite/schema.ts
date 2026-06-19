@@ -34,7 +34,20 @@ function rebuildUsersTableWithStaffForeignKey(db: Database.Database): void {
         insert into users_with_staff_fk (
           id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
         )
-        select id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
+        select
+          id,
+          username,
+          display_name,
+          role,
+          case
+            when staff_id is null then null
+            when exists (select 1 from staff where staff.id = users.staff_id) then staff_id
+            else null
+          end,
+          password_hash,
+          enabled,
+          created_at,
+          updated_at
         from users;
 
         drop table users;

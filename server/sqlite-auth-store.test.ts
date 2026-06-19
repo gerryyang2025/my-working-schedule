@@ -98,6 +98,19 @@ function createVersion3AuthSchemaWithStaffIdWithoutForeignKey(db: Database.Datab
       '2026-06-19T00:00:00.000Z'
     );
 
+    insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+    values (
+      'user-dangling-viewer',
+      'dangling-viewer',
+      '悬空绑定用户',
+      'viewer',
+      'missing-staff',
+      'hash',
+      1,
+      '2026-06-19T00:00:00.000Z',
+      '2026-06-19T00:00:00.000Z'
+    );
+
     insert into user_sessions (id, user_id, token_hash, created_at, expires_at, revoked_at)
     values (
       'session-viewer',
@@ -167,9 +180,13 @@ describe("SQLite auth store", () => {
       expect(db.prepare("select staff_id from users where id = ?").get("user-viewer")).toEqual({
         staff_id: "staff-nurse-003"
       });
+      expect(db.prepare("select staff_id from users where id = ?").get("user-dangling-viewer")).toEqual({
+        staff_id: null
+      });
       expect(db.prepare("select user_id from user_sessions where id = ?").get("session-viewer")).toEqual({
         user_id: "user-viewer"
       });
+      expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
       expect(() =>
         db
           .prepare(
