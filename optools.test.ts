@@ -11,6 +11,11 @@ interface CommandResult {
   stderr: string;
 }
 
+interface RunOptoolsOptions {
+  cwd?: string;
+  env?: Record<string, string>;
+}
+
 const tempDirs: string[] = [];
 const scriptPath = resolve(process.cwd(), "optools.sh");
 
@@ -20,15 +25,22 @@ async function createStateDir(): Promise<string> {
   return dir;
 }
 
-function runOptools(args: string[], env: Record<string, string> = {}): Promise<CommandResult> {
+function runOptools(
+  args: string[],
+  envOrOptions: Record<string, string> | RunOptoolsOptions = {}
+): Promise<CommandResult> {
+  const options: RunOptoolsOptions =
+    "cwd" in envOrOptions || "env" in envOrOptions ? envOrOptions : { env: envOrOptions };
+
   return new Promise((resolveResult) => {
     execFile(
       "bash",
       [scriptPath, ...args],
       {
+        cwd: options.cwd,
         env: {
           ...process.env,
-          ...env
+          ...options.env
         }
       },
       (error: ExecFileException | null, stdout, stderr) => {
@@ -196,6 +208,78 @@ describe("optools.sh", () => {
     const combinedOutput = `${result.stdout}\n${result.stderr}`;
     expect(combinedOutput).not.toContain("super-secret-password");
     expect(combinedOutput).not.toContain('"adminPassword":');
+  });
+
+  it("shows server config when invoked from outside the source root", async () => {
+    const stateDir = await createStateDir();
+    const configPath = join(stateDir, "server.local.json");
+    const outsideCwd = join(stateDir, "outside");
+
+    await mkdir(outsideCwd, { recursive: true });
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          host: "127.0.0.1",
+          port: 3999,
+          storageDriver: "sqlite",
+          sqlitePath: "/var/lib/my-working-schedule/schedule.db",
+          backupPath: "/var/backups/my-working-schedule",
+          adminPassword: "super-secret-password"
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const result = await runOptools(["config", "server"], {
+      cwd: outsideCwd,
+      env: {
+        SCHEDULE_CONFIG_PATH: configPath
+      }
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain("config: effective server config");
+    expect(result.stdout).toContain('"host": "127.0.0.1"');
+    expect(result.stdout).toContain('"port": 3999');
+    expect(result.stdout).toContain('"storageDriver": "sqlite"');
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(combinedOutput).not.toContain("super-secret-password");
+    expect(combinedOutput).not.toContain('"adminPassword":');
+  });
+
+  it("uses explicit HOST and PORT values over config-file host and port", async () => {
+    const stateDir = await createStateDir();
+    const configPath = join(stateDir, "server.local.json");
+
+    await writeFile(
+      configPath,
+      JSON.stringify(
+        {
+          host: "127.0.0.1",
+          port: 3999,
+          storageDriver: "sqlite",
+          sqlitePath: "/var/lib/my-working-schedule/schedule.db",
+          backupPath: "/var/backups/my-working-schedule",
+          adminPassword: "super-secret-password"
+        },
+        null,
+        2
+      ),
+      "utf8"
+    );
+
+    const result = await runOptools(["config", "server"], {
+      SCHEDULE_CONFIG_PATH: configPath,
+      HOST: "0.0.0.0",
+      PORT: "4888"
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(result.stdout).toContain('"host": "0.0.0.0"');
+    expect(result.stdout).toContain('"port": 4888');
   });
 
   it("rejects unknown config subcommands", async () => {

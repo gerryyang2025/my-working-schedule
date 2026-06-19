@@ -1012,7 +1012,7 @@ run_config_server() {
     env_args+=(-u PORT)
   fi
 
-  env "${env_args[@]}" node --import tsx -e '
+  env_args+=(node --import tsx -e '
     const { resolveServerConfig } = await import("./server/config.ts");
     const config = resolveServerConfig();
     const redacted = {
@@ -1026,7 +1026,12 @@ run_config_server() {
     };
     console.log("config: effective server config");
     console.log(JSON.stringify(redacted, null, 2));
-  '
+  ')
+
+  (
+    cd "$ROOT_DIR"
+    env "${env_args[@]}"
+  )
 }
 
 run_config_helper() {
