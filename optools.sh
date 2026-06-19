@@ -49,6 +49,8 @@ SYSTEMD_SOURCE_FILE="${OPTOOLS_SYSTEMD_SOURCE_FILE:-"$ROOT_DIR/deploy/systemd/my
 SYSTEMD_SERVICE_FILE="${OPTOOLS_SYSTEMD_SERVICE_FILE:-"/etc/systemd/system/${APP_SERVICE_NAME}.service"}"
 NPM_BIN="${OPTOOLS_NPM_BIN:-}"
 NPM_CANDIDATES="${OPTOOLS_NPM_CANDIDATES:-"/opt/node-v22.22.0/bin/npm /opt/node/bin/npm /usr/local/bin/npm /usr/bin/npm"}"
+HOST_WAS_SET="${HOST+x}"
+PORT_WAS_SET="${PORT+x}"
 API_PORT="${PORT:-3001}"
 PORT="$API_PORT"
 HOST="${HOST:-0.0.0.0}"
@@ -72,6 +74,10 @@ Usage:
   ./optools.sh dev logs -f    Follow daemon logs
   ./optools.sh build          Build frontend assets and install production runtime files
   ./optools.sh deploy         Build, install dependencies, check services, and restart production app
+  ./optools.sh config         Show key production operations config
+  ./optools.sh config show    Show key production operations config
+  ./optools.sh config paths   Show important local and production paths
+  ./optools.sh config server  Show effective server config with secrets redacted
   ./optools.sh nginx install  Install/configure nginx and reload
   ./optools.sh nginx configure [--no-reload]
   ./optools.sh nginx test     Run nginx -t through the helper
@@ -121,7 +127,7 @@ Environment:
   PUBLIC_HOST                 Host/IP shown for external access (default: detected LAN IP)
   VITE_API_PROXY_TARGET       Vite API proxy target (default: http://127.0.0.1:PORT)
   SCHEDULE_DATA_PATH          Optional API data file override
-  SCHEDULE_CONFIG_PATH        Optional API config file override
+  SCHEDULE_CONFIG_PATH        Optional server config file path
   SCHEDULE_ADMIN_PASSWORD     Optional admin password override
 EOF
 }
@@ -953,6 +959,100 @@ run_deploy() {
   echo "deploy: completed"
 }
 
+server_config_path() {
+  if [[ -n "${SCHEDULE_CONFIG_PATH:-}" ]]; then
+    echo "$SCHEDULE_CONFIG_PATH"
+    return
+  fi
+
+  echo "$ROOT_DIR/config/server.local.json"
+}
+
+run_config_show() {
+  echo "config: operations summary"
+  echo "source root: $ROOT_DIR"
+  echo "install dir: $INSTALL_DIR"
+  echo "static dist: $INSTALL_DIST_DIR"
+  echo "data dir: $DATA_DIR"
+  echo "backup dir: $BACKUP_DIR"
+  echo "systemd service: $APP_SERVICE_NAME"
+  echo "systemd file: $SYSTEMD_SERVICE_FILE"
+  echo "nginx helper: $NGINX_SERVICE_SCRIPT"
+  echo "sqlite helper: $SQLITE_SERVICE_SCRIPT"
+  echo "api health url: $API_HEALTH_URL"
+}
+
+run_config_paths() {
+  echo "config: paths"
+  echo "source root: $ROOT_DIR"
+  echo "install dir: $INSTALL_DIR"
+  echo "static dist: $INSTALL_DIST_DIR"
+  echo "state dir: $STATE_DIR"
+  echo "log dir: $LOG_DIR"
+  echo "dev pid file: $PID_FILE"
+  echo "dev log file: $LOG_FILE"
+  echo "server config path: $(server_config_path)"
+  echo "systemd source file: $SYSTEMD_SOURCE_FILE"
+  echo "systemd file: $SYSTEMD_SERVICE_FILE"
+  echo "nginx helper: $NGINX_SERVICE_SCRIPT"
+  echo "sqlite helper: $SQLITE_SERVICE_SCRIPT"
+}
+
+run_config_server() {
+  if ! command -v node >/dev/null 2>&1; then
+    echo "config server: node command not found" >&2
+    return 1
+  fi
+
+  local env_args=()
+  if [[ -z "$HOST_WAS_SET" ]]; then
+    env_args+=(-u HOST)
+  fi
+  if [[ -z "$PORT_WAS_SET" ]]; then
+    env_args+=(-u PORT)
+  fi
+
+  env "${env_args[@]}" node --import tsx -e '
+    const { resolveServerConfig } = await import("./server/config.ts");
+    const config = resolveServerConfig();
+    const redacted = {
+      host: config.host,
+      port: config.port,
+      storageDriver: config.storageDriver,
+      storagePath: config.storagePath ?? null,
+      sqlitePath: config.sqlitePath ?? null,
+      backupPath: config.backupPath ?? null,
+      adminPasswordConfigured: Boolean(config.adminPassword)
+    };
+    console.log("config: effective server config");
+    console.log(JSON.stringify(redacted, null, 2));
+  '
+}
+
+run_config_helper() {
+  local command="${1:-show}"
+
+  case "$command" in
+    show|"")
+      run_config_show
+      ;;
+    paths)
+      run_config_paths
+      ;;
+    server)
+      run_config_server
+      ;;
+    help|-h|--help)
+      usage
+      ;;
+    *)
+      echo "Unknown config command: $command" >&2
+      usage
+      return 1
+      ;;
+  esac
+}
+
 doctor_check() {
   local label="$1"
   shift
@@ -1020,6 +1120,10 @@ main() {
       ;;
     deploy)
       run_deploy
+      ;;
+    config)
+      shift || true
+      run_config_helper "$@"
       ;;
     nginx)
       shift || true
