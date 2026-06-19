@@ -193,8 +193,9 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain('"port": 3999');
     expect(result.stdout).toContain('"storageDriver": "sqlite"');
     expect(result.stdout).toContain('"adminPasswordConfigured": true');
-    expect(result.stdout).not.toContain("super-secret-password");
-    expect(result.stdout).not.toContain('"adminPassword":');
+    const combinedOutput = `${result.stdout}\n${result.stderr}`;
+    expect(combinedOutput).not.toContain("super-secret-password");
+    expect(combinedOutput).not.toContain('"adminPassword":');
   });
 
   it("rejects unknown config subcommands", async () => {
