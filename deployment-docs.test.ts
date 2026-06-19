@@ -14,6 +14,8 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db");
     expect(runbook).toContain("SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule");
     expect(runbook).toContain("./optools.sh deploy");
+    expect(runbook).toContain("安装并 dry-run 验证 logrotate");
+    expect(runbook).toContain("OPTOOLS_HEALTH_RETRIES=60 OPTOOLS_HEALTH_RETRY_DELAY=1 ./optools.sh deploy");
     expect(runbook).toContain("./optools.sh build");
     expect(runbook).toContain("npm run start:api");
     expect(runbook).toContain("./optools.sh app init");

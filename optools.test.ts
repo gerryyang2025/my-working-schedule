@@ -609,7 +609,9 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
     const sourceFile = join(stateDir, "source.service");
     const fakeDataHelper = join(stateDir, "sqlite-service.sh");
     const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const fakeLogrotateHelper = join(stateDir, "logrotate-service.sh");
     const commandLogPath = join(stateDir, "deploy.log");
+    const curlCountPath = join(stateDir, "curl-count");
     const fakeNpmPath = join(fakeBinDir, "npm");
 
     await mkdir(fakeBinDir, { recursive: true });
@@ -630,9 +632,23 @@ fi
     await createExecutable(join(fakeBinDir, "systemctl"), `printf 'systemctl %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
     await createExecutable(join(fakeBinDir, "runuser"), `printf 'runuser %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
     await createExecutable(join(fakeBinDir, "ss"), `printf 'ss %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
-    await createExecutable(join(fakeBinDir, "curl"), `printf 'curl %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
+    await createExecutable(
+      join(fakeBinDir, "curl"),
+      `count=0
+if [ -f "$CURL_COUNT_FILE" ]; then
+  count="$(cat "$CURL_COUNT_FILE")"
+fi
+count=$((count + 1))
+printf '%s' "$count" > "$CURL_COUNT_FILE"
+printf 'curl %s\\n' "$*" >> "$DEPLOY_LOG"
+if [ "$count" -lt 3 ]; then
+  exit 7
+fi
+`
+    );
     await createExecutable(fakeDataHelper, `printf 'data %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
     await createExecutable(fakeNginxHelper, `printf 'nginx %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
+    await createExecutable(fakeLogrotateHelper, `printf 'logrotate %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
 
     const result = await runOptools(["deploy"], {
       DEPLOY_LOG: commandLogPath,
@@ -643,8 +659,12 @@ fi
       OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
       OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
       OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
       OPTOOLS_APP_SERVICE_NAME: "schedule-api",
       OPTOOLS_API_HEALTH_URL: "http://127.0.0.1:3001/api/health",
+      OPTOOLS_HEALTH_RETRIES: "3",
+      OPTOOLS_HEALTH_RETRY_DELAY: "0",
+      CURL_COUNT_FILE: curlCountPath,
       PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
     });
 
@@ -658,11 +678,14 @@ fi
     expect(log).toContain("data status");
     expect(log).toContain("data check");
     expect(log).toContain("nginx test");
+    expect(log).toContain("logrotate install");
+    expect(log).toContain("logrotate test");
     expect(log).toContain("systemctl stop schedule-api");
     expect(log).toContain("ss -ltnp sport = :3001");
     expect(log).toContain("systemctl start schedule-api");
     expect(log).toContain("systemctl status schedule-api");
-    expect(log).toContain("curl -fsS --max-time 2 http://127.0.0.1:3001/api/health");
+    expect((log.match(/curl -fsS --max-time 2 http:\/\/127\.0\.0\.1:3001\/api\/health/g) ?? []).length).toBe(3);
+    expect(result.stdout).toContain("api health: ok <http://127.0.0.1:3001/api/health>");
   });
 
   it("stops deploy when the API port is already occupied after stopping the app service", async () => {
@@ -675,6 +698,7 @@ fi
     const sourceFile = join(stateDir, "source.service");
     const fakeDataHelper = join(stateDir, "sqlite-service.sh");
     const fakeNginxHelper = join(stateDir, "nginx-service.sh");
+    const fakeLogrotateHelper = join(stateDir, "logrotate-service.sh");
     const commandLogPath = join(stateDir, "deploy.log");
     const fakeNpmPath = join(fakeBinDir, "npm");
 
@@ -705,6 +729,7 @@ printf 'LISTEN 0 511 127.0.0.1:3001 0.0.0.0:* users:(("node",pid=123,fd=18))\\n'
     await createExecutable(join(fakeBinDir, "curl"), `printf 'curl %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
     await createExecutable(fakeDataHelper, `printf 'data %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
     await createExecutable(fakeNginxHelper, `printf 'nginx %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
+    await createExecutable(fakeLogrotateHelper, `printf 'logrotate %s\\n' "$*" >> "$DEPLOY_LOG"\n`);
 
     const result = await runOptools(["deploy"], {
       DEPLOY_LOG: commandLogPath,
@@ -715,6 +740,7 @@ printf 'LISTEN 0 511 127.0.0.1:3001 0.0.0.0:* users:(("node",pid=123,fd=18))\\n'
       OPTOOLS_SYSTEMD_SERVICE_FILE: systemdFile,
       OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
       OPTOOLS_NGINX_SERVICE_SCRIPT: fakeNginxHelper,
+      OPTOOLS_LOGROTATE_SERVICE_SCRIPT: fakeLogrotateHelper,
       OPTOOLS_APP_SERVICE_NAME: "schedule-api",
       PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
     });
@@ -724,6 +750,8 @@ printf 'LISTEN 0 511 127.0.0.1:3001 0.0.0.0:* users:(("node",pid=123,fd=18))\\n'
     expect(result.stderr).toContain("node");
     const log = await readFile(commandLogPath, "utf8");
     expect(log).toContain("systemctl stop schedule-api");
+    expect(log).toContain("logrotate install");
+    expect(log).toContain("logrotate test");
     expect(log).not.toContain("systemctl start schedule-api");
     expect(log).not.toContain("curl -fsS --max-time 2");
   });

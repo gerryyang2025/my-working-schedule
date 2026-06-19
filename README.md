@@ -163,7 +163,7 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 
 单机正式部署建议使用：
 
-- `./optools.sh deploy` 一键完成初始化、构建、依赖安装、SQLite/Nginx 检查、生产服务重启和健康检查。
+- `./optools.sh deploy` 一键完成初始化、构建、依赖安装、SQLite/Nginx/logrotate 检查、生产服务重启和健康检查等待。
 - `./optools.sh build` 构建前端静态资源，并把 API 运行文件安装到 `/opt/my-working-schedule`。
 - `npm run start:api` 启动 Express API。
 - `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。
@@ -182,6 +182,14 @@ cd /root/github/my-working-schedule
 git pull
 ./optools.sh deploy
 ```
+
+API 重启后可能需要几秒钟才能响应 `/api/health`。`deploy` 会自动重试健康检查；服务器启动较慢时可临时放宽等待时间：
+
+```bash
+OPTOOLS_HEALTH_RETRIES=60 OPTOOLS_HEALTH_RETRY_DELAY=1 ./optools.sh deploy
+```
+
+`deploy` 也会自动安装并 dry-run 验证 logrotate 配置，避免后续 `./optools.sh doctor` 因日志轮转未初始化而失败。如果服务器缺少 `logrotate` 系统命令，请先安装系统包后重新执行 `./optools.sh deploy`。
 
 如果 systemd 日志出现 `status=203/EXEC`，通常是 service 中的 `ExecStart` 指向了不存在或服务用户不可执行的 npm。不要把 `/root/.nvm/.../npm` 直接配置给非 root 服务用户；推荐把 Node.js 放到 `/opt/node-v22.22.0` 这类可访问路径。`deploy` 会自动寻找服务用户可执行的 npm；特殊路径可用 `OPTOOLS_NPM_BIN=/custom/node/bin/npm ./optools.sh deploy` 覆盖。
 

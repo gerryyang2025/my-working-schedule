@@ -62,6 +62,8 @@ PUBLIC_HOST="${PUBLIC_HOST:-$(detect_public_host)}"
 VITE_API_PROXY_TARGET="${VITE_API_PROXY_TARGET:-"http://127.0.0.1:${API_PORT}"}"
 API_HEALTH_URL="${OPTOOLS_API_HEALTH_URL:-"http://127.0.0.1:${API_PORT}/api/health"}"
 WEB_URL="${OPTOOLS_WEB_URL:-"http://127.0.0.1:${WEB_PORT}"}"
+HEALTH_RETRIES="${OPTOOLS_HEALTH_RETRIES:-30}"
+HEALTH_RETRY_DELAY="${OPTOOLS_HEALTH_RETRY_DELAY:-1}"
 
 export HOST WEB_HOST WEB_PORT PORT VITE_API_PROXY_TARGET
 
@@ -129,6 +131,8 @@ Environment:
   OPTOOLS_SYSTEMD_SERVICE_FILE systemd target file (default: /etc/systemd/system/OPTOOLS_APP_SERVICE_NAME.service)
   OPTOOLS_NPM_BIN             npm executable for systemd ExecStart (default: detected with command -v npm)
   OPTOOLS_NPM_CANDIDATES      Fallback npm candidates for app init/deploy (default: /opt/node-v22.22.0/bin/npm /opt/node/bin/npm /usr/local/bin/npm /usr/bin/npm)
+  OPTOOLS_HEALTH_RETRIES      API health retry count during deploy (default: 30)
+  OPTOOLS_HEALTH_RETRY_DELAY  Seconds between deploy health retries (default: 1)
   HOST                        API bind host (default: 0.0.0.0)
   PORT                        API port used by npm run dev:api (default: 3001)
   WEB_HOST                    Web bind host (default: 0.0.0.0)
@@ -203,6 +207,40 @@ health_check() {
     printf '%s: ok <%s>\n' "$label" "$url"
     return 0
   fi
+
+  printf '%s: unavailable <%s>\n' "$label" "$url"
+  return 1
+}
+
+wait_health_check() {
+  local label="$1"
+  local url="$2"
+  local attempts="${3:-$HEALTH_RETRIES}"
+  local delay_seconds="${4:-$HEALTH_RETRY_DELAY}"
+  local attempt=1
+
+  if ! command -v curl >/dev/null 2>&1; then
+    printf '%s: unknown (curl not found) <%s>\n' "$label" "$url"
+    return 1
+  fi
+
+  if ! [[ "$attempts" =~ ^[0-9]+$ ]] || ((attempts < 1)); then
+    attempts=1
+  fi
+
+  while ((attempt <= attempts)); do
+    if curl -fsS --max-time 2 "$url" >/dev/null 2>&1; then
+      printf '%s: ok <%s>\n' "$label" "$url"
+      return 0
+    fi
+
+    if ((attempt < attempts)); then
+      printf '%s: waiting (%s/%s) <%s>\n' "$label" "$attempt" "$attempts" "$url"
+      sleep "$delay_seconds"
+    fi
+
+    attempt=$((attempt + 1))
+  done
 
   printf '%s: unavailable <%s>\n' "$label" "$url"
   return 1
@@ -1008,11 +1046,13 @@ run_deploy() {
   run_data_helper status
   run_data_helper check
   run_nginx_helper test
+  run_logrotate_helper install
+  run_logrotate_helper test
   run_app_systemctl stop
   ensure_api_port_available
   run_app_systemctl start
   run_app_doctor
-  health_check "api health" "$API_HEALTH_URL"
+  wait_health_check "api health" "$API_HEALTH_URL"
   echo "deploy: completed"
 }
 
