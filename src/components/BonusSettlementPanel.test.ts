@@ -72,7 +72,7 @@ const settledSnapshot: MonthlySettlement = {
 function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>["$props"]> = {}) {
   return mount(BonusSettlementPanel, {
     props: {
-      adminMode: true,
+      canOperateSettlement: true,
       canceling: false,
       month: "2026-06",
       monthlySummary,
@@ -150,12 +150,21 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.emitted("confirmSettlement")).toEqual([[{ month: "2026-06", bonusPool: 1000 }]]);
   });
 
-  it("disables confirmation outside admin mode", async () => {
-    const wrapper = mountPanel({ adminMode: false });
+  it("disables confirmation outside settlement operation mode", async () => {
+    const wrapper = mountPanel({ canOperateSettlement: false });
 
     await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
 
     expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("blocks settlement actions when the current account cannot operate the whole settlement", async () => {
+    const wrapper = mountPanel({ canOperateSettlement: false });
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.emitted("confirmSettlement")).toBeUndefined();
   });
 
   it("shows a settled snapshot and emits the canceled month", async () => {

@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
-import type { PublicAppData } from "@/api/client";
+import type { AuthUser, PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
   deleteHoliday: vi.fn(),
@@ -85,7 +85,23 @@ const testData: PublicAppData = {
   }
 };
 
-const testAuthUser = {
+const twoStaffData: PublicAppData = {
+  ...testData,
+  staff: [
+    ...testData.staff,
+    {
+      id: "staff-nurse-002",
+      jobId: "100002",
+      name: "王护士",
+      type: "nurse",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 2
+    }
+  ]
+};
+
+const testAuthUser: AuthUser = {
   id: "user-admin",
   username: "admin",
   displayName: "系统管理员",
@@ -93,6 +109,17 @@ const testAuthUser = {
   staffId: null,
   managedStaffIds: []
 };
+
+function createSchedulerUser(managedStaffIds: string[]): AuthUser {
+  return {
+    id: "user-scheduler",
+    username: "scheduler",
+    displayName: "排班员",
+    role: "scheduler",
+    staffId: null,
+    managedStaffIds
+  };
+}
 
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
@@ -124,8 +151,28 @@ const AppToolbarStub = defineComponent({
 
 const ScheduleGridStub = defineComponent({
   name: "ScheduleGrid",
-  props: ["days"],
-  template: '<section data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</section>'
+  props: ["days", "editableStaffIds"],
+  emits: ["quickFill", "editCell"],
+  template: `
+    <section>
+      <span data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</span>
+      <span data-testid="schedule-editable-staff-ids">{{ editableStaffIds?.join(",") }}</span>
+      <button
+        data-testid="emit-unmanaged-quick-fill"
+        type="button"
+        @click="$emit('quickFill', 'staff-nurse-002', '2026-06-15')"
+      >
+        unmanaged quick fill
+      </button>
+      <button
+        data-testid="emit-unmanaged-edit-cell"
+        type="button"
+        @click="$emit('editCell', 'staff-nurse-002', '2026-06-15')"
+      >
+        unmanaged edit
+      </button>
+    </section>
+  `
 });
 
 const WeeklySummaryStub = defineComponent({
@@ -136,6 +183,18 @@ const WeeklySummaryStub = defineComponent({
 
 const EmptyStub = defineComponent({
   template: "<section />"
+});
+
+const CellEditorDialogStub = defineComponent({
+  name: "CellEditorDialog",
+  props: ["modelValue", "staff"],
+  emits: ["save"],
+  template: `
+    <section v-if="modelValue" data-testid="cell-editor">
+      <span data-testid="editing-staff-id">{{ staff?.id }}</span>
+      <button data-testid="save-editor" type="button" @click="$emit('save', ['shift-a1'], 'note')">save editor</button>
+    </section>
+  `
 });
 
 const ManagementDrawerStub = defineComponent({
@@ -216,7 +275,17 @@ const PrintViewsStub = defineComponent({
 
 const BonusSettlementPanelStub = defineComponent({
   name: "BonusSettlementPanel",
-  props: ["month", "monthlySummary", "settlement", "startMonth", "endMonth", "isRangeMode", "isRangeValid", "sourceMonths"],
+  props: [
+    "month",
+    "monthlySummary",
+    "settlement",
+    "startMonth",
+    "endMonth",
+    "isRangeMode",
+    "isRangeValid",
+    "sourceMonths",
+    "canOperateSettlement"
+  ],
   emits: ["confirmSettlement", "cancelSettlement", "update:startMonth", "update:endMonth"],
   setup() {
     return { draftBonusPool: ref("") };
@@ -226,6 +295,7 @@ const BonusSettlementPanelStub = defineComponent({
       <span data-testid="bonus-month">{{ month }}</span>
       <span data-testid="bonus-range">{{ startMonth }}-{{ endMonth }} {{ isRangeMode ? "range" : "single" }}</span>
       <span data-testid="bonus-range-valid">{{ isRangeValid ? "valid" : "invalid" }}</span>
+      <span data-testid="bonus-can-operate">{{ canOperateSettlement ? "true" : "false" }}</span>
       <span data-testid="bonus-status">{{ settlement ? "已月结" : "未月结" }}</span>
       <span data-testid="bonus-summary">
         {{ monthlySummary.rows.map((row) => [row.staffName, row.attendanceShifts, row.coefficientTotal === null ? "null" : row.coefficientTotal.toFixed(2)].join(":")).join("|") }}
@@ -239,6 +309,12 @@ const BonusSettlementPanelStub = defineComponent({
       <button data-testid="cancel-settlement" type="button" @click="$emit('cancelSettlement', month)">cancel</button>
     </section>
   `
+});
+
+const ShiftPaletteStub = defineComponent({
+  name: "ShiftPalette",
+  emits: ["select"],
+  template: '<button data-testid="select-shift-a1" type="button" @click="$emit(\'select\', \'shift-a1\')">select shift</button>'
 });
 
 const ElDialogStub = defineComponent({
@@ -261,8 +337,8 @@ const ElButtonStub = defineComponent({
   template: '<button type="button" :disabled="disabled" v-bind="$attrs"><slot /></button>'
 });
 
-function mountApp(appData: PublicAppData = testData) {
-  apiMocks.getCurrentUser.mockResolvedValue(testAuthUser);
+function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null = testAuthUser) {
+  apiMocks.getCurrentUser.mockResolvedValue(authUser);
   apiMocks.loadData.mockResolvedValue(structuredClone(appData));
   apiMocks.listUsers.mockResolvedValue({
     rows: [
@@ -301,7 +377,7 @@ function mountApp(appData: PublicAppData = testData) {
       stubs: {
         AppToolbar: AppToolbarStub,
         BonusSettlementPanel: BonusSettlementPanelStub,
-        CellEditorDialog: EmptyStub,
+        CellEditorDialog: CellEditorDialogStub,
         ElButton: ElButtonStub,
         ElDialog: ElDialogStub,
         ElInput: ElInputStub,
@@ -310,7 +386,7 @@ function mountApp(appData: PublicAppData = testData) {
         PasswordChangeDialog: PasswordChangeDialogStub,
         PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
-        ShiftPalette: EmptyStub,
+        ShiftPalette: ShiftPaletteStub,
         WeeklySummary: WeeklySummaryStub
       }
     }
@@ -473,8 +549,8 @@ describe("App", () => {
 
     const infoPanel = wrapper.get(".app-info-panel");
     expect(infoPanel.text()).toContain("快速上手");
-    expect(infoPanel.text()).toContain("选择日期查看所在周");
-    expect(infoPanel.text()).toContain("点击格子快速排班");
+    expect(infoPanel.text()).toContain("所有登录账号可查看全科排班");
+    expect(infoPanel.text()).toContain("排班员只能编辑账号可管理人员范围内的格子");
     expect(infoPanel.text()).toContain("核算规则");
     expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
     expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
@@ -490,7 +566,8 @@ describe("App", () => {
 
     await flushPromises();
     expect(wrapper.get('[data-testid="current-user"]').text()).toContain("系统管理员");
-    expect(wrapper.get(".admin-mode-banner").text()).toContain("当前账号可维护排班");
+    expect(wrapper.get(".admin-mode-banner").text()).toContain("当前账号可查看全科排班");
+    expect(wrapper.get(".admin-mode-banner").text()).toContain("并可维护人员、班次、节假日和账号");
 
     await wrapper.get('[data-testid="logout-button"]').trigger("click");
     await flushPromises();
@@ -648,6 +725,32 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
+  it("passes only scheduler-managed enabled staff ids to the schedule grid", async () => {
+    const wrapper = mountApp(twoStaffData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-editable-staff-ids"]').text()).toBe("staff-nurse-001");
+    expect(wrapper.get(".admin-mode-banner").text()).toContain("可编辑范围由账号可管理人员决定");
+  });
+
+  it("blocks unmanaged scheduler schedule edits even if the grid emits them", async () => {
+    apiMocks.saveScheduleEntry.mockResolvedValue(structuredClone(twoStaffData));
+    const wrapper = mountApp(twoStaffData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await wrapper.get('[data-testid="select-shift-a1"]').trigger("click");
+    await wrapper.get('[data-testid="emit-unmanaged-quick-fill"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveScheduleEntry).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="emit-unmanaged-edit-cell"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="cell-editor"]').exists()).toBe(false);
+  });
+
   it("shows scheduling content by default and switches workbench tabs without changing the selected date", async () => {
     const wrapper = mountApp();
 
@@ -784,6 +887,22 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士");
     vi.useRealTimers();
+  });
+
+  it("allows scheduler settlement operations only when every bonus row is managed", async () => {
+    const managedOnly = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await openBonusTab(managedOnly);
+
+    expect(managedOnly.get('[data-testid="bonus-can-operate"]').text()).toBe("true");
+
+    const withUnmanagedRow = mountApp(twoStaffData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await openBonusTab(withUnmanagedRow);
+
+    expect(withUnmanagedRow.get('[data-testid="bonus-can-operate"]').text()).toBe("false");
   });
 
   it("passes a custom range trial summary into the bonus panel", async () => {

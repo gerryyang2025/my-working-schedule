@@ -10,7 +10,7 @@ const props = defineProps<{
   shifts: Shift[];
   entries: ScheduleEntry[];
   selectedShiftId: string;
-  adminMode: boolean;
+  editableStaffIds: string[];
 }>();
 
 const emit = defineEmits<{
@@ -21,6 +21,7 @@ const emit = defineEmits<{
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftMap = computed(() => new Map(props.shifts.map((shift) => [shift.id, shift])));
 const entryMap = computed(() => new Map(props.entries.map((entry) => [`${entry.date}__${entry.staffId}`, entry])));
+const editableStaffIdSet = computed(() => new Set(props.editableStaffIds));
 const visibleDayKeys = computed(() => new Set(props.days.map((day) => day.key)));
 const staffWithVisibleEntries = computed(
   () => new Set(props.entries.filter((entry) => visibleDayKeys.value.has(entry.date)).map((entry) => entry.staffId))
@@ -76,7 +77,7 @@ function entryFor(staffId: string, date: string): ScheduleEntry | null {
 }
 
 function canEditStaff(staff: StaffMember): boolean {
-  return props.adminMode && staff.enabled;
+  return staff.enabled && editableStaffIdSet.value.has(staff.id);
 }
 
 function handleCellClick(staff: StaffMember, date: string): void {

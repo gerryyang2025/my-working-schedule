@@ -139,9 +139,40 @@ const shiftCoefficientDescriptions = computed(() =>
     .map((shift) => `${shift.name} ${shift.countsAttendance ? shift.coefficient.toFixed(2) : "不计出勤"}`)
     .join("；")
 );
-const canEditSchedule = computed(
-  () => currentUser.value?.role === "admin" || currentUser.value?.role === "scheduler"
-);
+const managedStaffIdSet = computed(() => new Set(currentUser.value?.managedStaffIds ?? []));
+const editableStaffIds = computed(() => {
+  if (!data.value || !currentUser.value) {
+    return [];
+  }
+
+  if (currentUser.value.role === "admin") {
+    return data.value.staff.filter((staff) => staff.enabled).map((staff) => staff.id);
+  }
+
+  if (currentUser.value.role === "scheduler") {
+    return data.value.staff
+      .filter((staff) => staff.enabled && managedStaffIdSet.value.has(staff.id))
+      .map((staff) => staff.id);
+  }
+
+  return [];
+});
+const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
+const canOperateCurrentSettlement = computed(() => {
+  if (!currentUser.value || !displayedBonusSummary.value) {
+    return false;
+  }
+
+  if (currentUser.value.role === "admin") {
+    return true;
+  }
+
+  if (currentUser.value.role !== "scheduler") {
+    return false;
+  }
+
+  return displayedBonusSummary.value.rows.every((row) => managedStaffIdSet.value.has(row.staffId));
+});
 const canManageConfig = computed(() => currentUser.value?.role === "admin");
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
@@ -428,8 +459,12 @@ async function saveEntry(staffId: string, date: string, shiftIds: string[], note
   }
 }
 
+function canEditStaffId(staffId: string): boolean {
+  return editableStaffIds.value.includes(staffId);
+}
+
 async function handleQuickFill(staffId: string, date: string): Promise<void> {
-  if (!canEditSchedule.value || !selectedShiftId.value) {
+  if (!canEditStaffId(staffId) || !selectedShiftId.value) {
     return;
   }
 
@@ -437,12 +472,21 @@ async function handleQuickFill(staffId: string, date: string): Promise<void> {
 }
 
 function handleEditCell(staffId: string, date: string): void {
+  if (!canEditStaffId(staffId)) {
+    return;
+  }
+
   editingStaffId.value = staffId;
   editingDate.value = date;
   editorOpen.value = true;
 }
 
 async function handleEditorSave(shiftIds: string[], note: string): Promise<void> {
+  if (!canEditStaffId(editingStaffId.value)) {
+    editorOpen.value = false;
+    return;
+  }
+
   if (await saveEntry(editingStaffId.value, editingDate.value, shiftIds, note)) {
     editorOpen.value = false;
   }
@@ -539,7 +583,7 @@ async function handleConfirmSettlement(payload: { month: string; bonusPool: numb
     return;
   }
 
-  if (!canEditSchedule.value) {
+  if (!canOperateCurrentSettlement.value) {
     ElMessage.warning("当前账号没有月结权限");
     return;
   }
@@ -575,7 +619,7 @@ async function handleCancelSettlement(month: string): Promise<void> {
     return;
   }
 
-  if (!canEditSchedule.value) {
+  if (!canOperateCurrentSettlement.value) {
     ElMessage.warning("当前账号没有月结权限");
     return;
   }
@@ -620,7 +664,7 @@ onMounted(async () => {
     <section class="app-info-panel" aria-label="系统使用说明与核算规则">
       <div class="app-info-block">
         <h2>快速上手</h2>
-        <p>选择日期查看所在周；选择班次画笔后点击格子快速排班，点击格子可编辑一天最多两个班次。</p>
+        <p>所有登录账号可查看全科排班；排班员只能编辑账号可管理人员范围内的格子，其他格子为只读。</p>
       </div>
       <div class="app-info-block">
         <h2>核算规则</h2>
@@ -652,8 +696,8 @@ onMounted(async () => {
       @change-password="handleChangePassword"
     />
 
-    <section v-if="canEditSchedule" class="admin-mode-banner" role="status">
-      当前账号可维护排班{{ canManageConfig ? "、人员、班次和节假日" : "" }}。
+    <section v-if="currentUser.role === 'admin' || currentUser.role === 'scheduler'" class="admin-mode-banner" role="status">
+      当前账号可查看全科排班{{ canManageConfig ? "，并可维护人员、班次、节假日和账号" : "；可编辑范围由账号可管理人员决定" }}。
     </section>
 
     <el-dialog
@@ -760,7 +804,7 @@ onMounted(async () => {
               :shifts="data.shifts"
               :entries="data.scheduleEntries"
               :selected-shift-id="selectedShiftId"
-              :admin-mode="canEditSchedule"
+              :editable-staff-ids="editableStaffIds"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
             />
@@ -773,7 +817,7 @@ onMounted(async () => {
               v-if="displayedBonusSummary"
               v-model:start-month="bonusStartMonth"
               v-model:end-month="bonusEndMonth"
-              :admin-mode="canEditSchedule"
+              :can-operate-settlement="canOperateCurrentSettlement"
               :month="bonusStartMonth"
               :monthly-summary="displayedBonusSummary"
               :settlement="isBonusRangeMode ? null : currentBonusMonthlySettlement"

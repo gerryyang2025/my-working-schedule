@@ -59,7 +59,7 @@ function mountGrid(entries: ScheduleEntry[], overrides: Partial<InstanceType<typ
       shifts,
       entries,
       selectedShiftId: "shift-day",
-      adminMode: true,
+      editableStaffIds: ["staff-enabled"],
       ...overrides
     }
   });
@@ -170,6 +170,23 @@ describe("ScheduleGrid", () => {
     await cell?.trigger("click");
     vi.advanceTimersByTime(200);
     await cell?.trigger("dblclick");
+
+    expect(wrapper.emitted("quickFill")).toBeUndefined();
+    expect(wrapper.emitted("editCell")).toBeUndefined();
+  });
+
+  it("keeps unmanaged enabled staff cells read-only", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid([], {
+      editableStaffIds: []
+    });
+    const cell = wrapper.get('[data-testid="schedule-cell-staff-enabled-2026-06-19"]');
+
+    expect(cell.classes()).not.toContain("editable");
+
+    await cell.trigger("click");
+    vi.advanceTimersByTime(200);
+    await cell.trigger("dblclick");
 
     expect(wrapper.emitted("quickFill")).toBeUndefined();
     expect(wrapper.emitted("editCell")).toBeUndefined();

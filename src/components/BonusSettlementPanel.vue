@@ -14,7 +14,7 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
 };
 
 const props = defineProps<{
-  adminMode: boolean;
+  canOperateSettlement: boolean;
   canceling: boolean;
   month: string;
   monthlySummary: MonthlySummary;
@@ -90,7 +90,7 @@ const bonusPoolInputDescribedBy = computed(() =>
 );
 const canConfirm = computed(
   () =>
-    props.adminMode &&
+    props.canOperateSettlement &&
     !props.isRangeMode &&
     props.isRangeValid &&
     !isSettled.value &&
@@ -100,7 +100,13 @@ const canConfirm = computed(
     previewAllocation.value.canSettle
 );
 const canCancel = computed(
-  () => props.adminMode && !props.isRangeMode && props.isRangeValid && isSettled.value && !props.saving && !props.canceling
+  () =>
+    props.canOperateSettlement &&
+    !props.isRangeMode &&
+    props.isRangeValid &&
+    isSettled.value &&
+    !props.saving &&
+    !props.canceling
 );
 
 watch(
