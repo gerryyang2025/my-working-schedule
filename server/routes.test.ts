@@ -256,6 +256,20 @@ describe.sequential("API routes", () => {
         role: "scheduler",
         enabled: true,
         staffId: null,
+        managedStaffIds: null,
+        password: "scheduler-password"
+      })
+      .expect(400, { message: "账号信息不完整" });
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
         managedStaffIds: ["missing-staff"],
         password: "scheduler-password"
       })

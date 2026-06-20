@@ -244,7 +244,7 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
   }
 
   let parsedManagedStaffIds: string[];
-  if (managedStaffIds === undefined || managedStaffIds === null) {
+  if (managedStaffIds === undefined) {
     parsedManagedStaffIds = [];
   } else if (isStringArray(managedStaffIds)) {
     parsedManagedStaffIds = managedStaffIds.map((staffId) => staffId.trim()).filter(Boolean);
