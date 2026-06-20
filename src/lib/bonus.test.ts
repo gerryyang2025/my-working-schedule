@@ -81,6 +81,16 @@ describe("calculateBonusAllocation", () => {
     expect(nurse?.overtimeShifts).toBe(baseSummary.rows.find((row) => row.staffId === "staff-nurse")?.overtimeShifts);
   });
 
+  it("copies required shifts and attendance balance into allocation rows", () => {
+    const allocation = calculateBonusAllocation(baseSummary, 1500);
+
+    expect(allocation.rows.map((row) => [row.staffName, row.requiredShifts, row.attendanceBalance])).toEqual([
+      ["段护士长", 20, -10],
+      ["李护士", 20, -8],
+      ["王文员", 20, -12]
+    ]);
+  });
+
   it("copies staff job IDs into allocation rows", () => {
     const allocation = calculateBonusAllocation(baseSummary, 1500);
 
@@ -230,6 +240,8 @@ describe("createMonthlySettlement", () => {
         staffJobId: "000228",
         staffType: "head_nurse",
         attendanceShifts: 10,
+        requiredShifts: 20,
+        attendanceBalance: -10,
         overtimeShifts: 0,
         coefficientTotal: null,
         coefficientExcludedReason: "护士长绩效单独核算",
@@ -242,6 +254,8 @@ describe("createMonthlySettlement", () => {
         staffJobId: "100001",
         staffType: "nurse",
         attendanceShifts: 12,
+        requiredShifts: 20,
+        attendanceBalance: -8,
         overtimeShifts: 2,
         coefficientTotal: 10,
         coefficientExcludedReason: "",
@@ -254,6 +268,8 @@ describe("createMonthlySettlement", () => {
         staffJobId: "200001",
         staffType: "clerk",
         attendanceShifts: 8,
+        requiredShifts: 20,
+        attendanceBalance: -12,
         overtimeShifts: 0,
         coefficientTotal: 5,
         coefficientExcludedReason: "",

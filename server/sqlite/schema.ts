@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const SQLITE_SCHEMA_VERSION = 4;
+export const SQLITE_SCHEMA_VERSION = 5;
 
 function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
   const rows = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
@@ -75,6 +75,16 @@ function ensureUsersStaffBindingSchema(db: Database.Database): void {
   ).run();
 }
 
+function ensureMonthlySettlementRowsAttendanceBalanceSchema(db: Database.Database): void {
+  if (!tableHasColumn(db, "monthly_settlement_rows", "required_shifts")) {
+    db.prepare("alter table monthly_settlement_rows add column required_shifts integer not null default 0").run();
+  }
+
+  if (!tableHasColumn(db, "monthly_settlement_rows", "attendance_balance")) {
+    db.prepare("alter table monthly_settlement_rows add column attendance_balance integer not null default 0").run();
+  }
+}
+
 export function initializeSqliteSchema(db: Database.Database): void {
   db.pragma("foreign_keys = ON");
   db.exec(`
@@ -145,6 +155,8 @@ export function initializeSqliteSchema(db: Database.Database): void {
       staff_job_id text not null,
       staff_type text not null check (staff_type in ('nurse', 'clerk', 'head_nurse')),
       attendance_shifts integer not null,
+      required_shifts integer not null default 0,
+      attendance_balance integer not null default 0,
       overtime_shifts integer not null,
       coefficient_total real,
       coefficient_excluded_reason text not null,
@@ -206,6 +218,7 @@ export function initializeSqliteSchema(db: Database.Database): void {
   `);
 
   ensureUsersStaffBindingSchema(db);
+  ensureMonthlySettlementRowsAttendanceBalanceSchema(db);
 
   const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
   if (!migration) {

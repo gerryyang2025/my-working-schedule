@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
+import { createMonthlySettlement } from "./bonus";
+import { calculateMonthlySummary } from "./calculation";
+import { getMonthDays } from "./date";
 import { calculateRangeBonusSummary, monthRangeToDates } from "./range-bonus";
-import type { AppData, MonthlySettlement, MonthlyStaffSummary } from "@/types/domain";
+import type { AppData, MonthlySettlement } from "@/types/domain";
 
 function settlement(month: string, overrides: Partial<MonthlySettlement> = {}): MonthlySettlement {
   return {
@@ -19,6 +22,8 @@ function settlement(month: string, overrides: Partial<MonthlySettlement> = {}): 
         staffJobId: "100001",
         staffType: "nurse",
         attendanceShifts: 4,
+        requiredShifts: 20,
+        attendanceBalance: -16,
         overtimeShifts: 1,
         coefficientTotal: 2,
         coefficientExcludedReason: "",
@@ -89,25 +94,26 @@ describe("calculateRangeBonusSummary", () => {
   });
 
   it("merges required shifts and attendance balance across settled and live months", () => {
-    const settledRow = {
-      staffId: "staff-nurse-001",
-      staffName: "李护士",
-      staffJobId: "100001",
-      staffType: "nurse",
-      attendanceShifts: 4,
-      requiredShifts: 20,
-      attendanceBalance: -16,
-      overtimeShifts: 1,
-      coefficientTotal: 2,
-      coefficientExcludedReason: "",
-      bonusAmount: 1000,
-      bonusExcludedReason: ""
-    } as MonthlySettlement["rows"][number] & Pick<MonthlyStaffSummary, "requiredShifts" | "attendanceBalance">;
     const summary = calculateRangeBonusSummary(
       data({
         monthlySettlements: [
           settlement("2026-06", {
-            rows: [settledRow]
+            rows: [
+              {
+                staffId: "staff-nurse-001",
+                staffName: "李护士",
+                staffJobId: "100001",
+                staffType: "nurse",
+                attendanceShifts: 4,
+                requiredShifts: 20,
+                attendanceBalance: -16,
+                overtimeShifts: 1,
+                coefficientTotal: 2,
+                coefficientExcludedReason: "",
+                bonusAmount: 1000,
+                bonusExcludedReason: ""
+              }
+            ]
           })
         ]
       }),
@@ -119,6 +125,44 @@ describe("calculateRangeBonusSummary", () => {
     expect(nurse?.attendanceShifts).toBe(5);
     expect(nurse?.requiredShifts).toBe(43);
     expect(nurse?.attendanceBalance).toBe(-38);
+  });
+
+  it("uses settled rows created from monthly summaries when merging required shifts and balances", () => {
+    const baseData = data({
+      scheduleEntries: [
+        { id: "2026-06-01__staff-nurse-001", date: "2026-06-01", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" },
+        { id: "2026-06-02__staff-nurse-001", date: "2026-06-02", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" },
+        { id: "2026-07-01__staff-nurse-001", date: "2026-07-01", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" }
+      ]
+    });
+    const juneSummary = calculateMonthlySummary(baseData, getMonthDays(2026, 6));
+    const juneSettlement = createMonthlySettlement({
+      month: "2026-06",
+      monthlySummary: juneSummary,
+      bonusPool: 1000,
+      settledAt: "2026-06-30T10:00:00.000Z"
+    });
+    const summary = calculateRangeBonusSummary(
+      data({
+        scheduleEntries: baseData.scheduleEntries,
+        monthlySettlements: [juneSettlement]
+      }),
+      "2026-06",
+      "2026-07"
+    );
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(juneSettlement.rows[0]).toMatchObject({
+      requiredShifts: 22,
+      attendanceBalance: -20
+    });
+    expect(summary.sourceMonths).toEqual([
+      { month: "2026-06", source: "settlement" },
+      { month: "2026-07", source: "live" }
+    ]);
+    expect(nurse?.attendanceShifts).toBe(3);
+    expect(nurse?.requiredShifts).toBe(45);
+    expect(nurse?.attendanceBalance).toBe(-42);
   });
 
   it("keeps head nurses excluded when merging range rows", () => {
@@ -133,6 +177,8 @@ describe("calculateRangeBonusSummary", () => {
                 staffJobId: "000228",
                 staffType: "head_nurse",
                 attendanceShifts: 2,
+                requiredShifts: 20,
+                attendanceBalance: -18,
                 overtimeShifts: 0,
                 coefficientTotal: null,
                 coefficientExcludedReason: "护士长绩效单独核算",

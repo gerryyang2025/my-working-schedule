@@ -116,6 +116,8 @@ function isMonthlySettlementRow(value: unknown): value is MonthlySettlementRow {
     isString(value.staffJobId) &&
     (value.staffType === "nurse" || value.staffType === "clerk" || value.staffType === "head_nurse") &&
     isNumber(value.attendanceShifts) &&
+    isNumber(value.requiredShifts) &&
+    isNumber(value.attendanceBalance) &&
     isNumber(value.overtimeShifts) &&
     (isNumber(value.coefficientTotal) || value.coefficientTotal === null) &&
     isString(value.coefficientExcludedReason) &&
@@ -132,6 +134,8 @@ function normalizeMonthlySettlementRow(row: unknown): MonthlySettlementRow | nul
   const candidate = {
     ...row,
     staffJobId: "staffJobId" in row ? row.staffJobId : "",
+    requiredShifts: "requiredShifts" in row ? row.requiredShifts : 0,
+    attendanceBalance: "attendanceBalance" in row ? row.attendanceBalance : 0,
     overtimeShifts: "overtimeShifts" in row ? row.overtimeShifts : 0
   };
 

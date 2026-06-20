@@ -119,9 +119,9 @@ export function replaceAppDataInSqlite(db: Database.Database, data: AppData): vo
     `);
     const insertSettlementRow = db.prepare(`
       insert into monthly_settlement_rows (
-        settlement_id, position, staff_id, staff_name, staff_job_id, staff_type, attendance_shifts, overtime_shifts,
-        coefficient_total, coefficient_excluded_reason, bonus_amount, bonus_excluded_reason
-      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        settlement_id, position, staff_id, staff_name, staff_job_id, staff_type, attendance_shifts, required_shifts,
+        attendance_balance, overtime_shifts, coefficient_total, coefficient_excluded_reason, bonus_amount, bonus_excluded_reason
+      ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
     for (const settlement of next.monthlySettlements) {
       insertSettlement.run(
@@ -143,6 +143,8 @@ export function replaceAppDataInSqlite(db: Database.Database, data: AppData): vo
           row.staffJobId,
           row.staffType,
           row.attendanceShifts,
+          row.requiredShifts,
+          row.attendanceBalance,
           row.overtimeShifts,
           row.coefficientTotal,
           row.coefficientExcludedReason,
@@ -289,6 +291,8 @@ type MonthlySettlementDataRow = {
   staff_job_id: string;
   staff_type: MonthlySettlement["rows"][number]["staffType"];
   attendance_shifts: number;
+  required_shifts: number;
+  attendance_balance: number;
   overtime_shifts: number;
   coefficient_total: number | null;
   coefficient_excluded_reason: string;
@@ -321,6 +325,8 @@ function readMonthlySettlements(db: Database.Database): MonthlySettlement[] {
       staff_job_id,
       staff_type,
       attendance_shifts,
+      required_shifts,
+      attendance_balance,
       overtime_shifts,
       coefficient_total,
       coefficient_excluded_reason,
@@ -341,6 +347,8 @@ function readMonthlySettlements(db: Database.Database): MonthlySettlement[] {
         staffJobId: settlementRow.staff_job_id,
         staffType: settlementRow.staff_type,
         attendanceShifts: settlementRow.attendance_shifts,
+        requiredShifts: settlementRow.required_shifts,
+        attendanceBalance: settlementRow.attendance_balance,
         overtimeShifts: settlementRow.overtime_shifts,
         coefficientTotal: settlementRow.coefficient_total,
         coefficientExcludedReason: settlementRow.coefficient_excluded_reason,

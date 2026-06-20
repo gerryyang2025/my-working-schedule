@@ -36,6 +36,8 @@ function createMonthlySettlement(): MonthlySettlement {
         staffJobId: "100001",
         staffType: "nurse",
         attendanceShifts: 6,
+        requiredShifts: 5,
+        attendanceBalance: 1,
         overtimeShifts: 1,
         coefficientTotal: null,
         coefficientExcludedReason: "excluded from coefficient pool",
@@ -48,6 +50,8 @@ function createMonthlySettlement(): MonthlySettlement {
         staffJobId: "000228",
         staffType: "head_nurse",
         attendanceShifts: 7,
+        requiredShifts: 5,
+        attendanceBalance: 2,
         overtimeShifts: 2,
         coefficientTotal: 2.5,
         coefficientExcludedReason: "",
@@ -117,6 +121,8 @@ function createReplacementData(): AppData {
             staffJobId: "300001",
             staffType: "nurse",
             attendanceShifts: 5,
+            requiredShifts: 20,
+            attendanceBalance: -15,
             overtimeShifts: 0,
             coefficientTotal: 1,
             coefficientExcludedReason: "",
@@ -136,6 +142,11 @@ function createReplacementData(): AppData {
 function countRows(db: Database.Database, sql: string, ...params: unknown[]): number {
   const row = db.prepare(sql).get(...params) as { count: number };
   return row.count;
+}
+
+function listTableColumnNames(db: Database.Database, tableName: string): string[] {
+  const rows = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
+  return rows.map((row) => row.name);
 }
 
 afterEach(async () => {
@@ -164,6 +175,51 @@ describe("SQLite schema and mapper", () => {
           "shifts",
           "staff"
         ])
+      );
+    } finally {
+      db.close();
+    }
+  });
+
+  it("creates monthly settlement row attendance balance columns", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+
+      expect(listTableColumnNames(db, "monthly_settlement_rows")).toEqual(
+        expect.arrayContaining(["required_shifts", "attendance_balance"])
+      );
+    } finally {
+      db.close();
+    }
+  });
+
+  it("migrates legacy monthly settlement row tables to include attendance balance columns", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      db.exec(`
+        create table monthly_settlement_rows (
+          settlement_id text not null,
+          position integer not null,
+          staff_id text not null,
+          staff_name text not null,
+          staff_job_id text not null,
+          staff_type text not null check (staff_type in ('nurse', 'clerk', 'head_nurse')),
+          attendance_shifts integer not null,
+          overtime_shifts integer not null,
+          coefficient_total real,
+          coefficient_excluded_reason text not null,
+          bonus_amount real not null,
+          bonus_excluded_reason text not null,
+          primary key(settlement_id, position),
+          unique(settlement_id, staff_id)
+        );
+      `);
+
+      initializeSqliteSchema(db);
+
+      expect(listTableColumnNames(db, "monthly_settlement_rows")).toEqual(
+        expect.arrayContaining(["required_shifts", "attendance_balance"])
       );
     } finally {
       db.close();
@@ -207,6 +263,10 @@ describe("SQLite schema and mapper", () => {
       const loaded = readAppDataFromSqlite(db);
 
       expect(loaded).toEqual(seed);
+      expect(loaded.monthlySettlements[0].rows.map((row) => [row.requiredShifts, row.attendanceBalance])).toEqual([
+        [5, 1],
+        [5, 2]
+      ]);
       expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
     } finally {
       db.close();

@@ -96,6 +96,8 @@ function createSettlementRow(row: MonthlySummary["rows"][number], bonusAmount: n
     staffJobId: row.staffJobId,
     staffType: row.staffType,
     attendanceShifts: row.attendanceShifts,
+    requiredShifts: row.requiredShifts,
+    attendanceBalance: row.attendanceBalance,
     overtimeShifts: row.overtimeShifts,
     coefficientTotal: row.coefficientTotal,
     coefficientExcludedReason: row.coefficientExcludedReason,
