@@ -61,7 +61,10 @@ describe("calculateSettlementChecks", () => {
 
   it("warns when a summary row has negative attendance balance", () => {
     const checks = calculateSettlementChecks(
-      baseData,
+      {
+        ...baseData,
+        scheduleEntries: [{ id: "day", date: "2026-06-02", staffId: "staff-active", shiftIds: ["shift-day"], note: "" }]
+      },
       {
         ...baseSummary,
         rows: [{ ...baseSummary.rows[0], attendanceShifts: 18, attendanceBalance: -2 }]
@@ -75,6 +78,82 @@ describe("calculateSettlementChecks", () => {
         message: expect.stringContaining("缺勤")
       })
     );
+  });
+
+  it("does not duplicate attendance deficit when a staff member already has no attendance warning", () => {
+    const checks = calculateSettlementChecks(
+      {
+        ...baseData,
+        scheduleEntries: [{ id: "rest", date: "2026-06-02", staffId: "staff-active", shiftIds: ["shift-rest"], note: "" }]
+      },
+      {
+        ...baseSummary,
+        rows: [{ ...baseSummary.rows[0], attendanceBalance: -20 }]
+      }
+    );
+
+    const staffChecks = checks.filter((check) => check.staffId === "staff-active");
+    expect(staffChecks.filter((check) => check.type === "no-attendance")).toHaveLength(1);
+    expect(staffChecks.some((check) => check.type === "attendance-deficit")).toBe(false);
+  });
+
+  it("warns when a schedule references only a missing shift id", () => {
+    const checks = calculateSettlementChecks(
+      {
+        ...baseData,
+        scheduleEntries: [{ id: "missing", date: "2026-06-06", staffId: "staff-active", shiftIds: ["shift-missing"], note: "" }]
+      },
+      baseSummary
+    );
+
+    expect(checks).toContainEqual(
+      expect.objectContaining({
+        type: "missing-shift",
+        staffId: "staff-active",
+        date: "2026-06-06",
+        shiftIds: ["shift-missing"],
+        message: expect.stringContaining("李护士")
+      })
+    );
+    expect(checks.find((check) => check.type === "missing-shift")?.message).toContain("shift-missing");
+  });
+
+  it("warns about a missing shift id while still counting a valid attendance shift", () => {
+    const checks = calculateSettlementChecks(
+      {
+        ...baseData,
+        scheduleEntries: [
+          { id: "mixed", date: "2026-06-07", staffId: "staff-active", shiftIds: ["shift-day", "shift-missing"], note: "" }
+        ]
+      },
+      baseSummary
+    );
+
+    expect(checks).toContainEqual(
+      expect.objectContaining({
+        type: "missing-shift",
+        staffId: "staff-active",
+        date: "2026-06-07",
+        shiftIds: ["shift-missing"]
+      })
+    );
+    expect(checks.some((check) => check.type === "no-attendance" && check.staffId === "staff-active")).toBe(false);
+  });
+
+  it("ignores schedules outside the summary month", () => {
+    const checks = calculateSettlementChecks(
+      {
+        ...baseData,
+        scheduleEntries: [
+          { id: "outside-missing", date: "2026-07-01", staffId: "staff-active", shiftIds: ["shift-missing"], note: "" },
+          { id: "inside-day", date: "2026-06-01", staffId: "staff-active", shiftIds: ["shift-day"], note: "" }
+        ]
+      },
+      baseSummary
+    );
+
+    expect(checks.some((check) => check.date === "2026-07-01")).toBe(false);
+    expect(checks.some((check) => check.type === "missing-shift")).toBe(false);
   });
 
   it("warns about double shifts, disabled shifts, and schedules assigned to disabled staff", () => {

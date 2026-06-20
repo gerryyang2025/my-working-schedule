@@ -4,6 +4,7 @@ export type SettlementCheckType =
   | "no-attendance"
   | "attendance-deficit"
   | "double-shift"
+  | "missing-shift"
   | "disabled-shift"
   | "disabled-staff-with-schedule";
 
@@ -29,6 +30,7 @@ export function calculateSettlementChecks(data: AppData, summary: MonthlySummary
   const shiftNameById = new Map(data.shifts.map((shift) => [shift.id, shift.name]));
   const monthEntries = data.scheduleEntries.filter((entry) => isWithinSummaryMonth(entry.date, summary));
   const checks: SettlementCheckItem[] = [];
+  const staffIdsWithoutAttendance = new Set<string>();
 
   for (const staff of data.staff.filter((person) => person.enabled)) {
     const staffEntries = monthEntries.filter((entry) => entry.staffId === staff.id);
@@ -37,6 +39,7 @@ export function calculateSettlementChecks(data: AppData, summary: MonthlySummary
     );
 
     if (!hasAttendanceShift) {
+      staffIdsWithoutAttendance.add(staff.id);
       checks.push({
         type: "no-attendance",
         staffId: staff.id,
@@ -46,7 +49,7 @@ export function calculateSettlementChecks(data: AppData, summary: MonthlySummary
   }
 
   for (const row of summary.rows) {
-    if (row.attendanceBalance < 0) {
+    if (row.attendanceBalance < 0 && !staffIdsWithoutAttendance.has(row.staffId)) {
       checks.push({
         type: "attendance-deficit",
         staffId: row.staffId,
@@ -58,6 +61,7 @@ export function calculateSettlementChecks(data: AppData, summary: MonthlySummary
   for (const entry of monthEntries) {
     const staff = staffById.get(entry.staffId);
     const staffName = staff?.name ?? entry.staffId;
+    const missingShiftIds = entry.shiftIds.filter((shiftId) => !shiftById.has(shiftId));
     const disabledShiftIds = entry.shiftIds.filter((shiftId) => shiftById.get(shiftId)?.enabled === false);
 
     if (entry.shiftIds.length >= 2) {
@@ -67,6 +71,16 @@ export function calculateSettlementChecks(data: AppData, summary: MonthlySummary
         date: entry.date,
         shiftIds: [...entry.shiftIds],
         message: `${staffName} ${entry.date} 有多个班次：${formatShiftNames(entry.shiftIds, shiftNameById)}。`
+      });
+    }
+
+    if (missingShiftIds.length > 0) {
+      checks.push({
+        type: "missing-shift",
+        staffId: entry.staffId,
+        date: entry.date,
+        shiftIds: missingShiftIds,
+        message: `${staffName} ${entry.date} 引用了不存在的班次 ID：${missingShiftIds.join("、")}。`
       });
     }
 
