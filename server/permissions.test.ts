@@ -50,6 +50,21 @@ describe("permissions", () => {
     expect(canManageStaff(user({ role: "viewer", managedStaffIds: ["staff-a"] }), "staff-a")).toBe(false);
   });
 
+  it("keeps schedulers without managed staff read-only for staff writes", () => {
+    const scheduler = user({ role: "scheduler", managedStaffIds: [] });
+
+    expect(canManageStaff(scheduler, "staff-a")).toBe(false);
+    expect(canManageAllStaff(scheduler, ["staff-a"])).toBe(false);
+  });
+
+  it("does not let staff binding grant edit permission by itself", () => {
+    const viewer = user({ role: "viewer", staffId: "staff-a", managedStaffIds: ["staff-a"] });
+    const scheduler = user({ role: "scheduler", staffId: "staff-a", managedStaffIds: [] });
+
+    expect(canManageStaff(viewer, "staff-a")).toBe(false);
+    expect(canManageStaff(scheduler, "staff-a")).toBe(false);
+  });
+
   it("treats an empty required staff list as manageable for any user", () => {
     expect(canManageAllStaff(null, [])).toBe(true);
     expect(canManageAllStaff(user({ enabled: false }), [])).toBe(true);
