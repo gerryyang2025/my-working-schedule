@@ -786,7 +786,7 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
-  it("resets the bonus range when the selected date changes within the same month", async () => {
+  it("keeps the bonus range when the selected date changes within the same month", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
@@ -798,7 +798,7 @@ describe("App", () => {
     await wrapper.get('[data-testid="jump-same-month-date"]').trigger("click");
     await nextTick();
 
-    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-06 single");
+    expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
   });
 
   it("passes selected monthly settlement into print views", async () => {
