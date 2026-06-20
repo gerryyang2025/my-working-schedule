@@ -594,6 +594,9 @@ describe("App", () => {
     expect(infoPanel.text()).toContain("快速上手");
     expect(infoPanel.text()).toContain("所有登录账号可查看全科排班");
     expect(infoPanel.text()).toContain("排班员只能编辑账号可管理人员范围内的格子");
+    expect(infoPanel.text()).toContain("绑定人员只用于标识账号本人");
+    expect(infoPanel.text()).toContain("不会自动授予排班权限");
+    expect(infoPanel.text()).toContain("编辑范围由账号可管理人员决定");
     expect(infoPanel.text()).toContain("核算规则");
     expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
     expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");

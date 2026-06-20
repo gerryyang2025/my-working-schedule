@@ -666,7 +666,10 @@ onMounted(async () => {
     <section class="app-info-panel" aria-label="系统使用说明与核算规则">
       <div class="app-info-block">
         <h2>快速上手</h2>
-        <p>所有登录账号可查看全科排班；排班员只能编辑账号可管理人员范围内的格子，其他格子为只读。</p>
+        <p>
+          所有登录账号可查看全科排班；排班员只能编辑账号可管理人员范围内的格子，其他格子为只读。绑定人员只用于标识账号本人，
+          不会自动授予排班权限，编辑范围由账号可管理人员决定。
+        </p>
       </div>
       <div class="app-info-block">
         <h2>核算规则</h2>
