@@ -1,5 +1,5 @@
 import { mount } from "@vue/test-utils";
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import BonusSettlementPanel from "./BonusSettlementPanel.vue";
 import type { MonthlySettlement, MonthlySummary } from "@/types/domain";
 
@@ -96,6 +96,35 @@ function mountPanel(overrides: Partial<InstanceType<typeof BonusSettlementPanel>
   });
 }
 
+function mockCsvDownload() {
+  const click = vi.fn();
+  const appendChild = vi.spyOn(document.body, "appendChild");
+  const removeChild = vi.spyOn(document.body, "removeChild");
+  Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn() });
+  Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
+  const createObjectUrl = vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:bonus-export");
+  const revokeObjectUrl = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const createElement = vi.spyOn(document, "createElement");
+
+  createElement.mockImplementation((tagName: string, options?: ElementCreationOptions) => {
+    const element = Document.prototype.createElement.call(document, tagName, options);
+
+    if (tagName.toLowerCase() === "a") {
+      Object.defineProperty(element, "click", { configurable: true, value: click });
+    }
+
+    return element;
+  });
+
+  return {
+    appendChild,
+    click,
+    createObjectUrl,
+    removeChild,
+    revokeObjectUrl
+  };
+}
+
 async function expectConfirmBlocked(wrapper: ReturnType<typeof mountPanel>): Promise<void> {
   const confirmButton = wrapper.get('[data-testid="confirm-settlement-button"]');
 
@@ -117,6 +146,10 @@ async function expectCancelBlocked(wrapper: ReturnType<typeof mountPanel>): Prom
 }
 
 describe("BonusSettlementPanel", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("uses the shared stats panel class", () => {
     const wrapper = mountPanel();
 
@@ -329,5 +362,50 @@ describe("BonusSettlementPanel", () => {
 
     expect(wrapper.text()).toContain("累计加班班次");
     expect(wrapper.text()).toContain("1");
+  });
+
+  it("exports the displayed bonus rows to a CSV download", async () => {
+    const download = mockCsvDownload();
+    const wrapper = mountPanel({ settlement: settledSnapshot });
+
+    await wrapper.get('[data-testid="export-bonus-csv-button"]').trigger("click");
+
+    expect(download.createObjectUrl).toHaveBeenCalledWith(expect.any(Blob));
+    const link = download.appendChild.mock.calls[0][0] as HTMLAnchorElement;
+    expect(link.download).toBe("bonus-allocation-2026-06.csv");
+    expect(link.href).toBe("blob:bonus-export");
+    expect(download.click).toHaveBeenCalledTimes(1);
+    expect(download.removeChild).toHaveBeenCalledWith(link);
+    expect(download.revokeObjectUrl).toHaveBeenCalledWith("blob:bonus-export");
+  });
+
+  it("exports a valid range trial with a range filename", async () => {
+    const download = mockCsvDownload();
+    const wrapper = mountPanel({
+      startMonth: "2026-06",
+      endMonth: "2026-07",
+      isRangeMode: true,
+      sourceMonths: [
+        { month: "2026-06", source: "settlement" },
+        { month: "2026-07", source: "live" }
+      ]
+    });
+
+    await wrapper.get('[data-testid="export-bonus-csv-button"]').trigger("click");
+
+    const link = download.appendChild.mock.calls[0][0] as HTMLAnchorElement;
+    expect(link.download).toBe("bonus-allocation-2026-06_to_2026-07.csv");
+    expect(download.click).toHaveBeenCalledTimes(1);
+  });
+
+  it("hides the CSV export button for invalid ranges", () => {
+    const wrapper = mountPanel({
+      startMonth: "2026-08",
+      endMonth: "2026-07",
+      isRangeMode: true,
+      isRangeValid: false
+    });
+
+    expect(wrapper.find('[data-testid="export-bonus-csv-button"]').exists()).toBe(false);
   });
 });

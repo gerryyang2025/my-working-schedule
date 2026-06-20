@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { calculateBonusAllocation, type BonusAllocation } from "@/lib/bonus";
+import { createBonusAllocationCsv, getBonusAllocationCsvFilename } from "@/lib/bonus-export";
 import { formatSettledAt } from "@/lib/format";
 import type { MonthlySettlement, MonthlySettlementRow, MonthlySummary, StaffType } from "@/types/domain";
 import type { RangeSourceMonth } from "@/lib/range-bonus";
@@ -108,6 +109,7 @@ const canCancel = computed(
     !props.saving &&
     !props.canceling
 );
+const canExport = computed(() => !isInvalidRange.value && !bonusPoolError.value && displayedRows.value.length > 0);
 
 watch(
   () => props.month,
@@ -189,6 +191,31 @@ function handleCancel(): void {
   }
 
   emit("cancelSettlement", props.month);
+}
+
+function handleExportCsv(): void {
+  if (!canExport.value) {
+    return;
+  }
+
+  const csv = createBonusAllocationCsv({
+    title: panelTitle.value,
+    status: statusText.value,
+    bonusPool: displayedBonusPool.value,
+    coefficientTotal: displayedCoefficientTotal.value,
+    sourceMonths: props.sourceMonths,
+    rows: displayedRows.value
+  });
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+
+  link.href = url;
+  link.download = getBonusAllocationCsvFilename(panelTitle.value, props.isRangeMode, props.startMonth, props.endMonth);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }
 
 function staffTypeLabel(type: StaffType): string {
@@ -281,6 +308,9 @@ function rowNote(row: MonthlySettlementRow): string {
         />
       </label>
       <div v-if="!isRangeMode" class="settlement-actions">
+        <button data-testid="export-bonus-csv-button" type="button" :disabled="!canExport" @click="handleExportCsv">
+          导出 CSV
+        </button>
         <button
           data-testid="confirm-settlement-button"
           type="button"
@@ -292,6 +322,11 @@ function rowNote(row: MonthlySettlementRow): string {
         </button>
         <button data-testid="cancel-settlement-button" type="button" :disabled="!canCancel" @click="handleCancel">
           {{ canceling ? "取消中" : "取消月结" }}
+        </button>
+      </div>
+      <div v-else class="settlement-actions">
+        <button data-testid="export-bonus-csv-button" type="button" :disabled="!canExport" @click="handleExportCsv">
+          导出 CSV
         </button>
       </div>
     </div>
