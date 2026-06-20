@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AuthUser } from "./auth";
-import { canManageAllStaff, canManageStaff, canReadAppData } from "./permissions";
+import { canManageAllStaff, canManageStaff, canManageSystem, canReadAppData } from "./permissions";
 
 function user(overrides: Partial<AuthUser>): AuthUser {
   return {
@@ -29,6 +29,14 @@ describe("permissions", () => {
     expect(canManageAllStaff(user({ role: "admin" }), ["staff-a", "staff-b"])).toBe(true);
   });
 
+  it("allows only enabled admins to manage system settings", () => {
+    expect(canManageSystem(null)).toBe(false);
+    expect(canManageSystem(user({ role: "admin", enabled: false }))).toBe(false);
+    expect(canManageSystem(user({ role: "scheduler" }))).toBe(false);
+    expect(canManageSystem(user({ role: "viewer" }))).toBe(false);
+    expect(canManageSystem(user({ role: "admin" }))).toBe(true);
+  });
+
   it("limits schedulers to managed staff ids", () => {
     const scheduler = user({ role: "scheduler", managedStaffIds: ["staff-a"] });
 
@@ -40,5 +48,11 @@ describe("permissions", () => {
 
   it("keeps viewers read-only even when managed ids are present", () => {
     expect(canManageStaff(user({ role: "viewer", managedStaffIds: ["staff-a"] }), "staff-a")).toBe(false);
+  });
+
+  it("treats an empty required staff list as manageable for any user", () => {
+    expect(canManageAllStaff(null, [])).toBe(true);
+    expect(canManageAllStaff(user({ enabled: false }), [])).toBe(true);
+    expect(canManageAllStaff(user({ role: "viewer" }), [])).toBe(true);
   });
 });

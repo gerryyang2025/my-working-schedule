@@ -617,6 +617,23 @@ describe.sequential("API routes", () => {
       .set(headers)
       .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
       .expect(403, { message: "当前账号没有该人员操作权限" });
+
+    const admin = await adminHeaders(app);
+    const auditResponse = await request(app).get("/api/audit-logs").set(admin).expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "auth.permission.denied",
+          targetId: "staff-nurse-001",
+          summary: "越权操作人员：staff-nurse-001"
+        })
+      ])
+    );
+
+    const dataResponse = await request(app).get("/api/data").set(admin).expect(200);
+    expect(dataResponse.body.scheduleEntries).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({ id: "2026-06-15__staff-nurse-001" })])
+    );
   });
 
   it("blocks viewers from schedule writes", async () => {
@@ -670,6 +687,17 @@ describe.sequential("API routes", () => {
       .set(fullHeaders)
       .send({ month: "2026-06", bonusPool: 1000 })
       .expect(200);
+
+    await request(app)
+      .delete("/api/data/monthly-settlement/2026-06")
+      .set(limitedHeaders)
+      .expect(403, { message: "当前账号没有该人员操作权限" });
+
+    const dataResponse = await request(app).get("/api/data").set(fullHeaders).expect(200);
+    expect(dataResponse.body.monthlySettlements).toEqual(
+      expect.arrayContaining([expect.objectContaining({ month: "2026-06" })])
+    );
+
     await request(app).delete("/api/data/monthly-settlement/2026-06").set(fullHeaders).expect(200);
   });
 
