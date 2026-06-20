@@ -17,6 +17,7 @@ const summary: WeeklySummaryModel = {
       staffType: "head_nurse",
       attendanceShifts: 0,
       requiredShifts: 4,
+      attendanceBalance: -4,
       overtimeShifts: 0,
       coefficientTotal: null,
       coefficientExcludedReason: "护士长绩效单独核算"
@@ -28,6 +29,7 @@ const summary: WeeklySummaryModel = {
       staffType: "nurse",
       attendanceShifts: 4,
       requiredShifts: 4,
+      attendanceBalance: 0,
       overtimeShifts: 0,
       coefficientTotal: 4.9,
       coefficientExcludedReason: ""

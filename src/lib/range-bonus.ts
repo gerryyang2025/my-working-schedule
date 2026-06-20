@@ -85,16 +85,22 @@ function addRows(target: Map<string, MonthlyStaffSummary>, rows: MonthlyStaffSum
 }
 
 function settlementRowsToSummaryRows(rows: AppData["monthlySettlements"][number]["rows"]): MonthlyStaffSummary[] {
-  return rows.map((row) => ({
-    staffId: row.staffId,
-    staffName: row.staffName,
-    staffJobId: row.staffJobId,
-    staffType: row.staffType,
-    attendanceShifts: row.attendanceShifts,
-    overtimeShifts: row.overtimeShifts,
-    coefficientTotal: row.coefficientTotal,
-    coefficientExcludedReason: row.coefficientExcludedReason
-  }));
+  return rows.map((row) => {
+    const rowWithBalance = row as typeof row & Partial<Pick<MonthlyStaffSummary, "requiredShifts" | "attendanceBalance">>;
+
+    return {
+      staffId: row.staffId,
+      staffName: row.staffName,
+      staffJobId: row.staffJobId,
+      staffType: row.staffType,
+      attendanceShifts: row.attendanceShifts,
+      requiredShifts: rowWithBalance.requiredShifts ?? 0,
+      attendanceBalance: rowWithBalance.attendanceBalance ?? 0,
+      overtimeShifts: row.overtimeShifts,
+      coefficientTotal: row.coefficientTotal,
+      coefficientExcludedReason: row.coefficientExcludedReason
+    };
+  });
 }
 
 export function calculateRangeBonusSummary(data: AppData, startMonth: string, endMonth: string): RangeBonusSummary {

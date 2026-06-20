@@ -14,6 +14,8 @@ const baseSummary: MonthlySummary = {
       staffJobId: "000228",
       staffType: "head_nurse",
       attendanceShifts: 10,
+      requiredShifts: 20,
+      attendanceBalance: -10,
       overtimeShifts: 0,
       coefficientTotal: null,
       coefficientExcludedReason: "护士长绩效单独核算"
@@ -24,6 +26,8 @@ const baseSummary: MonthlySummary = {
       staffJobId: "100001",
       staffType: "nurse",
       attendanceShifts: 12,
+      requiredShifts: 20,
+      attendanceBalance: -8,
       overtimeShifts: 2,
       coefficientTotal: 10,
       coefficientExcludedReason: ""
@@ -34,6 +38,8 @@ const baseSummary: MonthlySummary = {
       staffJobId: "200001",
       staffType: "clerk",
       attendanceShifts: 8,
+      requiredShifts: 20,
+      attendanceBalance: -12,
       overtimeShifts: 0,
       coefficientTotal: 5,
       coefficientExcludedReason: ""

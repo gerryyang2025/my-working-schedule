@@ -133,6 +133,7 @@ const summary: WeeklySummary = {
       staffType: "nurse",
       attendanceShifts: 5,
       requiredShifts: 4,
+      attendanceBalance: 1,
       overtimeShifts: 1,
       coefficientTotal: 5.5,
       coefficientExcludedReason: ""
@@ -152,6 +153,8 @@ const monthlySummary: MonthlySummary = {
       staffJobId: "N001",
       staffType: "nurse",
       attendanceShifts: 5,
+      requiredShifts: 20,
+      attendanceBalance: -15,
       overtimeShifts: 1,
       coefficientTotal: 5.5,
       coefficientExcludedReason: ""
@@ -162,6 +165,8 @@ const monthlySummary: MonthlySummary = {
       staffJobId: "C001",
       staffType: "clerk",
       attendanceShifts: 2,
+      requiredShifts: 20,
+      attendanceBalance: -18,
       overtimeShifts: 0,
       coefficientTotal: 2.4,
       coefficientExcludedReason: ""
@@ -172,6 +177,8 @@ const monthlySummary: MonthlySummary = {
       staffJobId: "H001",
       staffType: "head_nurse",
       attendanceShifts: 6,
+      requiredShifts: 20,
+      attendanceBalance: -14,
       overtimeShifts: 0,
       coefficientTotal: null,
       coefficientExcludedReason: "护士长绩效单独核算"
