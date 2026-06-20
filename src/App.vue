@@ -159,7 +159,7 @@ const editableStaffIds = computed(() => {
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
 const canOperateCurrentSettlement = computed(() => {
-  if (!currentUser.value || !displayedBonusSummary.value) {
+  if (!currentUser.value || isBonusRangeMode.value) {
     return false;
   }
 
@@ -171,7 +171,9 @@ const canOperateCurrentSettlement = computed(() => {
     return false;
   }
 
-  return displayedBonusSummary.value.rows.every((row) => managedStaffIdSet.value.has(row.staffId));
+  const rows = currentBonusMonthlySettlement.value?.rows ?? displayedBonusSummary.value?.rows;
+
+  return rows ? rows.every((row) => managedStaffIdSet.value.has(row.staffId)) : false;
 });
 const canManageConfig = computed(() => currentUser.value?.role === "admin");
 const printPreviewOpen = computed({

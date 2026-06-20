@@ -101,6 +101,48 @@ const twoStaffData: PublicAppData = {
   ]
 };
 
+const managedSettlementRow: PublicAppData["monthlySettlements"][number]["rows"][number] = {
+  staffId: "staff-nurse-001",
+  staffName: "李护士",
+  staffJobId: "100001",
+  staffType: "nurse",
+  attendanceShifts: 12,
+  overtimeShifts: 0,
+  coefficientTotal: 12,
+  coefficientExcludedReason: "",
+  bonusAmount: 1000,
+  bonusExcludedReason: ""
+};
+
+const unmanagedSettlementRow: PublicAppData["monthlySettlements"][number]["rows"][number] = {
+  staffId: "staff-nurse-002",
+  staffName: "王护士",
+  staffJobId: "100002",
+  staffType: "nurse",
+  attendanceShifts: 8,
+  overtimeShifts: 0,
+  coefficientTotal: 8,
+  coefficientExcludedReason: "",
+  bonusAmount: 500,
+  bonusExcludedReason: ""
+};
+
+function createMonthlySettlement(
+  rows: PublicAppData["monthlySettlements"][number]["rows"]
+): PublicAppData["monthlySettlements"][number] {
+  return {
+    id: "settlement-2026-06",
+    month: "2026-06",
+    monthStart: "2026-06-01",
+    monthEnd: "2026-06-30",
+    totalDays: 30,
+    bonusPool: rows.reduce((total, row) => total + row.bonusAmount, 0),
+    coefficientTotal: rows.reduce((total, row) => total + (row.coefficientTotal ?? 0), 0),
+    settledAt: "2026-06-30T10:00:00.000Z",
+    rows
+  };
+}
+
 const testAuthUser: AuthUser = {
   id: "user-admin",
   username: "admin",
@@ -151,11 +193,12 @@ const AppToolbarStub = defineComponent({
 
 const ScheduleGridStub = defineComponent({
   name: "ScheduleGrid",
-  props: ["days", "editableStaffIds"],
+  props: ["staff", "days", "editableStaffIds"],
   emits: ["quickFill", "editCell"],
   template: `
     <section>
       <span data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</span>
+      <span data-testid="schedule-staff-ids">{{ staff.map((person) => person.id).join(",") }}</span>
       <span data-testid="schedule-editable-staff-ids">{{ editableStaffIds?.join(",") }}</span>
       <button
         data-testid="emit-unmanaged-quick-fill"
@@ -734,6 +777,15 @@ describe("App", () => {
     expect(wrapper.get(".admin-mode-banner").text()).toContain("可编辑范围由账号可管理人员决定");
   });
 
+  it("lets a scheduler with no managed staff view the full schedule without editable cells", async () => {
+    const wrapper = mountApp(twoStaffData, createSchedulerUser([]));
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
+    expect(wrapper.get('[data-testid="schedule-editable-staff-ids"]').text()).toBe("");
+  });
+
   it("blocks unmanaged scheduler schedule edits even if the grid emits them", async () => {
     apiMocks.saveScheduleEntry.mockResolvedValue(structuredClone(twoStaffData));
     const wrapper = mountApp(twoStaffData, createSchedulerUser(["staff-nurse-001"]));
@@ -903,6 +955,38 @@ describe("App", () => {
     await openBonusTab(withUnmanagedRow);
 
     expect(withUnmanagedRow.get('[data-testid="bonus-can-operate"]').text()).toBe("false");
+  });
+
+  it("allows canceling a settled month when saved snapshot rows are managed even if live summary has unmanaged staff", async () => {
+    const wrapper = mountApp(
+      {
+        ...twoStaffData,
+        monthlySettlements: [createMonthlySettlement([managedSettlementRow])]
+      },
+      createSchedulerUser(["staff-nurse-001"])
+    );
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
+    expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("true");
+  });
+
+  it("blocks canceling a settled month when saved snapshot rows include unmanaged staff", async () => {
+    const wrapper = mountApp(
+      {
+        ...testData,
+        monthlySettlements: [createMonthlySettlement([managedSettlementRow, unmanagedSettlementRow])]
+      },
+      createSchedulerUser(["staff-nurse-001"])
+    );
+
+    await flushPromises();
+    await openBonusTab(wrapper);
+
+    expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
+    expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("false");
   });
 
   it("passes a custom range trial summary into the bonus panel", async () => {
