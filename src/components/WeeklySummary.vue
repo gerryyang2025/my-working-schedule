@@ -44,6 +44,10 @@ function coefficientCellText(row: WeeklyStaffSummary): string {
 function compactCoefficientText(row: WeeklyStaffSummary): string {
   return row.coefficientTotal === null ? "单独核算" : `系数 ${row.coefficientTotal.toFixed(2)}`;
 }
+
+function formatSignedBalance(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
 </script>
 
 <template>
@@ -65,6 +69,7 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
           <th>类型</th>
           <th>出勤班次</th>
           <th>满勤标准</th>
+          <th>出勤盈亏</th>
           <th>加班班次</th>
           <th>总系数</th>
         </tr>
@@ -80,6 +85,7 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
           <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
           <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
           <td data-label="满勤标准">{{ row.requiredShifts }}</td>
+          <td data-label="出勤盈亏">{{ formatSignedBalance(row.attendanceBalance) }}</td>
           <td data-label="加班班次">{{ row.overtimeShifts }}</td>
           <td data-label="总系数">{{ coefficientCellText(row) }}</td>
         </tr>
@@ -97,6 +103,7 @@ function compactCoefficientText(row: WeeklyStaffSummary): string {
         </div>
         <div class="summary-compact-metrics">
           <span>出勤 {{ row.attendanceShifts }}/{{ row.requiredShifts }}</span>
+          <span>盈亏 {{ formatSignedBalance(row.attendanceBalance) }}</span>
           <span>加班 {{ row.overtimeShifts }}</span>
           <span>{{ compactCoefficientText(row) }}</span>
         </div>

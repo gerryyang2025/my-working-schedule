@@ -64,6 +64,7 @@ describe("WeeklySummary", () => {
     expect(rows[1].text()).toContain("100001");
     expect(rows[1].text()).toContain("护士");
     expect(rows[1].text()).toContain("出勤 4/4");
+    expect(rows[1].text()).toContain("盈亏 0");
     expect(rows[1].text()).toContain("系数 4.90");
   });
 
@@ -78,5 +79,26 @@ describe("WeeklySummary", () => {
     expect(personCells[0].text()).toContain("000228");
     expect(personCells[1].text()).toContain("李护士");
     expect(personCells[1].text()).toContain("100001");
+  });
+
+  it("shows signed attendance balance in table and compact summaries", () => {
+    const wrapper = mount(WeeklySummary, {
+      props: {
+        summary: {
+          ...summary,
+          rows: [
+            {
+              ...summary.rows[1],
+              attendanceShifts: 5,
+              attendanceBalance: 1
+            }
+          ]
+        }
+      }
+    });
+
+    expect(wrapper.get("thead").text()).toContain("出勤盈亏");
+    expect(wrapper.get('tbody td[data-label="出勤盈亏"]').text()).toBe("+1");
+    expect(wrapper.get(".summary-compact-metrics").text()).toContain("盈亏 +1");
   });
 });

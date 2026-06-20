@@ -149,6 +149,28 @@ describe("BonusSettlementPanel", () => {
     expect(personCells[1].text()).toContain("100001");
   });
 
+  it("shows required shifts and signed attendance balance in bonus rows", async () => {
+    const wrapper = mountPanel();
+
+    await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
+
+    expect(wrapper.get("thead").text()).toContain("满勤标准");
+    expect(wrapper.get("thead").text()).toContain("出勤盈亏");
+
+    const firstRowCells = wrapper.findAll("tbody tr")[0].findAll("td");
+    expect(firstRowCells.map((cell) => cell.text())).toEqual([
+      "段护士长000228",
+      "护士长",
+      "10",
+      "20",
+      "-10",
+      "0",
+      "单独核算",
+      "0.00",
+      "护士长绩效单独核算"
+    ]);
+  });
+
   it("emits the confirmed settlement payload", async () => {
     const wrapper = mountPanel();
 

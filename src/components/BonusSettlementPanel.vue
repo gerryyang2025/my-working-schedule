@@ -203,6 +203,10 @@ function formatCoefficient(value: number): string {
   return value.toFixed(2);
 }
 
+function formatSignedBalance(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 function coefficientCellText(row: MonthlySettlementRow): string {
   return row.coefficientTotal === null ? "单独核算" : formatCoefficient(row.coefficientTotal);
 }
@@ -306,6 +310,8 @@ function rowNote(row: MonthlySettlementRow): string {
             <th>人员</th>
             <th>类型</th>
             <th>出勤班次</th>
+            <th>满勤标准</th>
+            <th>出勤盈亏</th>
             <th>累计加班班次</th>
             <th>月总系数</th>
             <th>分配金额</th>
@@ -322,6 +328,8 @@ function rowNote(row: MonthlySettlementRow): string {
             </td>
             <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
             <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
+            <td data-label="满勤标准">{{ row.requiredShifts }}</td>
+            <td data-label="出勤盈亏">{{ formatSignedBalance(row.attendanceBalance) }}</td>
             <td data-label="累计加班班次">{{ row.overtimeShifts }}</td>
             <td data-label="月总系数">{{ coefficientCellText(row) }}</td>
             <td data-label="分配金额">{{ formatMoney(row.bonusAmount) }}</td>
@@ -515,7 +523,7 @@ function rowNote(row: MonthlySettlementRow): string {
 
 .bonus-table {
   width: 100%;
-  min-width: 720px;
+  min-width: 840px;
   border-collapse: collapse;
   font-size: 13px;
 }

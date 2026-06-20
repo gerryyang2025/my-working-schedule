@@ -369,6 +369,8 @@ describe("PrintViews", () => {
       "人员",
       "人员类型",
       "月出勤班次",
+      "满勤标准",
+      "出勤盈亏",
       "累计加班班次",
       "月总系数",
       "备注"
@@ -379,6 +381,8 @@ describe("PrintViews", () => {
     expect(firstMonthSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
+      "20",
+      "-15",
       "1",
       "5.50",
       ""
@@ -416,6 +420,8 @@ describe("PrintViews", () => {
       "人员",
       "人员类型",
       "月出勤班次",
+      "满勤标准",
+      "出勤盈亏",
       "累计加班班次",
       "月总系数",
       "分配金额",
@@ -427,6 +433,8 @@ describe("PrintViews", () => {
     expect(firstBonusSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
+      "20",
+      "-15",
       "3",
       "5.50",
       "1392.41",
@@ -506,6 +514,8 @@ describe("PrintViews", () => {
     expect(weeklyPrint.text()).toContain("2026-06-15 至 2026-06-21");
     expect(weeklyPrint.text()).toContain("节假日：端午节");
     expect(weeklyPrint.text()).toContain("王护士");
+    expect(weeklyPrint.text()).toContain("出勤盈亏");
+    expect(weeklyPrint.text()).toContain("+1");
     expect(weeklyPrint.text()).toContain("5.50");
     expectPersonCellText(weeklyPrint.text(), "王护士", "N001");
   });

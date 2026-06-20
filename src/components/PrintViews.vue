@@ -121,6 +121,10 @@ function formatCoefficient(value: number): string {
   return value.toFixed(2);
 }
 
+function formatSignedBalance(value: number): string {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
 function getMonthlyCoefficientText(row: PrintedMonthlyRow): string {
   return row.coefficientTotal === null ? "单独核算" : row.coefficientTotal.toFixed(2);
 }
@@ -189,6 +193,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <th>人员</th>
             <th>人员类型</th>
             <th>月出勤班次</th>
+            <th>满勤标准</th>
+            <th>出勤盈亏</th>
             <th>累计加班班次</th>
             <th>月总系数</th>
             <th>备注</th>
@@ -205,6 +211,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             </td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
+            <td>{{ row.requiredShifts }}</td>
+            <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>
             <td>{{ row.overtimeShifts }}</td>
             <td>{{ getMonthlyCoefficientText(row) }}</td>
             <td>{{ row.coefficientExcludedReason }}</td>
@@ -226,6 +234,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <th>人员</th>
             <th>人员类型</th>
             <th>月出勤班次</th>
+            <th>满勤标准</th>
+            <th>出勤盈亏</th>
             <th>累计加班班次</th>
             <th>月总系数</th>
             <th>分配金额</th>
@@ -242,6 +252,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             </td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
+            <td>{{ row.requiredShifts }}</td>
+            <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>
             <td>{{ row.overtimeShifts }}</td>
             <td>{{ getMonthlyCoefficientText(row) }}</td>
             <td>{{ formatMoney(row.bonusAmount) }}</td>
@@ -306,6 +318,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
           <th>人员</th>
           <th>出勤班次</th>
           <th>满勤标准</th>
+          <th>出勤盈亏</th>
           <th>加班班次</th>
           <th>总系数</th>
         </tr>
@@ -320,6 +333,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
           </td>
           <td>{{ row.attendanceShifts }}</td>
           <td>{{ row.requiredShifts }}</td>
+          <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>
           <td>{{ row.overtimeShifts }}</td>
           <td>{{ row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2) }}</td>
         </tr>
