@@ -129,6 +129,16 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 
 预期无输出。
 
+查看账号可管理人员关系：
+
+    sqlite3 /var/lib/my-working-schedule/schedule.db "select user_id, staff_id, created_at, created_by from user_managed_staff order by user_id, staff_id;"
+
+查看可管理人员表结构：
+
+    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma table_info(user_managed_staff);"
+    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma foreign_key_list(user_managed_staff);"
+    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma index_list(user_managed_staff);"
+
 查看排班记录数量：
 
 ```bash

@@ -153,8 +153,8 @@ describe("SQLite auth store", () => {
         expect.arrayContaining([expect.objectContaining({ table: "staff", from: "staff_id", to: "id" })])
       );
 
-      const migration = db.prepare("select version from schema_migrations where version = 3").get();
-      expect(migration).toEqual(expect.objectContaining({ version: 3 }));
+      const migration = db.prepare("select version from schema_migrations where version = 4").get();
+      expect(migration).toEqual(expect.objectContaining({ version: 4 }));
     } finally {
       db.close();
     }
@@ -222,6 +222,66 @@ describe("SQLite auth store", () => {
     } finally {
       db.close();
     }
+  });
+
+  it("adds managed staff relation table when initializing schema", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+
+    try {
+      initializeSqliteSchema(db);
+
+      const tables = db.prepare("select name from sqlite_master where type = 'table'").all() as Array<{ name: string }>;
+      expect(tables.map((row) => row.name)).toContain("user_managed_staff");
+
+      const indexes = db.prepare("pragma index_list(user_managed_staff)").all() as Array<{ name: string; unique: number }>;
+      expect(indexes).toEqual(expect.arrayContaining([expect.objectContaining({ name: "sqlite_autoindex_user_managed_staff_1" })]));
+
+      const migration = db.prepare("select version from schema_migrations where version = 4").get();
+      expect(migration).toEqual(expect.objectContaining({ version: 4 }));
+    } finally {
+      db.close();
+    }
+  });
+
+  it("persists managed staff ids in SQLite users", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-001", "100001", "李护士", "nurse", 0, 1, 1);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-002", "100002", "王护士", "nurse", 0, 1, 2);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "123456" });
+    await store.saveUser({
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      enabled: true,
+      staffId: null,
+      managedStaffIds: ["staff-nurse-002", "staff-nurse-001"],
+      managedStaffUpdatedBy: "user-admin",
+      password: "scheduler-password"
+    });
+
+    await expect(store.listUsers()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-scheduler",
+          managedStaffIds: ["staff-nurse-001", "staff-nurse-002"]
+        })
+      ])
+    );
   });
 
   it("persists users, sessions, and audit logs", async () => {

@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const SQLITE_SCHEMA_VERSION = 3;
+export const SQLITE_SCHEMA_VERSION = 4;
 
 function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
   const rows = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
@@ -171,6 +171,17 @@ export function initializeSqliteSchema(db: Database.Database): void {
       updated_at text not null
     );
 
+    create table if not exists user_managed_staff (
+      user_id text not null references users(id) on delete cascade,
+      staff_id text not null references staff(id),
+      created_at text not null,
+      created_by text references users(id),
+      primary key(user_id, staff_id)
+    );
+
+    create index if not exists idx_user_managed_staff_staff_id
+    on user_managed_staff(staff_id);
+
     create table if not exists user_sessions (
       id text primary key,
       user_id text not null references users(id),
@@ -222,6 +233,7 @@ export function listMissingCoreTables(db: Database.Database): string[] {
     "schema_migrations",
     "shifts",
     "staff",
+    "user_managed_staff",
     "user_sessions",
     "users"
   ];

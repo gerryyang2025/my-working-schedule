@@ -52,6 +52,24 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function normalizeManagedStaffIds(staffIds: string[] | undefined): string[] {
+  return Array.from(new Set((staffIds ?? []).map((staffId) => staffId.trim()).filter(Boolean))).sort();
+}
+
+function readManagedStaffIds(db: Database.Database, userId: string): string[] {
+  const rows = db
+    .prepare("select staff_id from user_managed_staff where user_id = ? order by staff_id asc")
+    .all(userId) as Array<{ staff_id: string }>;
+  return rows.map((row) => row.staff_id);
+}
+
+function attachManagedStaffIds(db: Database.Database, user: AuthUser): AuthUser {
+  return {
+    ...user,
+    managedStaffIds: readManagedStaffIds(db, user.id)
+  };
+}
+
 function mapUser(row: UserRow): AuthUser {
   return {
     id: row.id,
@@ -59,6 +77,7 @@ function mapUser(row: UserRow): AuthUser {
     displayName: row.display_name,
     role: row.role,
     staffId: row.staff_id,
+    managedStaffIds: [],
     enabled: row.enabled === 1,
     createdAt: row.created_at,
     updatedAt: row.updated_at
@@ -72,6 +91,7 @@ function sanitizeUser(user: AuthUser & { passwordHash: string }): AuthUser {
     displayName: user.displayName,
     role: user.role,
     staffId: user.staffId,
+    managedStaffIds: [...user.managedStaffIds],
     enabled: user.enabled,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -106,6 +126,31 @@ function normalizeAuditQuery(query: number | AuditLogQuery | undefined): Require
   };
 }
 
+function normalizeManagedStaffCreatedBy(db: Database.Database, createdBy: string | null): string | null {
+  if (!createdBy) {
+    return null;
+  }
+
+  const row = db.prepare("select id from users where id = ?").get(createdBy) as { id: string } | undefined;
+  return row ? createdBy : null;
+}
+
+function replaceManagedStaffIds(
+  db: Database.Database,
+  userId: string,
+  staffIds: string[],
+  createdBy: string | null,
+  timestamp: string
+): void {
+  db.prepare("delete from user_managed_staff where user_id = ?").run(userId);
+  const insertRelation = db.prepare(
+    "insert into user_managed_staff (user_id, staff_id, created_at, created_by) values (?, ?, ?, ?)"
+  );
+  for (const staffId of staffIds) {
+    insertRelation.run(userId, staffId, timestamp, createdBy);
+  }
+}
+
 export function createSqliteAuthStore(sqlitePath: string): AuthStore {
   function openDatabase() {
     const db = new Database(sqlitePath);
@@ -125,7 +170,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       )
       .get(username.trim()) as UserRow | undefined;
 
-    return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
+    return row ? { ...attachManagedStaffIds(db, mapUser(row)), passwordHash: row.password_hash } : null;
   }
 
   function readUserByUsername(db: Database.Database, username: string): (AuthUser & { passwordHash: string }) | null {
@@ -139,7 +184,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       )
       .get(username.trim()) as UserRow | undefined;
 
-    return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
+    return row ? { ...attachManagedStaffIds(db, mapUser(row)), passwordHash: row.password_hash } : null;
   }
 
   function readUserById(db: Database.Database, id: string): (AuthUser & { passwordHash: string }) | null {
@@ -153,7 +198,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       )
       .get(id) as UserRow | undefined;
 
-    return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
+    return row ? { ...attachManagedStaffIds(db, mapUser(row)), passwordHash: row.password_hash } : null;
   }
 
   function readUserByStaffId(db: Database.Database, staffId: string): (AuthUser & { passwordHash: string }) | null {
@@ -167,7 +212,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       )
       .get(staffId) as UserRow | undefined;
 
-    return row ? { ...mapUser(row), passwordHash: row.password_hash } : null;
+    return row ? { ...attachManagedStaffIds(db, mapUser(row)), passwordHash: row.password_hash } : null;
   }
 
   function readEnabledUserById(db: Database.Database, id: string): AuthUser | null {
@@ -181,7 +226,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       )
       .get(id) as UserRow | undefined;
 
-    return row ? mapUser(row) : null;
+    return row ? attachManagedStaffIds(db, mapUser(row)) : null;
   }
 
   function resolveUserForSave(
@@ -219,13 +264,16 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
         const existingUser = readUserByUsername(db, normalizedUsername);
         const timestamp = nowIso();
         if (existingUser) {
-          db.prepare(
-            `
-              update users
-              set display_name = ?, role = ?, staff_id = null, password_hash = ?, enabled = 1, updated_at = ?
-              where username = ?
-            `
-          ).run(displayName, "admin", hashPassword(password), timestamp, normalizedUsername);
+          db.transaction(() => {
+            db.prepare(
+              `
+                update users
+                set display_name = ?, role = ?, staff_id = null, password_hash = ?, enabled = 1, updated_at = ?
+                where username = ?
+              `
+            ).run(displayName, "admin", hashPassword(password), timestamp, normalizedUsername);
+            replaceManagedStaffIds(db, existingUser.id, [], null, timestamp);
+          })();
           return;
         }
 
@@ -252,7 +300,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
             `
           )
           .all() as UserRow[];
-        return rows.map(mapUser);
+        return rows.map((row) => attachManagedStaffIds(db, mapUser(row)));
       } finally {
         db.close();
       }
@@ -278,22 +326,34 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
         }
 
         assertCanSaveUser(db, existingUser, input.role, input.enabled);
+        const managedStaffIds = normalizeManagedStaffIds(input.managedStaffIds);
+        const managedStaffUpdatedBy = input.managedStaffUpdatedBy?.trim() || null;
         const timestamp = nowIso();
         if (existingUser) {
           const passwordHash = input.password ? hashPassword(input.password) : existingUser.passwordHash;
-          db.prepare(
-            `
-              update users
-              set username = ?, display_name = ?, role = ?, staff_id = ?, password_hash = ?, enabled = ?, updated_at = ?
-              where id = ?
-            `
-          ).run(username, displayName, input.role, staffId, passwordHash, input.enabled ? 1 : 0, timestamp, existingUser.id);
+          db.transaction(() => {
+            db.prepare(
+              `
+                update users
+                set username = ?, display_name = ?, role = ?, staff_id = ?, password_hash = ?, enabled = ?, updated_at = ?
+                where id = ?
+              `
+            ).run(username, displayName, input.role, staffId, passwordHash, input.enabled ? 1 : 0, timestamp, existingUser.id);
+            replaceManagedStaffIds(
+              db,
+              existingUser.id,
+              managedStaffIds,
+              normalizeManagedStaffCreatedBy(db, managedStaffUpdatedBy),
+              timestamp
+            );
+          })();
           return {
             id: existingUser.id,
             username,
             displayName,
             role: input.role,
             staffId,
+            managedStaffIds,
             enabled: input.enabled,
             createdAt: existingUser.createdAt,
             updatedAt: timestamp
@@ -303,23 +363,33 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
         if (!input.password) {
           throw new AuthStoreError(400, "新账号必须设置初始密码");
         }
+        const password = input.password;
 
-        db.prepare(
-          `
-            insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
-            values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `
-        ).run(
-          input.id,
-          username,
-          displayName,
-          input.role,
-          staffId,
-          hashPassword(input.password),
-          input.enabled ? 1 : 0,
-          timestamp,
-          timestamp
-        );
+        db.transaction(() => {
+          db.prepare(
+            `
+              insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+              values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `
+          ).run(
+            input.id,
+            username,
+            displayName,
+            input.role,
+            staffId,
+            hashPassword(password),
+            input.enabled ? 1 : 0,
+            timestamp,
+            timestamp
+          );
+          replaceManagedStaffIds(
+            db,
+            input.id,
+            managedStaffIds,
+            normalizeManagedStaffCreatedBy(db, managedStaffUpdatedBy),
+            timestamp
+          );
+        })();
 
         return {
           id: input.id,
@@ -327,6 +397,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           displayName,
           role: input.role,
           staffId,
+          managedStaffIds,
           enabled: input.enabled,
           createdAt: timestamp,
           updatedAt: timestamp
