@@ -163,7 +163,7 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 
 单机正式部署建议使用：
 
-- `./optools.sh deploy` 一键完成初始化、构建、依赖安装、SQLite/Nginx/logrotate 检查、生产服务重启和健康检查等待。
+- `./optools.sh deploy` 一键完成初始化、构建、依赖安装、SQLite 表结构初始化/升级、SQLite/Nginx/logrotate 检查、生产服务重启和健康检查等待。
 - `./optools.sh build` 构建前端静态资源，并把 API 运行文件安装到 `/opt/my-working-schedule`。
 - `npm run start:api` 启动 Express API。
 - `deploy/systemd/my-working-schedule.service.example` 管理 API 后台进程。

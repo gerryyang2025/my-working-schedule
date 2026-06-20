@@ -674,8 +674,10 @@ fi
     expect(log).toContain("systemctl enable schedule-api");
     expect(log).toContain(`npm cwd=${process.cwd()} args=run build`);
     expect(log).toContain(`npm cwd=${process.cwd()} args=--prefix ${installDir} ci --include=dev`);
+    expect(log).toContain("data init");
     expect(log).toContain("data status");
     expect(log).toContain("data check");
+    expect(log.indexOf("data init")).toBeLessThan(log.indexOf("data check"));
     expect(log).toContain("nginx test");
     expect(log).toContain("logrotate install");
     expect(log).toContain("logrotate test");
@@ -749,6 +751,7 @@ printf 'LISTEN 0 511 127.0.0.1:3001 0.0.0.0:* users:(("node",pid=123,fd=18))\\n'
     expect(result.stderr).toContain("node");
     const log = await readFile(commandLogPath, "utf8");
     expect(log).toContain("systemctl stop schedule-api");
+    expect(log).toContain("data init");
     expect(log).toContain("logrotate install");
     expect(log).toContain("logrotate test");
     expect(log).not.toContain("systemctl start schedule-api");

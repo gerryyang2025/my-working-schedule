@@ -1023,6 +1023,7 @@ run_deploy() {
   build_static_assets
   npm_bin="$(resolve_npm_bin)"
   install_production_dependencies "$npm_bin"
+  run_data_helper init
   run_data_helper status
   run_data_helper check
   run_nginx_helper test

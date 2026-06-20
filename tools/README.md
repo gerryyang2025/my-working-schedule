@@ -26,7 +26,7 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 ./optools.sh doctor
 ```
 
-Formal deployments should normally use `./optools.sh deploy` from the source directory. It builds and installs the app, validates SQLite and Nginx, installs and dry-runs logrotate, restarts the production API service, and waits for `/api/health` before completing. Slow servers can extend the health wait with:
+Formal deployments should normally use `./optools.sh deploy` from the source directory. It builds and installs the app, initializes/upgrades the SQLite schema, validates SQLite and Nginx, installs and dry-runs logrotate, restarts the production API service, and waits for `/api/health` before completing. Slow servers can extend the health wait with:
 
 ```bash
 OPTOOLS_HEALTH_RETRIES=60 OPTOOLS_HEALTH_RETRY_DELAY=1 ./optools.sh deploy
