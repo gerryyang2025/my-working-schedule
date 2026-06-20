@@ -147,6 +147,39 @@ function createMonthlySettlement(
   };
 }
 
+function juneWeekdayAttendanceEntries(): PublicAppData["scheduleEntries"] {
+  return [
+    "2026-06-01",
+    "2026-06-02",
+    "2026-06-03",
+    "2026-06-04",
+    "2026-06-05",
+    "2026-06-08",
+    "2026-06-09",
+    "2026-06-10",
+    "2026-06-11",
+    "2026-06-12",
+    "2026-06-15",
+    "2026-06-16",
+    "2026-06-17",
+    "2026-06-18",
+    "2026-06-19",
+    "2026-06-22",
+    "2026-06-23",
+    "2026-06-24",
+    "2026-06-25",
+    "2026-06-26",
+    "2026-06-29",
+    "2026-06-30"
+  ].map((date) => ({
+    id: `${date}__staff-nurse-001`,
+    date,
+    staffId: "staff-nurse-001",
+    shiftIds: ["shift-a1"],
+    note: ""
+  }));
+}
+
 const testAuthUser: AuthUser = {
   id: "user-admin",
   username: "admin",
@@ -1128,7 +1161,7 @@ describe("App", () => {
         }
       ]
     });
-    const wrapper = mountApp();
+    const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
@@ -1146,9 +1179,78 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
   });
 
+  it("shows settlement pre-check warnings before final confirmation and saves after continuing", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.saveMonthlySettlement.mockResolvedValue({
+      ...testData,
+      monthlySettlements: [
+        {
+          id: "settlement-2026-06",
+          month: "2026-06",
+          monthStart: "2026-06-01",
+          monthEnd: "2026-06-30",
+          totalDays: 30,
+          bonusPool: 1000,
+          coefficientTotal: 0,
+          settledAt: "2026-06-30T10:00:00.000Z",
+          rows: []
+        }
+      ]
+    });
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(2);
+    expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][1]).toBe("月结前数据检查");
+    expect(String(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][0])).toContain("李护士");
+    expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][2]).toMatchObject({
+      cancelButtonText: "返回核对",
+      confirmButtonText: "继续月结",
+      type: "warning"
+    });
+    expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[1][1]).toBe("确认月结");
+    expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+  });
+
+  it("does not save monthly settlement when pre-check warning is canceled", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockRejectedValueOnce("cancel");
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
+    expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][1]).toBe("月结前数据检查");
+    expect(apiMocks.saveMonthlySettlement).not.toHaveBeenCalled();
+  });
+
+  it("skips settlement pre-check warning when no check items exist", async () => {
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.saveMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
+    const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
+
+    await flushPromises();
+    await enterAdminModeForTest(wrapper);
+    await openBonusTab(wrapper);
+    await wrapper.get('[data-testid="confirm-settlement"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
+    expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][1]).toBe("确认月结");
+    expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+  });
+
   it("does not save or show an error when monthly settlement confirmation is canceled", async () => {
     elementPlusMocks.ElMessageBox.confirm.mockRejectedValue("cancel");
-    const wrapper = mountApp();
+    const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);
@@ -1166,7 +1268,7 @@ describe("App", () => {
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     const deferred = createDeferred<PublicAppData>();
     apiMocks.saveMonthlySettlement.mockReturnValue(deferred.promise);
-    const wrapper = mountApp();
+    const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
 
     await flushPromises();
     await enterAdminModeForTest(wrapper);

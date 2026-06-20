@@ -42,6 +42,7 @@ import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculati
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
 import { calculateRangeBonusSummary, monthRangeToDates } from "@/lib/range-bonus";
+import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
 type WorkbenchTab = "schedule" | "weekly" | "bonus";
@@ -592,6 +593,18 @@ async function handleConfirmSettlement(payload: { month: string; bonusPool: numb
 
   settlementSaving.value = true;
   try {
+    if (data.value && displayedBonusSummary.value) {
+      const settlementChecks = calculateSettlementChecks(data.value, displayedBonusSummary.value);
+
+      if (settlementChecks.length > 0) {
+        await ElMessageBox.confirm(settlementChecks.map((item) => item.message).join("\n"), "月结前数据检查", {
+          cancelButtonText: "返回核对",
+          confirmButtonText: "继续月结",
+          type: "warning"
+        });
+      }
+    }
+
     await ElMessageBox.confirm(
       `${payload.month} 月结奖金总额 ${payload.bonusPool.toFixed(2)}。确认后该月排班会被锁定，不能继续修改。`,
       "确认月结",
