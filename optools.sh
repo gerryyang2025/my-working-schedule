@@ -92,6 +92,8 @@ Usage:
   ./optools.sh logrotate test    Dry-run logrotate config
   ./optools.sh firewall status   Inspect firewall status and print access guidance
   ./optools.sh firewall guide    Print firewall and security group guidance
+  ./optools.sh data install   Check SQLite maintenance prerequisites
+  ./optools.sh data init      Initialize or upgrade SQLite schema
   ./optools.sh data status    Show SQLite storage status
   ./optools.sh data check     Check SQLite storage integrity
   ./optools.sh data backup    Back up SQLite storage

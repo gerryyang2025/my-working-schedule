@@ -73,6 +73,7 @@ describe("production deployment docs and examples", () => {
     expect(service).toContain("WorkingDirectory=/opt/my-working-schedule");
     expect(service).toContain("Environment=SCHEDULE_STORAGE_DRIVER=sqlite");
     expect(service).toContain("Environment=SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db");
+    expect(service).not.toContain("SCHEDULE_DATA_PATH");
     expect(service).toContain("ExecStart=/usr/bin/npm run start:api");
     expect(service).not.toContain("npm run dev");
 
@@ -89,6 +90,7 @@ describe("production deployment docs and examples", () => {
     expect(logrotate).toContain("copytruncate");
 
     expect(cron).toContain("SCHEDULE_STORAGE_DRIVER=sqlite");
+    expect(cron).not.toContain("SCHEDULE_DATA_PATH");
     expect(cron).toContain("/opt/my-working-schedule/tools/sqlite-service.sh backup");
   });
 });

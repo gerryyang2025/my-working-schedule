@@ -40,7 +40,7 @@ npm run dev
 
 默认前端开发服务监听 `0.0.0.0:5173`，API 监听 `0.0.0.0:3001`，同一局域网内可通过本机真实 IP 访问，例如 `http://192.168.x.x:5173`。如需仅本机访问，可使用 `HOST=127.0.0.1 WEB_HOST=127.0.0.1 npm run dev`。
 
-开发服务默认把运行时排班数据写入 `data/app-data.local.json`，该文件已被 `.gitignore` 忽略；`data/app-data.json` 只作为仓库种子数据保留。需要重置本地验证数据时，删除 `data/app-data.local.json` 后重新启动服务即可。也可以通过 `SCHEDULE_DATA_PATH` 指定其他数据文件。
+当前开发和正式运行时都使用 SQLite。默认本地开发数据库为 `data/schedule.db`，该文件已被 `.gitignore` 忽略；仓库不再保留 JSON 数据文件。需要重置本地验证数据时，停止服务后删除 `data/schedule.db`，再执行 `./optools.sh data init`。
 
 默认管理员账号为 `admin`。管理员初始密码只从服务端配置读取，不再保存在排班数据文件中。优先级如下：
 
@@ -59,7 +59,9 @@ cp config/server.example.json config/server.local.json
 {
   "host": "0.0.0.0",
   "port": 3001,
-  "storagePath": "data/app-data.local.json",
+  "storageDriver": "sqlite",
+  "sqlitePath": "data/schedule.db",
+  "backupPath": "backups",
   "adminPassword": "请改成真实密码"
 }
 ```
@@ -70,11 +72,11 @@ cp config/server.example.json config/server.local.json
 ./optools.sh dev restart
 ```
 
-使用 SQLite 存储时，默认管理员密码会以哈希形式保存到 `users` 表；每次服务启动都会按当前配置刷新 `admin` 账号密码，便于部署阶段通过配置文件或环境变量统一调整。
+默认管理员密码会以哈希形式保存到 `users` 表；每次服务启动都会按当前配置刷新 `admin` 账号密码，便于部署阶段通过配置文件或环境变量统一调整。
 
 ## SQLite 存储与正式单机部署
 
-开发环境默认继续使用 JSON 文件存储，便于本地调试和快速重置数据。正式单机部署可切换到 SQLite 文件数据库：
+当前版本只保留 SQLite 运行时存储。正式单机部署推荐使用 `/var/lib/my-working-schedule/schedule.db`：
 
 ```bash
 export SCHEDULE_STORAGE_DRIVER=sqlite
@@ -89,8 +91,6 @@ SQLite 是嵌入式文件数据库，不需要单独启动数据库 daemon。长
 ```bash
 ./optools.sh data install
 ./optools.sh data init
-./optools.sh data migrate
-./optools.sh data export-json
 ./optools.sh data backup
 CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 ./optools.sh data status
@@ -99,19 +99,16 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 
 说明：
 
-- `./optools.sh data init` 只初始化 SQLite 库和表结构，不会自动从 JSON 导入数据。
-- `./optools.sh data migrate` 用当前 JSON 业务数据迁移到 SQLite；如目标库已存在且确认覆盖，仍可使用底层命令 `npm run data:migrate:sqlite -- --overwrite`。
-- `./optools.sh data export-json` 用于导出当前 SQLite 数据，便于人工检查或留存可读副本。
+- `./optools.sh data init` 初始化或升级 SQLite 库和表结构，不会从 JSON 导入数据。
 - `./optools.sh data backup` 会在 `SCHEDULE_BACKUP_PATH` 下生成带时间戳的数据库备份。
 - `./optools.sh data check` 会输出完整性和核心表检查结果，`ok: true` 代表检查通过。
-- `./optools.sh data install` 是无副作用的运行前检查，会回显 JSON 路径、SQLite 路径和备份目录，便于部署联调。
+- `./optools.sh data install` 是无副作用的运行前检查，会回显 SQLite 路径和备份目录，便于部署联调。
 
 底层 Linux 辅助脚本仍保留，便于单独调试：
 
 ```bash
 ./tools/sqlite-service.sh install
 ./tools/sqlite-service.sh init
-./tools/sqlite-service.sh migrate
 ./tools/sqlite-service.sh backup
 ./tools/sqlite-service.sh restore <backup-file>
 ./tools/sqlite-service.sh status
@@ -246,4 +243,4 @@ npm run test:e2e
 npx playwright install chromium
 ```
 
-E2E 会为 API 服务使用系统临时目录中的独立数据文件，不会读写 `data/app-data.local.json`。
+E2E 会为 API 服务使用系统临时目录中的独立 SQLite 数据库，不会读写 `data/schedule.db`。

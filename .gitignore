@@ -33,8 +33,10 @@ temp/
 data/*.db
 data/*.db-shm
 data/*.db-wal
+data/*.json
 data/*.local.json
 data/*.bak
+data/archive/
 
 # Source requirement attachment kept outside Git history
 排班需求.docx

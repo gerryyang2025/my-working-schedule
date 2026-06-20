@@ -1,7 +1,6 @@
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 SCHEDULE_STORAGE_DRIVER=sqlite
-SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
 SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
 SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
 
