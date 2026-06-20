@@ -154,6 +154,25 @@ describe("calculateWeeklySummary", () => {
     expect(nurse.coefficientTotal).toBe(6.7);
   });
 
+  it("calculates weekly attendance balance as attendance minus required shifts", () => {
+    const summary = calculateWeeklySummary(baseData, "2026-06-17");
+    const nurse = getRow(summary, "staff-nurse");
+    const clerk = getRow(summary, "staff-clerk");
+
+    expect(nurse).toMatchObject({
+      attendanceShifts: 5,
+      requiredShifts: 4,
+      attendanceBalance: 1,
+      overtimeShifts: 1
+    });
+    expect(clerk).toMatchObject({
+      attendanceShifts: 1,
+      requiredShifts: 4,
+      attendanceBalance: -3,
+      overtimeShifts: 0
+    });
+  });
+
   it("counts clerks with the same rules as nurses", () => {
     const summary = calculateWeeklySummary(baseData, "2026-06-17");
     const clerk = getRow(summary, "staff-clerk");
@@ -314,6 +333,28 @@ describe("calculateMonthlySummary", () => {
     expect(clerk.coefficientTotal).toBe(1.3);
   });
 
+  it("calculates monthly required shifts and attendance balance across partial weeks", () => {
+    const data = createData({
+      holidays: [{ id: "h1", date: "2026-06-19", name: "端午节", affectsRequiredAttendance: true }],
+      scheduleEntries: [
+        entry("2026-06-01", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-02", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-03", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-04", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-05", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-29", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-30", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateMonthlySummary(data, getMonthDays(2026, 6));
+    const nurse = getMonthlyRow(summary, "staff-nurse-001");
+
+    expect(nurse.requiredShifts).toBe(21);
+    expect(nurse.attendanceShifts).toBe(7);
+    expect(nurse.attendanceBalance).toBe(-14);
+  });
+
   it("counts head nurse monthly attendance but excludes coefficient", () => {
     const summary = calculateMonthlySummary(baseData, monthDays);
     const head = getMonthlyRow(summary, "staff-head");
@@ -422,6 +463,27 @@ describe("calculateMonthlySummary", () => {
 });
 
 describe("calculateRangeSummary", () => {
+  it("keeps monthly overtime as positive weekly overtime instead of net monthly balance", () => {
+    const data = createData({
+      scheduleEntries: [
+        entry("2026-06-01", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-02", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-03", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-04", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-05", "staff-nurse-001", ["shift-a1"]),
+        entry("2026-06-06", "staff-nurse-001", ["shift-a1"])
+      ]
+    });
+
+    const summary = calculateRangeSummary(data, "2026-06-01", "2026-06-14");
+    const nurse = getMonthlyRow(summary, "staff-nurse-001");
+
+    expect(nurse.requiredShifts).toBe(10);
+    expect(nurse.attendanceShifts).toBe(6);
+    expect(nurse.attendanceBalance).toBe(-4);
+    expect(nurse.overtimeShifts).toBe(1);
+  });
+
   it("calculates overtime by partial weeks inside the selected range", () => {
     const data = createData({
       scheduleEntries: [

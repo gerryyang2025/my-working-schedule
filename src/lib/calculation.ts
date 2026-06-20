@@ -68,7 +68,8 @@ function summarizeStaff(
   requiredShifts: number
 ): WeeklyStaffSummary {
   const totals = summarizeShiftTotals(entries, shiftMap);
-  const overtimeShifts = Math.max(0, totals.attendanceShifts - requiredShifts);
+  const attendanceBalance = totals.attendanceShifts - requiredShifts;
+  const overtimeShifts = Math.max(0, attendanceBalance);
   const isCoefficientExcluded = shouldExcludeCoefficient(staff);
 
   return {
@@ -78,6 +79,7 @@ function summarizeStaff(
     staffType: staff.type,
     attendanceShifts: totals.attendanceShifts,
     requiredShifts,
+    attendanceBalance,
     overtimeShifts,
     coefficientTotal: isCoefficientExcluded ? null : totals.coefficientTotal,
     coefficientExcludedReason: isCoefficientExcluded ? "护士长绩效单独核算" : ""
@@ -118,9 +120,11 @@ export function calculateWeeklySummary(data: WeeklySummaryInput, selectedDate: s
 function summarizeMonthlyStaff(
   staff: StaffMember,
   entries: ScheduleEntry[],
-  shiftMap: Map<string, Shift>
+  shiftMap: Map<string, Shift>,
+  requiredShifts: number
 ): MonthlyStaffSummary {
   const totals = summarizeShiftTotals(entries, shiftMap);
+  const attendanceBalance = totals.attendanceShifts - requiredShifts;
   const isCoefficientExcluded = shouldExcludeCoefficient(staff);
 
   return {
@@ -129,6 +133,8 @@ function summarizeMonthlyStaff(
     staffJobId: staff.jobId,
     staffType: staff.type,
     attendanceShifts: totals.attendanceShifts,
+    requiredShifts,
+    attendanceBalance,
     overtimeShifts: 0,
     coefficientTotal: isCoefficientExcluded ? null : totals.coefficientTotal,
     coefficientExcludedReason: isCoefficientExcluded ? "护士长绩效单独核算" : ""
@@ -182,6 +188,20 @@ function calculateOvertimeByStaff(data: WeeklySummaryInput, rangeStart: string, 
   return overtimeByStaff;
 }
 
+function calculateRequiredShiftsByStaff(data: WeeklySummaryInput, rangeStart: string, rangeEnd: string): Map<string, number> {
+  const requiredByStaff = new Map<string, number>();
+
+  for (const weekRange of splitRangeIntoWeekRanges(rangeStart, rangeEnd)) {
+    const requiredShifts = requiredShiftsForPartialWeek(data, weekRange.start, weekRange.end);
+
+    for (const staff of data.staff) {
+      requiredByStaff.set(staff.id, (requiredByStaff.get(staff.id) ?? 0) + requiredShifts);
+    }
+  }
+
+  return requiredByStaff;
+}
+
 export function calculateRangeSummary(
   data: WeeklySummaryInput & MonthlySummaryInput,
   rangeStart: string,
@@ -199,6 +219,7 @@ export function calculateRangeSummary(
     .sort((left, right) => left.date.localeCompare(right.date))
     .map((holiday) => holiday.name);
   const overtimeByStaff = calculateOvertimeByStaff(data, rangeStart, rangeEnd);
+  const requiredByStaff = calculateRequiredShiftsByStaff(data, rangeStart, rangeEnd);
 
   return {
     rangeStart,
@@ -211,7 +232,8 @@ export function calculateRangeSummary(
       ...summarizeMonthlyStaff(
         staff,
         rangeEntries.filter((entry) => entry.staffId === staff.id),
-        shiftMap
+        shiftMap,
+        requiredByStaff.get(staff.id) ?? 0
       ),
       overtimeShifts: overtimeByStaff.get(staff.id) ?? 0
     }))

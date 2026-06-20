@@ -57,6 +57,7 @@ export interface WeeklyStaffSummary {
   staffType: StaffType;
   attendanceShifts: number;
   requiredShifts: number;
+  attendanceBalance: number;
   overtimeShifts: number;
   coefficientTotal: number | null;
   coefficientExcludedReason: string;
@@ -77,6 +78,8 @@ export interface MonthlyStaffSummary {
   staffJobId: string;
   staffType: StaffType;
   attendanceShifts: number;
+  requiredShifts: number;
+  attendanceBalance: number;
   overtimeShifts: number;
   coefficientTotal: number | null;
   coefficientExcludedReason: string;
