@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calculateRangeBonusSummary, monthRangeToDates } from "./range-bonus";
-import type { AppData, MonthlySettlement } from "@/types/domain";
+import type { AppData, MonthlySettlement, MonthlyStaffSummary } from "@/types/domain";
 
 function settlement(month: string, overrides: Partial<MonthlySettlement> = {}): MonthlySettlement {
   return {
@@ -86,6 +86,39 @@ describe("calculateRangeBonusSummary", () => {
     expect(nurse?.overtimeShifts).toBe(1);
     expect(nurse?.coefficientTotal).toBe(3.5);
     expect(nurse?.staffJobId).toBe("100001");
+  });
+
+  it("merges required shifts and attendance balance across settled and live months", () => {
+    const settledRow = {
+      staffId: "staff-nurse-001",
+      staffName: "李护士",
+      staffJobId: "100001",
+      staffType: "nurse",
+      attendanceShifts: 4,
+      requiredShifts: 20,
+      attendanceBalance: -16,
+      overtimeShifts: 1,
+      coefficientTotal: 2,
+      coefficientExcludedReason: "",
+      bonusAmount: 1000,
+      bonusExcludedReason: ""
+    } as MonthlySettlement["rows"][number] & Pick<MonthlyStaffSummary, "requiredShifts" | "attendanceBalance">;
+    const summary = calculateRangeBonusSummary(
+      data({
+        monthlySettlements: [
+          settlement("2026-06", {
+            rows: [settledRow]
+          })
+        ]
+      }),
+      "2026-06",
+      "2026-07"
+    );
+    const nurse = summary.rows.find((row) => row.staffId === "staff-nurse-001");
+
+    expect(nurse?.attendanceShifts).toBe(5);
+    expect(nurse?.requiredShifts).toBe(43);
+    expect(nurse?.attendanceBalance).toBe(-38);
   });
 
   it("keeps head nurses excluded when merging range rows", () => {

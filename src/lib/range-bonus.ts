@@ -74,6 +74,8 @@ function addRows(target: Map<string, MonthlyStaffSummary>, rows: MonthlyStaffSum
     }
 
     existing.attendanceShifts += row.attendanceShifts;
+    existing.requiredShifts += row.requiredShifts;
+    existing.attendanceBalance += row.attendanceBalance;
     existing.overtimeShifts += row.overtimeShifts;
     existing.coefficientTotal =
       existing.coefficientTotal === null || row.coefficientTotal === null
