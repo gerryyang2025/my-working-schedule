@@ -12,6 +12,7 @@ import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
 import {
+  bulkUpdateWeekSchedule,
   changePassword,
   copyPreviousWeekSchedule,
   deleteHoliday,
@@ -33,6 +34,7 @@ import type {
   AuditLogEntry,
   AuditLogQuery,
   AuthUser,
+  BulkWeekSchedulePayload,
   CopyPreviousWeekMode,
   ManagedAuthUser,
   PasswordChangeInput,
@@ -85,6 +87,7 @@ const passwordDialogOpen = ref(false);
 const passwordChanging = ref(false);
 const passwordChangeError = ref("");
 const copyingPreviousWeek = ref(false);
+const bulkUpdatingWeek = ref(false);
 
 const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
@@ -171,6 +174,9 @@ const currentWeekEditableEntryCount = computed(() => {
   const editableIds = new Set(editableStaffIds.value);
   return data.value.scheduleEntries.filter((entry) => weekDayKeys.has(entry.date) && editableIds.has(entry.staffId)).length;
 });
+const restShift = computed(() => findEnabledShift(["休"], ["休息"]));
+const officeShift = computed(() => findEnabledShift(["办公"], ["办公"]));
+const scheduleActionBusy = computed(() => copyingPreviousWeek.value || bulkUpdatingWeek.value);
 const canOperateCurrentSettlement = computed(() => {
   if (!currentUser.value || isBonusRangeMode.value) {
     return false;
@@ -349,8 +355,42 @@ async function resolveCopyPreviousWeekMode(): Promise<CopyPreviousWeekMode | nul
   }
 }
 
+function findEnabledShift(shortNames: string[], nameKeywords: string[]): Shift | null {
+  return (
+    data.value?.shifts.find((shift) => {
+      if (!shift.enabled) {
+        return false;
+      }
+
+      return shortNames.includes(shift.shortName) || nameKeywords.some((keyword) => shift.name.includes(keyword));
+    }) ?? null
+  );
+}
+
+async function resolveBatchSetMode(label: string): Promise<CopyPreviousWeekMode | null> {
+  if (currentWeekEditableEntryCount.value === 0) {
+    return "overwrite";
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `当前周已有排班。选择覆盖会将当前周可编辑格子设置为${label}，选择跳过会保留已有格子。`,
+      `批量设置${label}`,
+      {
+        type: "warning",
+        confirmButtonText: "覆盖已有排班",
+        cancelButtonText: "跳过已有排班",
+        distinguishCancelAndClose: true
+      }
+    );
+    return "overwrite";
+  } catch (action) {
+    return action === "cancel" ? "skip" : null;
+  }
+}
+
 async function handleCopyPreviousWeek(): Promise<void> {
-  if (!data.value || !canEditSchedule.value || copyingPreviousWeek.value) {
+  if (!data.value || !canEditSchedule.value || scheduleActionBusy.value) {
     return;
   }
 
@@ -381,6 +421,89 @@ async function handleCopyPreviousWeek(): Promise<void> {
   } finally {
     copyingPreviousWeek.value = false;
   }
+}
+
+async function submitBulkWeek(payload: BulkWeekSchedulePayload, actionLabel: "更新" | "清空"): Promise<void> {
+  bulkUpdatingWeek.value = true;
+  try {
+    const response = await bulkUpdateWeekSchedule(payload);
+    data.value = response.data;
+    const { updated, skipped } = response.result;
+
+    if (updated > 0) {
+      const skippedText = skipped > 0 ? `，跳过 ${skipped} 个已有排班` : "";
+      ElMessage.success(`已批量${actionLabel} ${updated} 个排班${skippedText}`);
+      return;
+    }
+
+    if (skipped > 0) {
+      ElMessage.info(`没有新的排班可${actionLabel}，已跳过 ${skipped} 个已有排班`);
+      return;
+    }
+
+    ElMessage.info(`当前周没有可${actionLabel}的排班`);
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : `批量${actionLabel}排班失败`);
+  } finally {
+    bulkUpdatingWeek.value = false;
+  }
+}
+
+async function handleBatchSetWeekShift(kind: "rest" | "office"): Promise<void> {
+  if (!data.value || !canEditSchedule.value || scheduleActionBusy.value) {
+    return;
+  }
+
+  const label = kind === "rest" ? "休息" : "办公";
+  const shift = kind === "rest" ? restShift.value : officeShift.value;
+  if (!shift) {
+    ElMessage.error(`未找到启用的${label}班次，请先在系统配置中维护。`);
+    return;
+  }
+
+  const mode = await resolveBatchSetMode(label);
+  if (!mode) {
+    return;
+  }
+
+  await submitBulkWeek(
+    {
+      weekStart: selectedWeek.value.start,
+      operation: "set-shift",
+      shiftId: shift.id,
+      mode
+    },
+    "更新"
+  );
+}
+
+async function handleClearWeek(): Promise<void> {
+  if (!data.value || !canEditSchedule.value || scheduleActionBusy.value) {
+    return;
+  }
+
+  if (currentWeekEditableEntryCount.value === 0) {
+    ElMessage.info("当前周没有可清空的排班");
+    return;
+  }
+
+  try {
+    await ElMessageBox.confirm("将清空当前周可编辑人员的排班记录，此操作不可撤销。", "批量清空排班", {
+      type: "warning",
+      confirmButtonText: "确认清空",
+      cancelButtonText: "取消"
+    });
+  } catch {
+    return;
+  }
+
+  await submitBulkWeek(
+    {
+      weekStart: selectedWeek.value.start,
+      operation: "clear"
+    },
+    "清空"
+  );
 }
 
 async function handleFullscreen(): Promise<void> {
@@ -890,10 +1013,35 @@ onMounted(async () => {
               <button
                 data-testid="copy-previous-week-button"
                 type="button"
-                :disabled="!canEditSchedule || copyingPreviousWeek"
+                :disabled="!canEditSchedule || scheduleActionBusy"
                 @click="handleCopyPreviousWeek"
               >
                 {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
+              </button>
+              <button
+                data-testid="batch-rest-week-button"
+                type="button"
+                :disabled="!canEditSchedule || scheduleActionBusy"
+                @click="handleBatchSetWeekShift('rest')"
+              >
+                批量休息
+              </button>
+              <button
+                data-testid="batch-office-week-button"
+                type="button"
+                :disabled="!canEditSchedule || scheduleActionBusy"
+                @click="handleBatchSetWeekShift('office')"
+              >
+                批量办公
+              </button>
+              <button
+                class="danger-action"
+                data-testid="clear-week-button"
+                type="button"
+                :disabled="!canEditSchedule || scheduleActionBusy"
+                @click="handleClearWeek"
+              >
+                批量清空
               </button>
             </div>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />

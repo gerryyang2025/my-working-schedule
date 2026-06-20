@@ -5,6 +5,7 @@ import App from "./App.vue";
 import type { AuthUser, PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
+  bulkUpdateWeekSchedule: vi.fn(),
   copyPreviousWeekSchedule: vi.fn(),
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
@@ -85,6 +86,23 @@ const testData: PublicAppData = {
     defaultRequiredShiftsPerWeek: 5,
     version: 1
   }
+};
+
+const officeShiftData: PublicAppData = {
+  ...testData,
+  shifts: [
+    ...testData.shifts,
+    {
+      id: "shift-office",
+      name: "办公班",
+      shortName: "办公",
+      color: "#7C3AED",
+      countsAttendance: true,
+      coefficient: 1.2,
+      enabled: true,
+      sortOrder: 3
+    }
+  ]
 };
 
 const twoStaffData: PublicAppData = {
@@ -909,6 +927,121 @@ describe("App", () => {
 
     expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalled();
     expect(apiMocks.copyPreviousWeekSchedule).toHaveBeenCalledWith({ weekStart: "2026-06-15", mode: "overwrite" });
+    vi.useRealTimers();
+  });
+
+  it("batch sets rest shifts for the selected week when the current week is empty", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(testData),
+      result: { updated: 7, skipped: 0 }
+    });
+    const wrapper = mountApp(testData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="batch-rest-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).not.toHaveBeenCalled();
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "set-shift",
+      shiftId: "shift-rest",
+      mode: "overwrite"
+    });
+    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("已批量更新 7 个排班");
+    vi.useRealTimers();
+  });
+
+  it("batch sets office shifts using the configured office shift", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(officeShiftData),
+      result: { updated: 7, skipped: 0 }
+    });
+    const wrapper = mountApp(officeShiftData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="batch-office-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "set-shift",
+      shiftId: "shift-office",
+      mode: "overwrite"
+    });
+    vi.useRealTimers();
+  });
+
+  it("asks before overwriting current week entries during batch shift setting", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(testData),
+      result: { updated: 7, skipped: 0 }
+    });
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: "existing"
+        }
+      ]
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="batch-rest-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalled();
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "set-shift",
+      shiftId: "shift-rest",
+      mode: "overwrite"
+    });
+    vi.useRealTimers();
+  });
+
+  it("confirms before clearing the selected week", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(testData),
+      result: { updated: 1, skipped: 0 }
+    });
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: ""
+        }
+      ]
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="clear-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalled();
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "clear"
+    });
+    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("已批量清空 1 个排班");
     vi.useRealTimers();
   });
 

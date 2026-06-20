@@ -41,6 +41,25 @@ export interface CopyPreviousWeekScheduleResult {
   skipped: number;
 }
 
+export type BulkWeekScheduleOperation = "set-shift" | "clear";
+
+export interface BulkWeekScheduleResult {
+  updated: number;
+  skipped: number;
+}
+
+export type BulkWeekSchedulePayload =
+  | {
+      weekStart: string;
+      operation: "set-shift";
+      shiftId: string;
+      mode: CopyPreviousWeekMode;
+    }
+  | {
+      weekStart: string;
+      operation: "clear";
+    };
+
 export interface AuditLogEntry {
   id: string;
   occurredAt: string;
@@ -287,6 +306,15 @@ export function copyPreviousWeekSchedule(payload: {
       body: JSON.stringify(payload)
     }
   );
+}
+
+export function bulkUpdateWeekSchedule(
+  payload: BulkWeekSchedulePayload
+): Promise<{ data: PublicAppData; result: BulkWeekScheduleResult }> {
+  return requestJson<{ data: PublicAppData; result: BulkWeekScheduleResult }>("/api/data/schedule-bulk-week", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
 }
 
 export async function saveMonthlySettlement(month: string, bonusPool: number): Promise<PublicAppData> {

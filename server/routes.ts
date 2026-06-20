@@ -38,6 +38,25 @@ interface CopyPreviousWeekResult {
   skipped: number;
 }
 
+type BulkWeekOperation = "set-shift" | "clear";
+
+type BulkWeekPayload =
+  | {
+      weekStart: string;
+      operation: "set-shift";
+      shiftId: string;
+      mode: CopyPreviousWeekMode;
+    }
+  | {
+      weekStart: string;
+      operation: "clear";
+    };
+
+interface BulkWeekResult {
+  updated: number;
+  skipped: number;
+}
+
 type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
 type AuthenticatedRequest = Request & { authUser?: AuthUser; authToken?: string };
 
@@ -491,6 +510,42 @@ function parseCopyPreviousWeekPayload(body: unknown): PayloadResult<CopyPrevious
   };
 }
 
+function parseBulkWeekPayload(body: unknown): PayloadResult<BulkWeekPayload> {
+  if (!isRecord(body)) {
+    return { ok: false, message: "批量排班信息不完整" };
+  }
+
+  const { weekStart, operation, shiftId, mode } = body;
+  if (!isNonEmptyString(weekStart) || (operation !== "set-shift" && operation !== "clear")) {
+    return { ok: false, message: "批量排班信息不完整" };
+  }
+
+  if (operation === "set-shift") {
+    if (!isNonEmptyString(shiftId) || (mode !== undefined && mode !== "skip" && mode !== "overwrite")) {
+      return { ok: false, message: "批量排班信息不完整" };
+    }
+    const parsedMode: CopyPreviousWeekMode = mode === "skip" ? "skip" : "overwrite";
+
+    return {
+      ok: true,
+      value: {
+        weekStart,
+        operation,
+        shiftId,
+        mode: parsedMode
+      }
+    };
+  }
+
+  return {
+    ok: true,
+    value: {
+      weekStart,
+      operation
+    }
+  };
+}
+
 function copyPreviousWeekEntries(
   data: AppData,
   user: AuthUser | undefined,
@@ -549,6 +604,69 @@ function copyPreviousWeekEntries(
       scheduleEntries: [...entriesById.values()]
     },
     result: { copied, skipped }
+  };
+}
+
+function bulkUpdateWeekEntries(data: AppData, user: AuthUser | undefined, payload: BulkWeekPayload): {
+  data: AppData;
+  result: BulkWeekResult;
+} {
+  const weekRange = getWeekRange(payload.weekStart);
+  const targetDates = listDateKeys(weekRange.start, weekRange.end);
+  for (const targetDate of targetDates) {
+    if (isMonthSettled(data, getMonthKey(targetDate))) {
+      throw new HttpResponseError(400, "该月份已月结，不能修改排班");
+    }
+  }
+
+  const enabledManageableStaffIds = new Set(
+    data.staff.filter((staff) => staff.enabled && canManageStaff(user, staff.id)).map((staff) => staff.id)
+  );
+  const entriesById = new Map(data.scheduleEntries.map((entry) => [entry.id, entry]));
+  let updated = 0;
+  let skipped = 0;
+
+  if (payload.operation === "set-shift") {
+    const validation = validateScheduleShiftIds([payload.shiftId], data.shifts);
+    if (!validation.ok) {
+      throw new HttpResponseError(400, validation.message);
+    }
+
+    for (const staffId of enabledManageableStaffIds) {
+      for (const targetDate of targetDates) {
+        const targetId = `${targetDate}__${staffId}`;
+        if (payload.mode === "skip" && entriesById.has(targetId)) {
+          skipped += 1;
+          continue;
+        }
+
+        entriesById.set(targetId, {
+          id: targetId,
+          date: targetDate,
+          staffId,
+          shiftIds: [payload.shiftId],
+          note: ""
+        });
+        updated += 1;
+      }
+    }
+  } else {
+    for (const staffId of enabledManageableStaffIds) {
+      for (const targetDate of targetDates) {
+        const targetId = `${targetDate}__${staffId}`;
+        if (entriesById.delete(targetId)) {
+          updated += 1;
+        }
+      }
+    }
+  }
+
+  return {
+    data: {
+      ...data,
+      scheduleEntries: [...entriesById.values()]
+    },
+    result: { updated, skipped }
   };
 }
 
@@ -1021,6 +1139,40 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         `复制上一周排班：${getWeekRange(payload.value.weekStart).start}，复制 ${copyResult.copied} 个，跳过 ${copyResult.skipped} 个`
       );
       response.json({ data: toPublicData(nextData), result: copyResult });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/data/schedule-bulk-week", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const payload = parseBulkWeekPayload(request.body);
+      if (payload.ok === false) {
+        response.status(400).json({ message: payload.message });
+        return;
+      }
+
+      if (!isValidDateKey(payload.value.weekStart)) {
+        response.status(400).json({ message: "日期格式不正确" });
+        return;
+      }
+
+      let bulkResult: BulkWeekResult = { updated: 0, skipped: 0 };
+      const weekStart = getWeekRange(payload.value.weekStart).start;
+      const nextData = await storage.update((data) => {
+        const updated = bulkUpdateWeekEntries(data, request.authUser, payload.value);
+        bulkResult = updated.result;
+        return updated.data;
+      });
+      const operationText = payload.value.operation === "clear" ? "批量清空排班" : `批量设置排班：${payload.value.shiftId}`;
+      await recordAudit(
+        request,
+        "data.schedule_entry.bulk_week",
+        "week",
+        weekStart,
+        `${operationText}，${weekStart}，更新 ${bulkResult.updated} 个，跳过 ${bulkResult.skipped} 个`
+      );
+      response.json({ data: toPublicData(nextData), result: bulkResult });
     } catch (error) {
       handleRouteError(error, response, next);
     }
