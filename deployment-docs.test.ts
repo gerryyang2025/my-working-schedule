@@ -42,7 +42,13 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("账号与人员档案绑定");
     expect(runbook).toContain("系统配置 > 账号");
     expect(runbook).toContain("绑定人员");
-    expect(runbook).toContain("本阶段不会改变账号角色权限");
+    expect(runbook).toContain("系统管理员");
+    expect(runbook).toContain("排班管理员");
+    expect(runbook).toContain("只读查看");
+    expect(runbook).toContain("护士长需要参与排班管理时");
+    expect(runbook).toContain("绑定人员只用于标识账号本人，不会自动授予排班权限；可管理人员决定排班和月结可操作范围。");
+    expect(runbook).toContain("排班管理员：使用 `scheduler` 角色，并显式选择可管理人员；未选择时只能查看，不能编辑任何人员。");
+    expect(runbook).toContain("护士长需要参与排班管理时，账号角色使用 `scheduler`");
     expect(runbook).toContain("EADDRINUSE");
     expect(runbook).toContain("ss -ltnp | grep ':3001'");
     expect(runbook).toContain("/api/health");
