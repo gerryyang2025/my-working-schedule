@@ -12,14 +12,27 @@ type UserStaffBindingRow = {
   staff_id: string;
 };
 
+type UserManagedStaffRelationRow = {
+  user_id: string;
+  staff_id: string;
+  created_at: string;
+  created_by: string | null;
+};
+
 export function replaceAppDataInSqlite(db: Database.Database, data: AppData): void {
   assertAppData(data);
   const replace = db.transaction((next: AppData) => {
     const userStaffBindings = db
       .prepare("select id, staff_id from users where staff_id is not null")
       .all() as UserStaffBindingRow[];
+    const userManagedStaffRelations = db
+      .prepare("select user_id, staff_id, created_at, created_by from user_managed_staff")
+      .all() as UserManagedStaffRelationRow[];
     if (userStaffBindings.length > 0) {
       db.prepare("update users set staff_id = null where staff_id is not null").run();
+    }
+    if (userManagedStaffRelations.length > 0) {
+      db.prepare("delete from user_managed_staff").run();
     }
 
     db.exec(`
@@ -47,6 +60,23 @@ export function replaceAppDataInSqlite(db: Database.Database, data: AppData): vo
       for (const binding of userStaffBindings) {
         if (nextStaffIds.has(binding.staff_id)) {
           restoreUserStaffBinding.run(binding.staff_id, binding.id);
+        }
+      }
+    }
+
+    if (userManagedStaffRelations.length > 0) {
+      const nextStaffIds = new Set(next.staff.map((staff) => staff.id));
+      const restoreUserManagedStaffRelation = db.prepare(
+        "insert into user_managed_staff (user_id, staff_id, created_at, created_by) values (?, ?, ?, ?)"
+      );
+      for (const relation of userManagedStaffRelations) {
+        if (nextStaffIds.has(relation.staff_id)) {
+          restoreUserManagedStaffRelation.run(
+            relation.user_id,
+            relation.staff_id,
+            relation.created_at,
+            relation.created_by
+          );
         }
       }
     }

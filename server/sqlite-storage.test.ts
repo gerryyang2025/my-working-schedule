@@ -329,6 +329,83 @@ describe("SQLite schema and mapper", () => {
     }
   });
 
+  it("preserves user managed staff relations when replacement data keeps referenced staff", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+      db.pragma("foreign_keys = ON");
+
+      const seed = createSeedData();
+      replaceAppDataInSqlite(db, seed);
+      db.prepare(
+        `
+          insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        "user-scheduler",
+        "scheduler",
+        "Scheduler",
+        "scheduler",
+        null,
+        "hash",
+        1,
+        "2026-06-20T00:00:00.000Z",
+        "2026-06-20T00:00:00.000Z"
+      );
+      db.prepare("insert into user_managed_staff (user_id, staff_id, created_at, created_by) values (?, ?, ?, ?)")
+        .run("user-scheduler", "staff-nurse-001", "2026-06-20T00:00:00.000Z", null);
+
+      const replacement = createReplacementData();
+      replacement.staff = [seed.staff.find((staff) => staff.id === "staff-nurse-001")!, ...replacement.staff];
+
+      replaceAppDataInSqlite(db, replacement);
+
+      expect(
+        db.prepare("select staff_id from user_managed_staff where user_id = ? order by staff_id asc").all("user-scheduler")
+      ).toEqual([{ staff_id: "staff-nurse-001" }]);
+      expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
+  it("removes user managed staff relations when replacement data removes referenced staff", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+      db.pragma("foreign_keys = ON");
+
+      const seed = createSeedData();
+      replaceAppDataInSqlite(db, seed);
+      db.prepare(
+        `
+          insert into users (id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at)
+          values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `
+      ).run(
+        "user-scheduler",
+        "scheduler",
+        "Scheduler",
+        "scheduler",
+        null,
+        "hash",
+        1,
+        "2026-06-20T00:00:00.000Z",
+        "2026-06-20T00:00:00.000Z"
+      );
+      db.prepare("insert into user_managed_staff (user_id, staff_id, created_at, created_by) values (?, ?, ?, ?)")
+        .run("user-scheduler", "staff-nurse-001", "2026-06-20T00:00:00.000Z", null);
+
+      replaceAppDataInSqlite(db, createReplacementData());
+
+      expect(db.prepare("select staff_id from user_managed_staff where user_id = ?").all("user-scheduler")).toEqual([]);
+      expect(db.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      db.close();
+    }
+  });
+
   it("rolls back the previous database state when constraints fail", async () => {
     const db = new Database(await createTempDbPath());
     try {

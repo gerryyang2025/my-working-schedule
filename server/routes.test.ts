@@ -1039,6 +1039,87 @@ describe.sequential("API routes", () => {
     }
   });
 
+  it("keeps SQLite managed staff relations valid across staff and schedule writes", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "schedule-routes-sqlite-managed-staff-"));
+    try {
+      const dbPath = join(dir, "schedule.db");
+      const db = new Database(dbPath);
+      try {
+        initializeSqliteSchema(db);
+        replaceAppDataInSqlite(db, createSeedData());
+      } finally {
+        db.close();
+      }
+
+      const app = express();
+      app.use(express.json());
+      app.use(
+        "/api",
+        createRoutes(createSqliteStorage(dbPath), {
+          adminPassword: TEST_ADMIN_PASSWORD,
+          authStore: createSqliteAuthStore(dbPath)
+        })
+      );
+      const headers = await adminHeaders(app);
+
+      const schedulerHeaders = await createUserAndLogin(app, {
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        managedStaffIds: ["staff-nurse-001", "staff-head-001"]
+      });
+
+      await request(app)
+        .put("/api/data/staff/staff-nurse-001")
+        .set(headers)
+        .send(createStaffPayload({ jobId: "100001", name: "李护士（更新）", sortOrder: 2 }))
+        .expect(200);
+
+      await request(app)
+        .put("/api/data/schedule-entry")
+        .set(schedulerHeaders)
+        .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "managed write" })
+        .expect(200);
+
+      const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+      expect(usersResponse.body.rows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "user-scheduler",
+            managedStaffIds: ["staff-head-001", "staff-nurse-001"]
+          })
+        ])
+      );
+
+      const dataResponse = await request(app).get("/api/data").set(headers).expect(200);
+      expect(dataResponse.body.scheduleEntries).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: "2026-06-15__staff-nurse-001",
+            note: "managed write",
+            shiftIds: ["shift-a1"]
+          })
+        ])
+      );
+
+      const verifyDb = new Database(dbPath);
+      try {
+        verifyDb.pragma("foreign_keys = ON");
+        expect(
+          verifyDb
+            .prepare("select staff_id from user_managed_staff where user_id = ? order by staff_id asc")
+            .all("user-scheduler")
+        ).toEqual([{ staff_id: "staff-head-001" }, { staff_id: "staff-nurse-001" }]);
+        expect(verifyDb.prepare("pragma foreign_key_check").all()).toEqual([]);
+      } finally {
+        verifyDb.close();
+      }
+    } finally {
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
   it("normalizes omitted schedule entry notes to an empty string", async () => {
     const app = createTestApp();
     const response = await request(app)
