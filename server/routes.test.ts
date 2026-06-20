@@ -256,6 +256,34 @@ describe.sequential("API routes", () => {
         role: "scheduler",
         enabled: true,
         staffId: null,
+        managedStaffIds: "staff-head-001",
+        password: "scheduler-password"
+      })
+      .expect(400, { message: "账号信息不完整" });
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: [123],
+        password: "scheduler-password"
+      })
+      .expect(400, { message: "账号信息不完整" });
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
         managedStaffIds: null,
         password: "scheduler-password"
       })
@@ -288,6 +316,35 @@ describe.sequential("API routes", () => {
         password: "scheduler-password"
       })
       .expect(400, { message: "可管理人员不能重复" });
+  });
+
+  it("defaults omitted managed staff ids to an empty list when saving accounts", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        password: "scheduler-password"
+      })
+      .expect(200);
+
+    const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+    expect(usersResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "user-scheduler",
+          role: "scheduler",
+          managedStaffIds: []
+        })
+      ])
+    );
   });
 
   it("records managed staff summaries in account audit logs", async () => {

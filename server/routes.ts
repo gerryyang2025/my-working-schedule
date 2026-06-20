@@ -687,7 +687,7 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
     }
   });
 
-  router.put("/users/:id", requireAdmin, async (request, response, next) => {
+  router.put("/users/:id", requireAdmin, async (request: AuthenticatedRequest, response, next) => {
     try {
       const userId = getRouteParam(request, "id");
       const payload = parseUserPayload(request.body, userId);
