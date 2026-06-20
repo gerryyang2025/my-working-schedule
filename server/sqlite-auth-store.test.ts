@@ -262,6 +262,8 @@ describe("SQLite auth store", () => {
 
     const store = createSqliteAuthStore(sqlitePath);
     await store.ensureBootstrapAdmin({ username: "admin", password: "123456" });
+    const admin = await store.authenticate("admin", "123456");
+    expect(admin).not.toBeNull();
     await store.saveUser({
       id: "user-scheduler",
       username: "scheduler",
@@ -270,7 +272,7 @@ describe("SQLite auth store", () => {
       enabled: true,
       staffId: null,
       managedStaffIds: ["staff-nurse-002", "staff-nurse-001"],
-      managedStaffUpdatedBy: "user-admin",
+      managedStaffUpdatedBy: ` ${admin!.id} `,
       password: "scheduler-password"
     });
 
@@ -282,6 +284,37 @@ describe("SQLite auth store", () => {
         })
       ])
     );
+  });
+
+  it("rejects non-existing managed staff updater ids", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-001", "100001", "李护士", "nurse", 0, 1, 1);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "123456" });
+
+    await expect(
+      store.saveUser({
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: ["staff-nurse-001"],
+        managedStaffUpdatedBy: " missing-user ",
+        password: "scheduler-password"
+      })
+    ).rejects.toThrow("FOREIGN KEY constraint failed");
   });
 
   it("persists users, sessions, and audit logs", async () => {

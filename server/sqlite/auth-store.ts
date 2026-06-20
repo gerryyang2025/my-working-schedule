@@ -126,15 +126,6 @@ function normalizeAuditQuery(query: number | AuditLogQuery | undefined): Require
   };
 }
 
-function normalizeManagedStaffCreatedBy(db: Database.Database, createdBy: string | null): string | null {
-  if (!createdBy) {
-    return null;
-  }
-
-  const row = db.prepare("select id from users where id = ?").get(createdBy) as { id: string } | undefined;
-  return row ? createdBy : null;
-}
-
 function replaceManagedStaffIds(
   db: Database.Database,
   userId: string,
@@ -343,7 +334,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
               db,
               existingUser.id,
               managedStaffIds,
-              normalizeManagedStaffCreatedBy(db, managedStaffUpdatedBy),
+              managedStaffUpdatedBy,
               timestamp
             );
           })();
@@ -386,7 +377,7 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
             db,
             input.id,
             managedStaffIds,
-            normalizeManagedStaffCreatedBy(db, managedStaffUpdatedBy),
+            managedStaffUpdatedBy,
             timestamp
           );
         })();
