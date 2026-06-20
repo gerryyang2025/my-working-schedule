@@ -49,6 +49,8 @@ export interface SaveAuthUserInput {
   enabled: boolean;
   password?: string | null;
   staffId?: string | null;
+  managedStaffIds?: string[];
+  managedStaffUpdatedBy?: string | null;
 }
 
 export interface ChangePasswordInput {
@@ -102,6 +104,7 @@ function createUser(username: string, password: string, role: UserRole): StoredU
     displayName: username === "admin" ? "系统管理员" : username,
     role,
     staffId: null,
+    managedStaffIds: [],
     enabled: true,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -126,6 +129,10 @@ function sortUsers(users: AuthUser[]): AuthUser[] {
   return [...users].sort((left, right) => left.username.localeCompare(right.username));
 }
 
+function normalizeManagedStaffIds(staffIds: string[] | undefined): string[] {
+  return Array.from(new Set((staffIds ?? []).map((staffId) => staffId.trim()).filter(Boolean))).sort();
+}
+
 function toAuthUser(user: StoredUser): AuthUser {
   return {
     id: user.id,
@@ -133,6 +140,7 @@ function toAuthUser(user: StoredUser): AuthUser {
     displayName: user.displayName,
     role: user.role,
     staffId: user.staffId,
+    managedStaffIds: [...user.managedStaffIds],
     enabled: user.enabled,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -201,6 +209,7 @@ export function createMemoryAuthStore(): AuthStore {
         existingUser.displayName = username.trim() === "admin" ? "系统管理员" : username.trim();
         existingUser.role = "admin";
         existingUser.staffId = null;
+        existingUser.managedStaffIds = [];
         existingUser.enabled = true;
         existingUser.updatedAt = nowIso();
         existingUser.passwordHash = hashPassword(password);
@@ -233,12 +242,14 @@ export function createMemoryAuthStore(): AuthStore {
       }
 
       assertCanSaveUser(existingUser, input.role, input.enabled);
+      const managedStaffIds = normalizeManagedStaffIds(input.managedStaffIds);
       const timestamp = nowIso();
       if (existingUser) {
         existingUser.username = username;
         existingUser.displayName = displayName;
         existingUser.role = input.role;
         existingUser.staffId = staffId;
+        existingUser.managedStaffIds = managedStaffIds;
         existingUser.enabled = input.enabled;
         existingUser.updatedAt = timestamp;
         if (input.password) {
@@ -257,6 +268,7 @@ export function createMemoryAuthStore(): AuthStore {
         displayName,
         role: input.role,
         staffId,
+        managedStaffIds,
         enabled: input.enabled,
         createdAt: timestamp,
         updatedAt: timestamp,

@@ -216,6 +216,38 @@ describe("memory auth store", () => {
     expect(unboundViewer).not.toHaveProperty("passwordHash");
   });
 
+  it("stores managed staff ids on users and public sessions", async () => {
+    const store = createMemoryAuthStore();
+    await store.ensureBootstrapAdmin({ username: "admin", password: "123456" });
+
+    const user = await store.saveUser({
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      enabled: true,
+      staffId: null,
+      managedStaffIds: ["staff-nurse-001", "staff-nurse-002"],
+      password: "scheduler-password"
+    });
+
+    expect(user.managedStaffIds).toEqual(["staff-nurse-001", "staff-nurse-002"]);
+    await expect(
+      store.saveUser({
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: ["staff-nurse-002", "staff-nurse-001", "staff-nurse-001"]
+      })
+    ).resolves.toEqual(expect.objectContaining({ managedStaffIds: ["staff-nurse-001", "staff-nurse-002"] }));
+
+    const session = await store.createSession("user-scheduler");
+    expect(session.user.managedStaffIds).toEqual(["staff-nurse-001", "staff-nurse-002"]);
+  });
+
   it("resets an existing bootstrap admin to unbound", async () => {
     const store = createMemoryAuthStore();
     await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });

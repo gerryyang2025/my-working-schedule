@@ -13,6 +13,7 @@ export interface AuthUser {
   displayName: string;
   role: UserRole;
   staffId: string | null;
+  managedStaffIds: string[];
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -24,6 +25,7 @@ export interface PublicAuthUser {
   displayName: string;
   role: UserRole;
   staffId: string | null;
+  managedStaffIds: string[];
 }
 
 export interface AuthSession {
@@ -72,6 +74,7 @@ export function toPublicAuthUser(user: AuthUser): PublicAuthUser {
     username: user.username,
     displayName: user.displayName,
     role: user.role,
-    staffId: user.staffId
+    staffId: user.staffId,
+    managedStaffIds: [...user.managedStaffIds]
   };
 }
