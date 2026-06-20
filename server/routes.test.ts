@@ -205,6 +205,7 @@ describe.sequential("API routes", () => {
   it("lets admins create accounts and list users without password hashes", async () => {
     const app = createTestApp();
     const headers = await adminHeaders(app);
+    const managedStaffIds = ["staff-head-001"];
 
     await request(app)
       .put("/api/users/user-scheduler")
@@ -214,6 +215,7 @@ describe.sequential("API routes", () => {
         displayName: "排班管理员",
         role: "scheduler",
         enabled: true,
+        managedStaffIds,
         password: "scheduler-password"
       })
       .expect(200);
@@ -221,7 +223,14 @@ describe.sequential("API routes", () => {
     const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
     expect(usersResponse.body.rows).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: "user-scheduler", username: "scheduler", role: "scheduler", staffId: null, enabled: true })
+        expect.objectContaining({
+          id: "user-scheduler",
+          username: "scheduler",
+          role: "scheduler",
+          staffId: null,
+          managedStaffIds,
+          enabled: true
+        })
       ])
     );
     expect(JSON.stringify(usersResponse.body.rows)).not.toContain("password");

@@ -59,7 +59,8 @@ function mountToolbar(
     username: "admin",
     displayName: "系统管理员",
     role: "admin" as const,
-    staffId: null
+    staffId: null,
+    managedStaffIds: []
   }
 ) {
   return mount(AppToolbar, {
@@ -139,7 +140,8 @@ describe("AppToolbar", () => {
       username: "admin",
       displayName: "系统管理员",
       role: "admin",
-      staffId: null
+      staffId: null,
+      managedStaffIds: []
     });
 
     expect(wrapper.get(".toolbar-user").text()).toBe("admin · 系统管理员");
@@ -151,7 +153,8 @@ describe("AppToolbar", () => {
       username: "scheduler",
       displayName: "排班负责人",
       role: "scheduler",
-      staffId: null
+      staffId: null,
+      managedStaffIds: []
     });
 
     expect(wrapper.get(".toolbar-user").text()).toBe("排班负责人 · 排班管理员");

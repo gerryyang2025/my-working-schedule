@@ -175,6 +175,7 @@ function toManagedAuthUser(user: AuthUser) {
     displayName: user.displayName,
     role: user.role,
     staffId: user.staffId,
+    managedStaffIds: [...user.managedStaffIds],
     enabled: user.enabled,
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
@@ -774,7 +775,7 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
     }
   });
 
-  router.put("/data/schedule-entry", requireScheduler, async (request, response, next) => {
+  router.put("/data/schedule-entry", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
     try {
       const payload = parseScheduleEntryPayload(request.body);
       if (payload.ok === false) {
@@ -845,7 +846,7 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
     }
   });
 
-  router.put("/data/monthly-settlement", requireScheduler, async (request, response, next) => {
+  router.put("/data/monthly-settlement", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
     try {
       const payload = parseMonthlySettlementPayload(request.body);
       const nextData = await storage.update((data) => {
@@ -897,7 +898,7 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
     }
   });
 
-  router.delete("/data/monthly-settlement/:month", requireScheduler, async (request, response, next) => {
+  router.delete("/data/monthly-settlement/:month", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
     try {
       const month = getRouteParam(request, "month");
       if (!MONTH_PATTERN.test(month)) {

@@ -224,7 +224,7 @@ function loadUserDraft(user: ManagedAuthUser): void {
     role: user.role,
     enabled: user.enabled,
     staffId: user.staffId,
-    managedStaffIds: [...user.managedStaffIds],
+    managedStaffIds: [...(user.managedStaffIds ?? [])],
     password: ""
   });
 }

@@ -312,6 +312,32 @@ describe("ManagementDrawer", () => {
     ]);
   });
 
+  it.each(["viewer", "admin"] as const)(
+    "emits empty managed staff ids when a scheduler account changes to %s",
+    async (role) => {
+      const wrapper = mountDrawer();
+
+      await wrapper
+        .findAll(".management-mobile-user")
+        .find((item) => item.text().includes("排班管理员"))!
+        .trigger("click");
+
+      await wrapper.get('select[data-placeholder="可管理人员"]').setValue("staff-head");
+      await wrapper.get('select[data-placeholder="角色"]').setValue(role);
+      await wrapper.get('[data-testid="save-user-button"]').trigger("click");
+
+      expect(wrapper.emitted("saveUser")).toEqual([
+        [
+          expect.objectContaining({
+            username: "scheduler",
+            role,
+            managedStaffIds: []
+          })
+        ]
+      ]);
+    }
+  );
+
   it("renders audit logs and emits audit filter requests", async () => {
     const wrapper = mountDrawer();
 
