@@ -62,6 +62,35 @@ async function adminHeaders(app: express.Express) {
   return { Authorization: `Bearer ${token}` };
 }
 
+async function createUserAndLogin(
+  app: express.Express,
+  payload: {
+    id: string;
+    username: string;
+    displayName: string;
+    role: "admin" | "scheduler" | "viewer";
+    managedStaffIds?: string[];
+  }
+) {
+  const password = `${payload.username}-password`;
+  await request(app)
+    .put(`/api/users/${payload.id}`)
+    .set(await adminHeaders(app))
+    .send({
+      username: payload.username,
+      displayName: payload.displayName,
+      role: payload.role,
+      enabled: true,
+      staffId: null,
+      managedStaffIds: payload.managedStaffIds ?? [],
+      password
+    })
+    .expect(200);
+
+  const loginResponse = await request(app).post("/api/auth/login").send({ username: payload.username, password }).expect(200);
+  return { Authorization: `Bearer ${loginResponse.body.token}` };
+}
+
 function createStaffPayload(overrides: Partial<StaffMember> = {}) {
   return {
     jobId: "100099",
@@ -101,8 +130,16 @@ describe.sequential("API routes", () => {
     await request(createTestApp()).get("/api/health").expect(200, { ok: true });
   });
 
-  it("returns app data without leaking the admin password", async () => {
-    const response = await request(createTestApp()).get("/api/data").expect(200);
+  it("requires login to read app data", async () => {
+    await request(createTestApp()).get("/api/data").expect(401, { message: "请先登录" });
+  });
+
+  it("returns app data to authenticated users without leaking the admin password", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    const response = await request(app).get("/api/data").set(headers).expect(200);
+
     expect(response.body.staff).toHaveLength(3);
     expect(response.body.settings.adminPassword).toBeUndefined();
   });
@@ -559,6 +596,83 @@ describe.sequential("API routes", () => {
     expect(response.body.message).toBe("请先登录");
   });
 
+  it("enforces managed staff permissions for schedule writes", async () => {
+    const app = createTestApp();
+    const headers = await createUserAndLogin(app, {
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班员",
+      role: "scheduler",
+      managedStaffIds: ["staff-head-001"]
+    });
+
+    await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-15", staffId: "staff-head-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(200);
+
+    await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(403, { message: "当前账号没有该人员操作权限" });
+  });
+
+  it("blocks viewers from schedule writes", async () => {
+    const app = createTestApp();
+    const headers = await createUserAndLogin(app, {
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读账号",
+      role: "viewer",
+      managedStaffIds: ["staff-head-001"]
+    });
+
+    await request(app)
+      .put("/api/data/schedule-entry")
+      .set(headers)
+      .send({ date: "2026-06-15", staffId: "staff-head-001", shiftIds: ["shift-a1"], note: "" })
+      .expect(403);
+  });
+
+  it("requires schedulers to cover every settlement row before creating or deleting month settlements", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      { id: "2026-06-15__staff-nurse-001", date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" },
+      { id: "2026-06-16__staff-clerk-001", date: "2026-06-16", staffId: "staff-clerk-001", shiftIds: ["shift-office"], note: "" }
+    ];
+    const app = createTestApp(initialData);
+    const limitedHeaders = await createUserAndLogin(app, {
+      id: "user-limited-scheduler",
+      username: "limited-scheduler",
+      displayName: "部分排班员",
+      role: "scheduler",
+      managedStaffIds: ["staff-head-001"]
+    });
+
+    await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(limitedHeaders)
+      .send({ month: "2026-06", bonusPool: 1000 })
+      .expect(403, { message: "当前账号没有该人员操作权限" });
+
+    const fullHeaders = await createUserAndLogin(app, {
+      id: "user-full-scheduler",
+      username: "full-scheduler",
+      displayName: "全量排班员",
+      role: "scheduler",
+      managedStaffIds: ["staff-head-001", "staff-nurse-001", "staff-clerk-001"]
+    });
+
+    await request(app)
+      .put("/api/data/monthly-settlement")
+      .set(fullHeaders)
+      .send({ month: "2026-06", bonusPool: 1000 })
+      .expect(200);
+    await request(app).delete("/api/data/monthly-settlement/2026-06").set(fullHeaders).expect(200);
+  });
+
   it("upserts staff and returns public data", async () => {
     const app = createTestApp();
     const response = await request(app)
@@ -669,7 +783,7 @@ describe.sequential("API routes", () => {
         .send({ date: "2026-06-15", staffId: "staff-nurse-001", shiftIds: ["shift-a1"], note: "" })
         .expect(200);
 
-      const response = await request(app).get("/api/data").expect(200);
+      const response = await request(app).get("/api/data").set(headers).expect(200);
       expect(response.body.scheduleEntries).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -732,7 +846,7 @@ describe.sequential("API routes", () => {
         ])
       );
 
-      const dataResponse = await request(app).get("/api/data").expect(200);
+      const dataResponse = await request(app).get("/api/data").set(headers).expect(200);
       expect(dataResponse.body.scheduleEntries).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
@@ -1121,7 +1235,7 @@ describe.sequential("API routes", () => {
     ]);
 
     gateLoads = false;
-    const response = await request(app).get("/api/data").expect(200);
+    const response = await request(app).get("/api/data").set(headers).expect(200);
     expect(response.body.scheduleEntries.map((entry: { id: string }) => entry.id).sort()).toEqual([
       "2026-06-15__staff-nurse-001",
       "2026-06-16__staff-clerk-001"

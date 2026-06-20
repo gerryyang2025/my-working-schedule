@@ -9,6 +9,7 @@ import { AuthStoreError, type AuditLogQuery, type AuthStore, type SaveAuthUserIn
 import { createMemoryAuthStore } from "./auth-store";
 import type { AuthUser, PublicAuthUser, UserRole } from "./auth";
 import { toPublicAuthUser } from "./auth";
+import { canManageAllStaff, canManageStaff } from "./permissions";
 
 type PublicAppData = AppData;
 
@@ -215,7 +216,7 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     return null;
   }
 
-  const { username, displayName, role, enabled, password, staffId } = body;
+  const { username, displayName, role, enabled, password, staffId, managedStaffIds } = body;
   if (!isNonEmptyString(username) || !isNonEmptyString(displayName) || !isUserRole(role) || !isBoolean(enabled)) {
     return null;
   }
@@ -241,6 +242,15 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     return null;
   }
 
+  let parsedManagedStaffIds: string[] | undefined;
+  if (managedStaffIds === undefined) {
+    parsedManagedStaffIds = undefined;
+  } else if (isStringArray(managedStaffIds)) {
+    parsedManagedStaffIds = managedStaffIds;
+  } else {
+    return null;
+  }
+
   return {
     id,
     username: username.trim(),
@@ -248,7 +258,8 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     role,
     enabled,
     password: parsedPassword,
-    staffId: parsedStaffId
+    staffId: parsedStaffId,
+    managedStaffIds: parsedManagedStaffIds
   };
 }
 
@@ -479,12 +490,18 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
 
   const requireAdmin = requireRoles(["admin"]);
   const requireScheduler = requireRoles(["admin", "scheduler"]);
+  const requireAuthenticated = requireRoles(["admin", "scheduler", "viewer"]);
+
+  async function denyStaffScope(request: Request, response: Response, staffId: string): Promise<void> {
+    await recordAudit(request, "auth.permission.denied", "staff", staffId, `越权操作人员：${staffId}`);
+    response.status(403).json({ message: "当前账号没有该人员操作权限" });
+  }
 
   router.get("/health", (_request, response) => {
     response.json({ ok: true });
   });
 
-  router.get("/data", async (_request, response, next) => {
+  router.get("/data", requireAuthenticated, async (_request, response, next) => {
     try {
       const data = await storage.load();
       response.json(toPublicData(data));
@@ -771,6 +788,11 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         return;
       }
 
+      if (!canManageStaff(request.authUser, staffId)) {
+        await denyStaffScope(request, response, staffId);
+        return;
+      }
+
       const nextData = await storage.update((data) => {
         if (isMonthSettled(data, getMonthKey(date))) {
           throw new HttpResponseError(400, "该月份已月结，不能修改排班");
@@ -834,6 +856,11 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         const [yearText, monthText] = payload.month.split("-");
         const days = getMonthDays(Number(yearText), Number(monthText));
         const monthlySummary = calculateMonthlySummary(data, days);
+        const settlementStaffIds = monthlySummary.rows.map((row) => row.staffId);
+        if (!canManageAllStaff(request.authUser, settlementStaffIds)) {
+          throw new HttpResponseError(403, "当前账号没有该人员操作权限");
+        }
+
         let settlement;
 
         try {
@@ -878,8 +905,12 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
       }
 
       const nextData = await storage.update((data) => {
-        if (!isMonthSettled(data, month)) {
+        const settlement = data.monthlySettlements.find((item) => item.month === month);
+        if (!settlement) {
           throw new HttpResponseError(404, "该月份未月结");
+        }
+        if (!canManageAllStaff(request.authUser, settlement.rows.map((row) => row.staffId))) {
+          throw new HttpResponseError(403, "当前账号没有该人员操作权限");
         }
 
         return {
