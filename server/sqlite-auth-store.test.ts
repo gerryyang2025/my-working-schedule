@@ -235,7 +235,12 @@ describe("SQLite auth store", () => {
       expect(tables.map((row) => row.name)).toContain("user_managed_staff");
 
       const indexes = db.prepare("pragma index_list(user_managed_staff)").all() as Array<{ name: string; unique: number }>;
-      expect(indexes).toEqual(expect.arrayContaining([expect.objectContaining({ name: "sqlite_autoindex_user_managed_staff_1" })]));
+      expect(indexes).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ name: "sqlite_autoindex_user_managed_staff_1" }),
+          expect.objectContaining({ name: "idx_user_managed_staff_staff_id" })
+        ])
+      );
 
       const migration = db.prepare("select version from schema_migrations where version = 4").get();
       expect(migration).toEqual(expect.objectContaining({ version: 4 }));
