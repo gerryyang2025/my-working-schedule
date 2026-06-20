@@ -6,6 +6,7 @@ import { createPrintPdfFile } from "./print-pdf";
 const pdfMocks = vi.hoisted(() => ({
   addImage: vi.fn(),
   addPage: vi.fn(),
+  drawImage: vi.fn(),
   output: vi.fn(),
   pageSize: {
     getWidth: vi.fn(),
@@ -43,7 +44,7 @@ describe("createPrintPdfFile", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.spyOn(HTMLCanvasElement.prototype, "getContext").mockReturnValue({
-      drawImage: vi.fn(),
+      drawImage: pdfMocks.drawImage,
       fillRect: vi.fn(),
       fillStyle: ""
     } as unknown as CanvasRenderingContext2D);
@@ -107,6 +108,29 @@ describe("createPrintPdfFile", () => {
     }
   });
 
+  it("tiles wide and tall print captures across PDF pages without clipping content", async () => {
+    const preview = document.createElement("section");
+    Object.defineProperties(preview, {
+      clientWidth: { configurable: true, value: 1200 },
+      offsetWidth: { configurable: true, value: 1200 },
+      scrollWidth: { configurable: true, value: 1200 },
+      clientHeight: { configurable: true, value: 850 },
+      offsetHeight: { configurable: true, value: 850 },
+      scrollHeight: { configurable: true, value: 850 }
+    });
+    const canvas = createCanvasMock(2400, 1700);
+    vi.mocked(html2canvas).mockResolvedValue(canvas);
+
+    await createPrintPdfFile({ element: preview, filename: "month-schedule.pdf" });
+
+    expect(pdfMocks.addImage).toHaveBeenCalledTimes(4);
+    expect(pdfMocks.addPage).toHaveBeenCalledTimes(3);
+    expect(pdfMocks.drawImage).toHaveBeenCalledWith(canvas, 0, 0, 1920, 1325, 0, 0, 1920, 1325);
+    expect(pdfMocks.drawImage).toHaveBeenCalledWith(canvas, 1920, 0, 480, 1325, 0, 0, 480, 1325);
+    expect(pdfMocks.drawImage).toHaveBeenCalledWith(canvas, 0, 1325, 1920, 375, 0, 0, 1920, 375);
+    expect(pdfMocks.drawImage).toHaveBeenCalledWith(canvas, 1920, 1325, 480, 375, 0, 0, 480, 375);
+  });
+
   it("captures a print-width clone instead of the narrow mobile preview", async () => {
     const preview = document.createElement("section");
     preview.className = "print-view print-week print-preview-active";
@@ -143,6 +167,32 @@ describe("createPrintPdfFile", () => {
       })
     );
     expect(document.body.contains(capturedElement as HTMLElement)).toBe(false);
+  });
+
+  it("expands cloned print content before PDF capture", async () => {
+    const preview = document.createElement("section");
+    preview.className = "print-view print-month print-preview-active";
+    Object.assign(preview.style, {
+      maxHeight: "320px",
+      overflow: "auto"
+    });
+    Object.defineProperties(preview, {
+      clientWidth: { configurable: true, value: 360 },
+      offsetWidth: { configurable: true, value: 360 },
+      scrollWidth: { configurable: true, value: 1120 },
+      clientHeight: { configurable: true, value: 320 },
+      offsetHeight: { configurable: true, value: 320 },
+      scrollHeight: { configurable: true, value: 1400 }
+    });
+    const canvas = createCanvasMock(2240, 2800);
+    vi.mocked(html2canvas).mockResolvedValue(canvas);
+
+    await createPrintPdfFile({ element: preview, filename: "month-schedule.pdf" });
+
+    const [capturedElement] = vi.mocked(html2canvas).mock.calls[0];
+    expect((capturedElement as HTMLElement).style.maxHeight).toBe("none");
+    expect((capturedElement as HTMLElement).style.overflow).toBe("visible");
+    expect((capturedElement as HTMLElement).style.height).toBe("auto");
   });
 
   it("rejects missing print content with a clear error", async () => {

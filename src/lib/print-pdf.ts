@@ -13,6 +13,15 @@ interface PdfCaptureTarget {
   cleanup: () => void;
 }
 
+interface PdfPageTile {
+  sourceX: number;
+  sourceY: number;
+  sourceWidth: number;
+  sourceHeight: number;
+  tileWidth: number;
+  tileHeight: number;
+}
+
 function getElementDimension(element: HTMLElement, dimensionNames: Array<"clientWidth" | "offsetWidth" | "scrollWidth">): number;
 function getElementDimension(element: HTMLElement, dimensionNames: Array<"clientHeight" | "offsetHeight" | "scrollHeight">): number;
 function getElementDimension(
@@ -25,7 +34,7 @@ function getElementDimension(
 }
 
 function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
-  const width = Math.max(
+  let width = Math.max(
     PDF_CAPTURE_MIN_WIDTH_PX,
     getElementDimension(sourceElement, ["scrollWidth", "offsetWidth", "clientWidth"])
   );
@@ -50,11 +59,17 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   });
   Object.assign(clonedElement.style, {
     display: "block",
-    width: "100%"
+    width: "100%",
+    height: "auto",
+    maxHeight: "none",
+    overflow: "visible"
   });
 
   host.appendChild(clonedElement);
   document.body.appendChild(host);
+
+  width = Math.max(width, getElementDimension(clonedElement, ["scrollWidth", "offsetWidth", "clientWidth"]));
+  host.style.width = `${width}px`;
 
   const height = Math.max(
     sourceHeight,
@@ -71,10 +86,32 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   };
 }
 
-function createPdfPageSliceCanvas(sourceCanvas: HTMLCanvasElement, sourceY: number, sliceHeight: number): HTMLCanvasElement {
+function createPdfPageTiles(canvas: HTMLCanvasElement, captureWidth: number, printableWidth: number, printableHeight: number): PdfPageTile[] {
+  const captureScale = canvas.width / Math.max(1, captureWidth);
+  const tileWidth = Math.min(canvas.width, Math.max(1, Math.floor(PDF_CAPTURE_MIN_WIDTH_PX * captureScale)));
+  const tileHeight = Math.max(1, Math.floor((printableHeight / printableWidth) * tileWidth));
+  const tiles: PdfPageTile[] = [];
+
+  for (let sourceY = 0; sourceY < canvas.height; sourceY += tileHeight) {
+    for (let sourceX = 0; sourceX < canvas.width; sourceX += tileWidth) {
+      tiles.push({
+        sourceX,
+        sourceY,
+        sourceWidth: Math.min(tileWidth, canvas.width - sourceX),
+        sourceHeight: Math.min(tileHeight, canvas.height - sourceY),
+        tileWidth,
+        tileHeight
+      });
+    }
+  }
+
+  return tiles;
+}
+
+function createPdfPageSliceCanvas(sourceCanvas: HTMLCanvasElement, tile: PdfPageTile): HTMLCanvasElement {
   const sliceCanvas = document.createElement("canvas");
-  sliceCanvas.width = sourceCanvas.width;
-  sliceCanvas.height = sliceHeight;
+  sliceCanvas.width = tile.tileWidth;
+  sliceCanvas.height = tile.tileHeight;
 
   const context = sliceCanvas.getContext("2d");
   if (!context) {
@@ -85,14 +122,14 @@ function createPdfPageSliceCanvas(sourceCanvas: HTMLCanvasElement, sourceY: numb
   context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
   context.drawImage(
     sourceCanvas,
+    tile.sourceX,
+    tile.sourceY,
+    tile.sourceWidth,
+    tile.sourceHeight,
     0,
-    sourceY,
-    sourceCanvas.width,
-    sliceHeight,
     0,
-    0,
-    sourceCanvas.width,
-    sliceHeight
+    tile.sourceWidth,
+    tile.sourceHeight
   );
 
   return sliceCanvas;
@@ -125,18 +162,15 @@ export async function createPrintPdfFile({ element, filename }: CreatePrintPdfFi
   const pageHeight = pdf.internal.pageSize.getHeight();
   const printableWidth = pageWidth - PDF_MARGIN_MM * 2;
   const printableHeight = pageHeight - PDF_MARGIN_MM * 2;
-  const pageSliceHeight = Math.max(1, Math.floor((printableHeight / printableWidth) * canvas.width));
-  const pageCount = Math.max(1, Math.ceil(canvas.height / pageSliceHeight));
+  const pageTiles = createPdfPageTiles(canvas, captureTarget.width, printableWidth, printableHeight);
 
-  for (let pageIndex = 0; pageIndex < pageCount; pageIndex += 1) {
+  for (const [pageIndex, pageTile] of pageTiles.entries()) {
     if (pageIndex > 0) {
       pdf.addPage();
     }
 
-    const sourceY = pageIndex * pageSliceHeight;
-    const sliceHeight = Math.min(pageSliceHeight, canvas.height - sourceY);
-    const pageSliceCanvas = createPdfPageSliceCanvas(canvas, sourceY, sliceHeight);
-    const pageImageHeight = (sliceHeight * printableWidth) / canvas.width;
+    const pageSliceCanvas = createPdfPageSliceCanvas(canvas, pageTile);
+    const pageImageHeight = Math.min(printableHeight, (pageTile.tileHeight * printableWidth) / pageTile.tileWidth);
 
     pdf.addImage(
       pageSliceCanvas.toDataURL("image/png"),
