@@ -299,4 +299,18 @@ describe("ManagementDrawer", () => {
       ]
     ]);
   });
+
+  it("clears audit filters when requesting the latest audit logs", async () => {
+    const wrapper = mountDrawer();
+
+    await wrapper.get('input[placeholder="账号筛选"]').setValue("admin");
+    await wrapper.get('input[placeholder="操作类型"]').setValue("user.save");
+    await wrapper.get('input[placeholder="关键词"]').setValue("scheduler");
+    await wrapper.get('[data-testid="refresh-latest-audit-logs"]').trigger("click");
+
+    expect(wrapper.emitted("refreshAuditLogs")).toEqual([[{ limit: 100 }]]);
+    expect((wrapper.get('input[placeholder="账号筛选"]').element as HTMLInputElement).value).toBe("");
+    expect((wrapper.get('input[placeholder="操作类型"]').element as HTMLInputElement).value).toBe("");
+    expect((wrapper.get('input[placeholder="关键词"]').element as HTMLInputElement).value).toBe("");
+  });
 });

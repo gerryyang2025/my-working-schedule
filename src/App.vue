@@ -188,6 +188,18 @@ async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<
   }
 }
 
+async function refreshLatestAuditLogs(): Promise<void> {
+  await refreshAuditLogs({ limit: 100 });
+}
+
+async function refreshLatestAuditLogsIfManaging(): Promise<void> {
+  if (!managementOpen.value || !canManageConfig.value) {
+    return;
+  }
+
+  await refreshLatestAuditLogs();
+}
+
 async function refreshManagementData(): Promise<void> {
   if (!canManageConfig.value) {
     return;
@@ -207,6 +219,11 @@ async function refreshManagementData(): Promise<void> {
 
 async function openManagementDrawer(): Promise<void> {
   managementOpen.value = true;
+  try {
+    await refreshData();
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
+  }
   await refreshManagementData();
 }
 
@@ -440,6 +457,7 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
   try {
     data.value = await saveStaff(staff);
     staffSaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
   } finally {
@@ -456,6 +474,7 @@ async function handleSaveShift(shift: Shift): Promise<void> {
   try {
     data.value = await saveShift(shift);
     shiftSaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
   } finally {
@@ -472,6 +491,7 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
   try {
     data.value = await saveHoliday(holiday);
     holidaySaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
   } finally {
@@ -488,6 +508,7 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
   try {
     data.value = await deleteHoliday(holidayId);
     holidaySaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日删除失败");
   } finally {
@@ -504,7 +525,7 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
   try {
     await saveUser(user);
     await refreshUsers();
-    await refreshAuditLogs({ limit: 100 });
+    await refreshLatestAuditLogs();
     ElMessage.success("账号已保存");
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号保存失败");

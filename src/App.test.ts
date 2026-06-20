@@ -139,11 +139,18 @@ const EmptyStub = defineComponent({
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
   props: ["modelValue", "users", "auditLogs"],
-  emits: ["saveUser", "refreshAuditLogs"],
+  emits: ["saveStaff", "saveUser", "refreshAuditLogs"],
   template: `
     <section v-if="modelValue" data-testid="management-drawer">
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
       <span data-testid="drawer-audit">{{ auditLogs.map((entry) => entry.summary).join(",") }}</span>
+      <button
+        data-testid="drawer-save-staff"
+        type="button"
+        @click="$emit('saveStaff', { id: 'staff-nurse-001', jobId: '100001', name: '李护士', type: 'nurse', isAdmin: false, enabled: true, sortOrder: 1 })"
+      >
+        save staff
+      </button>
       <button
         data-testid="drawer-save-user"
         type="button"
@@ -523,6 +530,29 @@ describe("App", () => {
       password: "secret123"
     });
     expect(apiMocks.listUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes latest audit logs after saving management configuration", async () => {
+    apiMocks.saveStaff.mockResolvedValue(structuredClone(testData));
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaff).toHaveBeenCalledWith({
+      id: "staff-nurse-001",
+      jobId: "100001",
+      name: "李护士",
+      type: "nurse",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 1
+    });
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ limit: 100 });
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
   });
 
   it("changes the current password and returns to the login page", async () => {

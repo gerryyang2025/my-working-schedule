@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, watch } from "vue";
+import { computed, reactive, ref, watch } from "vue";
 import type { AuditLogEntry, AuditLogQuery, ManagedAuthUser, PublicAppData, SaveAuthUserInput, UserRole } from "@/api/client";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
@@ -73,11 +73,16 @@ const auditFilters = reactive<Required<AuditLogQuery>>({
   keyword: "",
   limit: 100
 });
+const activeManagementTab = ref("staff");
 
 const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
 const isExistingUserDraft = computed(() => props.users.some((user) => user.id === userDraft.id));
 const staffById = computed(() => new Map(props.data.staff.map((staff) => [staff.id, staff])));
 const bindableStaff = computed(() => props.data.staff.filter((staff) => staff.enabled || staff.id === userDraft.staffId));
+const hasActiveAuditFilters = computed(() => Boolean(auditFilters.username || auditFilters.action || auditFilters.keyword));
+const auditEmptyText = computed(() =>
+  hasActiveAuditFilters.value ? "当前筛选无结果，可清空筛选查看最新审计" : "暂无审计日志"
+);
 
 function roleLabel(role: UserRole): string {
   if (role === "admin") {
@@ -228,6 +233,22 @@ function emitRefreshAuditLogs(): void {
   emit("refreshAuditLogs", { ...auditFilters });
 }
 
+function emitRefreshLatestAuditLogs(): void {
+  Object.assign(auditFilters, {
+    username: "",
+    action: "",
+    keyword: "",
+    limit: 100
+  });
+  emit("refreshAuditLogs", { limit: 100 });
+}
+
+function handleManagementTabChange(tabName: string | number): void {
+  if (tabName === "audit") {
+    emitRefreshLatestAuditLogs();
+  }
+}
+
 watch(
   () => props.modelValue,
   (isOpen) => {
@@ -271,8 +292,8 @@ watch(
   >
     <el-alert v-if="!adminMode" title="进入编辑模式后才能保存配置" type="warning" :closable="false" />
 
-    <el-tabs>
-      <el-tab-pane label="人员">
+    <el-tabs v-model="activeManagementTab" @tab-change="handleManagementTabChange">
+      <el-tab-pane label="人员" name="staff">
         <el-table :data="data.staff" size="small" @row-click="loadStaffDraft">
           <el-table-column prop="jobId" label="工号" width="90" />
           <el-table-column prop="name" label="姓名" />
@@ -328,7 +349,7 @@ watch(
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="班次">
+      <el-tab-pane label="班次" name="shift">
         <el-table :data="data.shifts" size="small" @row-click="loadShiftDraft">
           <el-table-column prop="shortName" label="简称" width="80" />
           <el-table-column prop="name" label="名称" />
@@ -381,7 +402,7 @@ watch(
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="节假日">
+      <el-tab-pane label="节假日" name="holiday">
         <el-table :data="data.holidays" size="small" @row-click="loadHolidayDraft">
           <el-table-column prop="date" label="日期" width="120" />
           <el-table-column prop="name" label="名称" />
@@ -437,7 +458,7 @@ watch(
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="账号">
+      <el-tab-pane label="账号" name="user">
         <el-table :data="users" size="small" @row-click="loadUserDraft">
           <el-table-column prop="username" label="账号" width="110" />
           <el-table-column prop="displayName" label="显示名" />
@@ -512,7 +533,7 @@ watch(
         </div>
       </el-tab-pane>
 
-      <el-tab-pane label="审计">
+      <el-tab-pane label="审计" name="audit">
         <div class="management-form audit-filter-form">
           <el-input v-model="auditFilters.username" placeholder="账号筛选" :disabled="auditLoading" />
           <el-input v-model="auditFilters.action" placeholder="操作类型" :disabled="auditLoading" />
@@ -520,24 +541,32 @@ watch(
           <el-input-number v-model="auditFilters.limit" :min="1" :max="200" :step="10" :disabled="auditLoading" />
           <div class="management-actions">
             <el-button
+              data-testid="refresh-latest-audit-logs"
+              :loading="auditLoading"
+              @click="emitRefreshLatestAuditLogs"
+            >
+              刷新最新
+            </el-button>
+            <el-button
               type="primary"
               data-testid="refresh-audit-logs"
               :loading="auditLoading"
               @click="emitRefreshAuditLogs"
             >
-              查询审计
+              按条件查询
             </el-button>
           </div>
         </div>
 
-        <el-table :data="auditLogs" size="small">
+        <el-table :data="auditLogs" size="small" :empty-text="auditEmptyText">
           <el-table-column prop="occurredAt" label="时间" width="170" />
           <el-table-column prop="username" label="账号" width="100" />
           <el-table-column prop="action" label="操作" width="150" />
           <el-table-column prop="summary" label="摘要" />
         </el-table>
 
-        <div class="management-mobile-list">
+        <p v-if="auditLogs.length === 0" class="management-empty-text">{{ auditEmptyText }}</p>
+        <div v-else class="management-mobile-list">
           <article v-for="entry in auditLogs" :key="entry.id" class="management-mobile-item management-mobile-audit">
             <span class="management-mobile-main">
               <strong>{{ entry.summary }}</strong>
@@ -558,6 +587,13 @@ watch(
 <style scoped>
 .management-help-text {
   margin: -4px 0 0;
+  color: var(--el-text-color-secondary);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.management-empty-text {
+  margin: 12px 0 0;
   color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.5;
