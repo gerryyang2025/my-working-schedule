@@ -338,6 +338,45 @@ describe("ManagementDrawer", () => {
     }
   );
 
+  it("explains staff binding and role scoped permissions", async () => {
+    const wrapper = mountDrawer();
+    const helpText = () => wrapper.findAll(".management-help-text").map((item) => item.text()).join(" ");
+    const expectActiveRoleGuidance = (expectedCopy: string, inactiveCopies: string[]) => {
+      const text = helpText();
+
+      expect(wrapper.findAll(".management-help-text")).toHaveLength(2);
+      expect(text).toContain(expectedCopy);
+      inactiveCopies.forEach((copy) => expect(text).not.toContain(copy));
+    };
+
+    expect(helpText()).toContain("绑定人员只用于标识账号本人");
+    expect(helpText()).toContain("不会自动授予排班权限");
+
+    await wrapper.get('select[data-placeholder="角色"]').setValue("admin");
+    expectActiveRoleGuidance("系统管理员默认管理全部人员", [
+      "排班管理员需要选择可管理人员",
+      "只读账号可以查看全科排班，但不能编辑排班和月结"
+    ]);
+
+    await wrapper.get('select[data-placeholder="角色"]').setValue("viewer");
+    expectActiveRoleGuidance("只读账号可以查看全科排班，但不能编辑排班和月结", [
+      "排班管理员需要选择可管理人员",
+      "系统管理员默认管理全部人员"
+    ]);
+
+    await wrapper
+      .findAll(".management-mobile-user")
+      .find((item) => item.text().includes("排班管理员"))!
+      .trigger("click");
+
+    expectActiveRoleGuidance("排班管理员需要选择可管理人员", [
+      "系统管理员默认管理全部人员",
+      "只读账号可以查看全科排班，但不能编辑排班和月结"
+    ]);
+    expect(helpText()).toContain("未选择时只能查看，不能编辑任何人员");
+    expect(helpText()).toContain("护士长需要参与排班管理时，请选择排班管理员");
+  });
+
   it("renders audit logs and emits audit filter requests", async () => {
     const wrapper = mountDrawer();
 

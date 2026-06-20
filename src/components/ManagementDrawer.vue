@@ -529,7 +529,7 @@ watch(
             />
           </el-select>
           <p class="management-help-text">
-            绑定人员用于标识账号本人；可管理人员决定排班和月结可操作范围。
+            绑定人员只用于标识账号本人，不会自动授予排班权限；可管理人员决定排班和月结可操作范围。
           </p>
           <el-select v-model="userDraft.role" placeholder="角色" :disabled="userSaving">
             <el-option label="系统管理员" value="admin" />
@@ -551,7 +551,10 @@ watch(
               :value="staff.id"
             />
           </el-select>
-          <p v-else-if="userDraft.role === 'admin'" class="management-help-text">系统管理员默认可管理全部人员。</p>
+          <p v-if="userDraft.role === 'scheduler'" class="management-help-text">
+            排班管理员需要选择可管理人员；未选择时只能查看，不能编辑任何人员。护士长需要参与排班管理时，请选择排班管理员并配置可管理人员。
+          </p>
+          <p v-else-if="userDraft.role === 'admin'" class="management-help-text">系统管理员默认管理全部人员。</p>
           <p v-else class="management-help-text">只读账号可以查看全科排班，但不能编辑排班和月结。</p>
           <el-checkbox v-model="userDraft.enabled" :disabled="userSaving">启用</el-checkbox>
           <el-input
