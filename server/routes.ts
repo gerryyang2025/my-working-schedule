@@ -243,11 +243,11 @@ function parseUserPayload(body: unknown, id: string): SaveAuthUserInput | null {
     return null;
   }
 
-  let parsedManagedStaffIds: string[] | undefined;
-  if (managedStaffIds === undefined) {
-    parsedManagedStaffIds = undefined;
+  let parsedManagedStaffIds: string[];
+  if (managedStaffIds === undefined || managedStaffIds === null) {
+    parsedManagedStaffIds = [];
   } else if (isStringArray(managedStaffIds)) {
-    parsedManagedStaffIds = managedStaffIds;
+    parsedManagedStaffIds = managedStaffIds.map((staffId) => staffId.trim()).filter(Boolean);
   } else {
     return null;
   }
@@ -269,14 +269,29 @@ function formatStaffBindingLabel(staff: StaffMember): string {
   return `${staff.name}(${staff.jobId}${disabledSuffix})`;
 }
 
-function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null): string {
-  if (!user.staffId) {
-    return `保存账号：${user.username}，未绑定人员`;
+function formatManagedStaffSummary(user: AuthUser, managedStaff: StaffMember[]): string {
+  if (user.role === "admin") {
+    return "可管理人员：全部人员";
   }
 
-  return staff
-    ? `保存账号：${user.username}，绑定人员：${formatStaffBindingLabel(staff)}`
-    : `保存账号：${user.username}，绑定人员：${user.staffId}`;
+  if (user.role === "viewer") {
+    return "可管理人员：只读账号不配置";
+  }
+
+  if (managedStaff.length === 0) {
+    return "可管理人员：未配置";
+  }
+
+  return `可管理人员：${managedStaff.map(formatStaffBindingLabel).join("、")}`;
+}
+
+function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null, managedStaff: StaffMember[]): string {
+  const bindingText = user.staffId
+    ? staff
+      ? `绑定人员：${formatStaffBindingLabel(staff)}`
+      : `绑定人员：${user.staffId}`
+    : "未绑定人员";
+  return `保存账号：${user.username}，${bindingText}，${formatManagedStaffSummary(user, managedStaff)}`;
 }
 
 function validateUserStaffBinding(
@@ -300,6 +315,31 @@ function validateUserStaffBinding(
   }
 
   return staff;
+}
+
+function validateManagedStaffIds(
+  data: AppData,
+  existingUser: AuthUser | undefined,
+  payload: SaveAuthUserInput
+): StaffMember[] {
+  const ids = payload.role === "scheduler" ? (payload.managedStaffIds ?? []) : [];
+  if (new Set(ids).size !== ids.length) {
+    throw new HttpResponseError(400, "可管理人员不能重复");
+  }
+
+  return ids.map((staffId) => {
+    const staff = data.staff.find((item) => item.id === staffId);
+    if (!staff) {
+      throw new HttpResponseError(400, "可管理人员不存在");
+    }
+
+    const keepsOriginalManagedStaff = existingUser?.managedStaffIds.includes(staffId) ?? false;
+    if (!staff.enabled && !keepsOriginalManagedStaff) {
+      throw new HttpResponseError(400, "只能选择启用人员作为可管理人员");
+    }
+
+    return staff;
+  });
 }
 
 function parsePasswordChangePayload(body: unknown): { currentPassword: string; newPassword: string } | null {
@@ -656,11 +696,21 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         return;
       }
 
-      const saveResult: { bindingStaff: StaffMember | null; user: AuthUser | null } = { bindingStaff: null, user: null };
+      const saveResult: { bindingStaff: StaffMember | null; managedStaff: StaffMember[]; user: AuthUser | null } = {
+        bindingStaff: null,
+        managedStaff: [],
+        user: null
+      };
       await storage.update(async (data) => {
         const users = await authStore.listUsers();
+        const existingUser = users.find((user) => user.id === payload.id || user.username === payload.username);
         saveResult.bindingStaff = validateUserStaffBinding(data, users, payload);
-        saveResult.user = await authStore.saveUser(payload);
+        saveResult.managedStaff = validateManagedStaffIds(data, existingUser, payload);
+        saveResult.user = await authStore.saveUser({
+          ...payload,
+          managedStaffIds: payload.role === "scheduler" ? payload.managedStaffIds : [],
+          managedStaffUpdatedBy: request.authUser?.id ?? null
+        });
         return data;
       });
       const user = saveResult.user;
@@ -668,7 +718,13 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         throw new Error("账号保存失败");
       }
 
-      await recordAudit(request, "user.save", "user", user.id, formatUserSaveSummary(user, saveResult.bindingStaff));
+      await recordAudit(
+        request,
+        "user.save",
+        "user",
+        user.id,
+        formatUserSaveSummary(user, saveResult.bindingStaff, saveResult.managedStaff)
+      );
       response.json({ user: toManagedAuthUser(user) });
     } catch (error) {
       handleRouteError(error, response, next);

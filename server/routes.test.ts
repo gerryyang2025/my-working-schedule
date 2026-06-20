@@ -243,6 +243,68 @@ describe.sequential("API routes", () => {
     expect(loginResponse.body.user.staffId).toBeNull();
   });
 
+  it("validates managed staff ids when saving accounts", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: ["missing-staff"],
+        password: "scheduler-password"
+      })
+      .expect(400, { message: "可管理人员不存在" });
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: ["staff-head-001", "staff-head-001"],
+        password: "scheduler-password"
+      })
+      .expect(400, { message: "可管理人员不能重复" });
+  });
+
+  it("records managed staff summaries in account audit logs", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-scheduler")
+      .set(headers)
+      .send({
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        enabled: true,
+        staffId: null,
+        managedStaffIds: ["staff-head-001"],
+        password: "scheduler-password"
+      })
+      .expect(200);
+
+    const response = await request(app).get("/api/audit-logs").set(headers).expect(200);
+    expect(response.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "user.save",
+          summary: expect.stringContaining("可管理人员：段鸿露(000228)")
+        })
+      ])
+    );
+  });
+
   it("lets admins bind accounts to enabled staff records and returns the binding in auth responses", async () => {
     const app = createTestApp();
     const headers = await adminHeaders(app);
@@ -290,7 +352,7 @@ describe.sequential("API routes", () => {
       expect.arrayContaining([
         expect.objectContaining({
           action: "user.save",
-          summary: "保存账号：viewer，绑定人员：李护士(100001)"
+          summary: "保存账号：viewer，绑定人员：李护士(100001)，可管理人员：只读账号不配置"
         })
       ])
     );
@@ -458,7 +520,7 @@ describe.sequential("API routes", () => {
     expect(auditResponse.body.rows).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          summary: "保存账号：viewer，绑定人员：李护士(100001，已停用)"
+          summary: "保存账号：viewer，绑定人员：李护士(100001，已停用)，可管理人员：只读账号不配置"
         })
       ])
     );
@@ -544,7 +606,7 @@ describe.sequential("API routes", () => {
         action: "user.save",
         targetType: "user",
         targetId: "user-audit",
-        summary: "保存账号：audit-user，未绑定人员"
+        summary: "保存账号：audit-user，未绑定人员，可管理人员：只读账号不配置"
       })
     ]);
   });
