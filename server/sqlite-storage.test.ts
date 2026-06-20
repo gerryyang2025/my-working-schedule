@@ -621,25 +621,31 @@ describe("SQLite schema and mapper", () => {
     }
   });
 
-  it("does not load the SQLite adapter for JSON configured storage", async () => {
+  it("uses the SQLite adapter for configured storage by default", async () => {
     const path = await createTempDbPath();
     vi.resetModules();
-    vi.doMock("./sqlite/storage", () => {
-      throw new Error("SQLite adapter imported");
-    });
+    const load = vi.fn().mockResolvedValue(createSeedData());
+    vi.doMock("./sqlite/storage", () => ({
+      createSqliteStorage: vi.fn(() => ({
+        load,
+        save: vi.fn(),
+        update: vi.fn()
+      }))
+    }));
 
     try {
       const { createConfiguredStorage } = await import("./storage");
       const storage = createConfiguredStorage({
         host: "127.0.0.1",
         port: 0,
-        storageDriver: "json",
-        storagePath: path
+        storageDriver: "sqlite",
+        sqlitePath: path
       });
 
       const data = await storage.load();
 
       expect(data.staff).toHaveLength(3);
+      expect(load).toHaveBeenCalledTimes(1);
     } finally {
       vi.doUnmock("./sqlite/storage");
       vi.resetModules();

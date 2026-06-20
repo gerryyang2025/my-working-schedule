@@ -14,8 +14,6 @@
     "test:e2e": "playwright test",
     "lint": "vue-tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "data:init:sqlite": "node --import tsx server/data-cli.ts init",
-    "data:migrate:sqlite": "node --import tsx server/data-cli.ts migrate",
-    "data:export:json": "node --import tsx server/data-cli.ts export-json",
     "data:backup": "node --import tsx server/data-cli.ts backup",
     "data:restore": "node --import tsx server/data-cli.ts restore",
     "data:check:sqlite": "node --import tsx server/data-cli.ts check",

@@ -166,7 +166,7 @@ const users: ManagedAuthUser[] = [
 const auditLogs: AuditLogEntry[] = [
   {
     id: "audit-1",
-    occurredAt: "2026-06-19T00:00:00.000Z",
+    occurredAt: "2026-06-20T02:55:24.346Z",
     userId: "user-admin",
     username: "admin",
     action: "user.save",
@@ -288,6 +288,8 @@ describe("ManagementDrawer", () => {
 
     expect(wrapper.text()).toContain("审计");
     expect(wrapper.text()).toContain("保存账号：scheduler");
+    expect(wrapper.text()).toContain("2026-06-20 10:55:24");
+    expect(wrapper.text()).not.toContain("2026-06-20T02:55:24.346Z");
 
     await wrapper.get('[data-testid="refresh-audit-logs"]').trigger("click");
 

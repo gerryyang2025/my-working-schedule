@@ -30,6 +30,9 @@ tmp/
 temp/
 
 # Local data snapshots
+data/*.db
+data/*.db-shm
+data/*.db-wal
 data/*.local.json
 data/*.bak
 

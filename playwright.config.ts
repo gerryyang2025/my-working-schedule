@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-const e2eDataPath = join(tmpdir(), `my-working-schedule-e2e-${process.pid}.json`);
+const e2eSqlitePath = join(tmpdir(), `my-working-schedule-e2e-${process.pid}.db`);
 const e2eApiPort = 3101;
 const e2eWebPort = 5174;
 const e2eApiUrl = `http://127.0.0.1:${e2eApiPort}`;
@@ -21,7 +21,8 @@ export default defineConfig({
       url: `${e2eApiUrl}/api/health`,
       env: {
         PORT: String(e2eApiPort),
-        SCHEDULE_DATA_PATH: e2eDataPath,
+        SCHEDULE_STORAGE_DRIVER: "sqlite",
+        SCHEDULE_SQLITE_PATH: e2eSqlitePath,
         SCHEDULE_ADMIN_PASSWORD: "123456"
       },
       reuseExistingServer: false

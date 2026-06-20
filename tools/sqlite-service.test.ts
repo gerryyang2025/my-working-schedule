@@ -86,7 +86,6 @@ async function createFakeNpmBin(dir: string) {
     join(fakeBin, "npm"),
     `{
   printf 'cwd=%s\\n' "$PWD"
-  printf 'SCHEDULE_DATA_PATH=%s\\n' "$SCHEDULE_DATA_PATH"
   printf 'SCHEDULE_SQLITE_PATH=%s\\n' "$SCHEDULE_SQLITE_PATH"
   printf 'SCHEDULE_BACKUP_PATH=%s\\n' "$SCHEDULE_BACKUP_PATH"
   printf 'argc=%s\\n' "$#"
@@ -241,7 +240,6 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.stdout).toContain(`sqlite path: ${join(sqliteDir, "schedule.db")}`);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${join(sqliteDir, "schedule.db")}`,
       `SCHEDULE_BACKUP_PATH=${backupDir}`,
       "argc=2",
@@ -318,7 +316,6 @@ exit 0
     expect(result.code).toBe(0);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${backupDir}`,
       "argc=2",
@@ -351,7 +348,6 @@ exit 0
     expect(result.stderr).toContain(`nearest existing parent is not a directory: ${blockedParent}`);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
       "argc=2",
@@ -381,7 +377,6 @@ exit 0
     expect(result.stderr).toContain("path exists but is a directory");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
       "argc=2",
@@ -416,7 +411,6 @@ exit 0
     expect(result.stderr).toContain(`sqlite path parent is not writable/traversable: ${sqliteParent}`);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
       "argc=2",
@@ -451,7 +445,6 @@ exit 0
     expect(result.stderr).toContain("path exists but is not readable/writable");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${join(dir, "backups")}`,
       "argc=2",
@@ -501,7 +494,6 @@ exit 0
     expect(result.stderr).toContain(`nearest existing parent is not a directory: ${blockedParent}`);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${join(dir, "sqlite", "schedule.db")}`,
       `SCHEDULE_BACKUP_PATH=${backupPath}`,
       "argc=2",
@@ -531,7 +523,6 @@ exit 0
     expect(result.stderr).toContain("path exists but is not a directory");
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${join(process.cwd(), "data", "app-data.local.json")}`,
       `SCHEDULE_SQLITE_PATH=${join(dir, "sqlite", "schedule.db")}`,
       `SCHEDULE_BACKUP_PATH=${backupPath}`,
       "argc=2",
@@ -808,12 +799,6 @@ exit 0
         preserveSystemPath: true
       },
       {
-        name: "migrate",
-        args: ["migrate"],
-        expectedNpmCalls: [["run", "data:migrate:sqlite"]],
-        preserveSystemPath: true
-      },
-      {
         name: "backup",
         args: ["backup"],
         expectedNpmCalls: [["run", "data:backup"]],
@@ -848,7 +833,6 @@ exit 0
         confirmRestore: false,
         npmBody: `{
   printf 'cwd=%s\\n' "$PWD"
-  printf 'SCHEDULE_DATA_PATH=%s\\n' "$SCHEDULE_DATA_PATH"
   printf 'SCHEDULE_SQLITE_PATH=%s\\n' "$SCHEDULE_SQLITE_PATH"
   printf 'SCHEDULE_BACKUP_PATH=%s\\n' "$SCHEDULE_BACKUP_PATH"
   printf 'argc=%s\\n' "$#"
@@ -867,7 +851,6 @@ exit 0
       const dir = await createTempDir();
       const fakeBin = testCase.npmBody ? join(dir, "bin") : await createFakeNpmBin(dir);
       const logPath = join(dir, `${testCase.name}.log`);
-      const dataPath = join(dir, "data", "app-data.local.json");
       const sqlitePath = join(dir, "sqlite", "schedule.db");
       const backupPath = join(dir, "backups");
 
@@ -879,7 +862,6 @@ exit 0
       const result = await runTool(testCase.args, {
         PATH: testCase.preserveSystemPath ? `${fakeBin}:${process.env.PATH ?? ""}` : fakeBin,
         NPM_LOG: logPath,
-        SCHEDULE_DATA_PATH: dataPath,
         SCHEDULE_SQLITE_PATH: sqlitePath,
         SCHEDULE_BACKUP_PATH: backupPath,
         CONFIRM_RESTORE: testCase.confirmRestore ? "yes" : ""
@@ -897,7 +879,6 @@ exit 0
         typeof testCase.expectedNpmCalls === "function" ? testCase.expectedNpmCalls(backupPath) : testCase.expectedNpmCalls;
       const expectedLogLines = expectedNpmCalls.flatMap((expectedNpmArgs) => [
         `cwd=${process.cwd()}`,
-        `SCHEDULE_DATA_PATH=${dataPath}`,
         `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
         `SCHEDULE_BACKUP_PATH=${backupPath}`,
         `argc=${expectedNpmArgs.length}`,
@@ -908,11 +889,27 @@ exit 0
     }
   });
 
+  it("rejects the removed JSON migration command before invoking npm", async () => {
+    const dir = await createTempDir();
+    const fakeBin = join(dir, "bin");
+    await mkdir(fakeBin);
+    await createFakeExecutable(join(fakeBin, "npm"), "echo npm should not be invoked >&2\nexit 64\n");
+
+    const result = await runTool(["migrate"], {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      SCHEDULE_SQLITE_PATH: join(dir, "sqlite", "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown command: migrate");
+    expect(result.stderr).not.toContain("npm should not be invoked");
+  });
+
   it("passes absolute restore backup paths through unchanged", async () => {
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
     const logPath = join(dir, "restore-absolute.log");
-    const dataPath = join(dir, "data", "app-data.local.json");
     const sqlitePath = join(dir, "sqlite", "schedule.db");
     const backupPath = join(dir, "backups");
     const backupFile = join(dir, "absolute backup file.db");
@@ -920,7 +917,6 @@ exit 0
     const result = await runTool(["restore", backupFile], {
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
       NPM_LOG: logPath,
-      SCHEDULE_DATA_PATH: dataPath,
       SCHEDULE_SQLITE_PATH: sqlitePath,
       SCHEDULE_BACKUP_PATH: backupPath,
       CONFIRM_RESTORE: "yes"
@@ -929,7 +925,6 @@ exit 0
     expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${dataPath}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${backupPath}`,
       "argc=4",
@@ -966,7 +961,6 @@ exit 0
     const dir = await createTempDir();
     const fakeBin = await createFakeNpmBin(dir);
     const logPath = join(dir, "restore-dotted.log");
-    const dataPath = join(dir, "data", "app-data.local.json");
     const sqlitePath = join(dir, "sqlite", "schedule.db");
     const backupPath = join(dir, "backups");
     const backupFilename = "backup..db";
@@ -974,7 +968,6 @@ exit 0
     const result = await runTool(["restore", backupFilename], {
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
       NPM_LOG: logPath,
-      SCHEDULE_DATA_PATH: dataPath,
       SCHEDULE_SQLITE_PATH: sqlitePath,
       SCHEDULE_BACKUP_PATH: backupPath,
       CONFIRM_RESTORE: "yes"
@@ -983,7 +976,6 @@ exit 0
     expect(result.code, `restore stderr: ${result.stderr}`).toBe(0);
     expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
       `cwd=${process.cwd()}`,
-      `SCHEDULE_DATA_PATH=${dataPath}`,
       `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
       `SCHEDULE_BACKUP_PATH=${backupPath}`,
       "argc=4",
@@ -1079,12 +1071,10 @@ exit 0
 
   it("runs the real data preflight script end to end", async () => {
     const dir = await createTempDir();
-    const jsonPath = join(dir, "data", "app-data.local.json");
     const sqlitePath = join(dir, "sqlite", "schedule.db");
     const backupPath = join(dir, "backups");
 
     const result = await runDataCli(["preflight"], {
-      SCHEDULE_DATA_PATH: jsonPath,
       SCHEDULE_SQLITE_PATH: sqlitePath,
       SCHEDULE_BACKUP_PATH: backupPath
     });
@@ -1094,7 +1084,6 @@ exit 0
     expect(JSON.parse(result.stdout.trim())).toEqual({
       ok: true,
       command: "preflight",
-      jsonPath,
       sqlitePath,
       backupPath
     });

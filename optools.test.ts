@@ -205,7 +205,6 @@ describe("optools.sh", () => {
           host: "127.0.0.1",
           port: 3999,
           storageDriver: "sqlite",
-          storagePath: "data/app-data.local.json",
           sqlitePath: "/var/lib/my-working-schedule/schedule.db",
           backupPath: "/var/backups/my-working-schedule",
           adminPassword: "super-secret-password"
@@ -225,6 +224,7 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain('"host": "127.0.0.1"');
     expect(result.stdout).toContain('"port": 3999');
     expect(result.stdout).toContain('"storageDriver": "sqlite"');
+    expect(result.stdout).not.toContain("storagePath");
     expect(result.stdout).toContain('"adminPasswordConfigured": true');
     const combinedOutput = `${result.stdout}\n${result.stderr}`;
     expect(combinedOutput).not.toContain("super-secret-password");
@@ -543,7 +543,7 @@ printf 'asset\\n' > dist/assets/app.js
     );
   });
 
-  it("runs data export-json through npm from the project root", async () => {
+  it("rejects the removed JSON export command", async () => {
     const stateDir = await createStateDir();
     const fakeBinDir = join(stateDir, "bin");
     const fakeNpmPath = join(fakeBinDir, "npm");
@@ -562,10 +562,9 @@ printf 'npm %s\\n' "$*" >> "$COMMAND_LOG"
       PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
     });
 
-    expect(result.code, result.stderr).toBe(0);
-    expect(await readFile(commandLogPath, "utf8")).toBe(
-      [`cwd=${process.cwd()}`, "npm run data:export:json", ""].join("\n")
-    );
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain("Unknown data command: export-json");
+    await expect(readFile(commandLogPath, "utf8")).rejects.toThrow();
   });
 
   it("delegates production app operations to systemd and journalctl", async () => {

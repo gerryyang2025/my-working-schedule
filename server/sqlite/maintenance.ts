@@ -3,9 +3,6 @@ import { existsSync } from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
-import { readJsonAppData, writeJsonAppData } from "../app-data";
-import type { AppData } from "../types";
-import { readAppDataFromSqlite, replaceAppDataInSqlite } from "./mapper";
 import { checkSqliteIntegrity, initializeSqliteSchema, listMissingCoreTables } from "./schema";
 
 export const sqliteMaintenanceFs = {
@@ -16,31 +13,6 @@ export const sqliteMaintenanceFs = {
 };
 
 const SQLITE_SIDECAR_SUFFIXES = ["-journal", "-shm", "-wal"] as const;
-const SQLITE_PERSISTED_SETTING_KEYS = ["defaultRequiredShiftsPerWeek", "version"] as const;
-
-export interface MigrationCount {
-  expected: number;
-  actual: number;
-}
-
-export interface MigrationReport {
-  ok: boolean;
-  counts: Record<string, MigrationCount>;
-  sourceJsonBackupPath: string;
-  sqlitePath: string;
-}
-
-export interface MigrationOptions {
-  jsonPath: string;
-  sqlitePath: string;
-  backupPath: string;
-  overwrite?: boolean;
-}
-
-export interface ExportOptions {
-  sqlitePath: string;
-  exportPath: string;
-}
 
 export interface BackupOptions {
   sqlitePath: string;
@@ -116,55 +88,6 @@ function ensureDefaultSettings(db: Database.Database): void {
   db.prepare("insert or ignore into app_settings (key, value) values (?, ?)").run("version", "1");
 }
 
-function countRows(db: Database.Database, table: string): number {
-  const row = db.prepare(`select count(*) as count from ${table}`).get() as { count: number };
-  return row.count;
-}
-
-function countExpectedRows(data: AppData): Record<string, number> {
-  return {
-    staff: data.staff.length,
-    shifts: data.shifts.length,
-    holidays: data.holidays.length,
-    scheduleEntries: data.scheduleEntries.length,
-    scheduleEntryShifts: data.scheduleEntries.reduce((total, entry) => total + entry.shiftIds.length, 0),
-    monthlySettlements: data.monthlySettlements.length,
-    monthlySettlementRows: data.monthlySettlements.reduce((total, settlement) => total + settlement.rows.length, 0),
-    settings: SQLITE_PERSISTED_SETTING_KEYS.reduce((total, key) => total + (key in data.settings ? 1 : 0), 0)
-  };
-}
-
-function countActualRows(db: Database.Database): Record<string, number> {
-  return {
-    staff: countRows(db, "staff"),
-    shifts: countRows(db, "shifts"),
-    holidays: countRows(db, "holidays"),
-    scheduleEntries: countRows(db, "schedule_entries"),
-    scheduleEntryShifts: countRows(db, "schedule_entry_shifts"),
-    monthlySettlements: countRows(db, "monthly_settlements"),
-    monthlySettlementRows: countRows(db, "monthly_settlement_rows"),
-    settings: countRows(db, "app_settings")
-  };
-}
-
-function buildMigrationCounts(data: AppData, db: Database.Database): Record<string, MigrationCount> {
-  const expected = countExpectedRows(data);
-  const actual = countActualRows(db);
-  return Object.fromEntries(
-    Object.entries(expected).map(([key, expectedCount]) => [
-      key,
-      {
-        expected: expectedCount,
-        actual: actual[key] ?? 0
-      }
-    ])
-  );
-}
-
-function countsAreOk(counts: Record<string, MigrationCount>): boolean {
-  return Object.values(counts).every((count) => count.expected === count.actual);
-}
-
 function checkOpenSqliteDatabase(db: Database.Database): { ok: boolean; integrity: string; missingTables: string[] } {
   const integrity = checkSqliteIntegrity(db);
   const missingTables = listMissingCoreTables(db);
@@ -203,59 +126,6 @@ export async function initSqliteDatabase(options: CheckOptions): Promise<string>
     db.close();
   }
   return options.sqlitePath;
-}
-
-export async function migrateJsonToSqlite(options: MigrationOptions): Promise<MigrationReport> {
-  if (existsSync(options.sqlitePath) && !options.overwrite) {
-    throw new Error("SQLite database already exists. Pass overwrite to replace it.");
-  }
-
-  const { data } = await readJsonAppData(options.jsonPath);
-  await sqliteMaintenanceFs.mkdir(options.backupPath, { recursive: true });
-  const sourceJsonBackupPath = join(options.backupPath, `app-data-before-sqlite-${timestamp()}.json`);
-  await sqliteMaintenanceFs.copyFile(options.jsonPath, sourceJsonBackupPath);
-  await sqliteMaintenanceFs.mkdir(dirname(options.sqlitePath), { recursive: true });
-
-  const tempSqlitePath = createTempSqlitePath(options.sqlitePath);
-  let db: Database.Database | undefined;
-  try {
-    db = new Database(tempSqlitePath);
-    initializeSqliteSchema(db);
-    replaceAppDataInSqlite(db, data);
-    const counts = buildMigrationCounts(data, db);
-    assertValidOpenSqliteDatabase(db, "Migrated SQLite database");
-    const report = {
-      ok: countsAreOk(counts),
-      counts,
-      sourceJsonBackupPath,
-      sqlitePath: options.sqlitePath
-    };
-
-    if (!report.ok) {
-      throw new Error("SQLite migration count verification failed.");
-    }
-
-    db.close();
-    db = undefined;
-    await sqliteMaintenanceFs.rename(tempSqlitePath, options.sqlitePath);
-    return report;
-  } finally {
-    if (db) {
-      db.close();
-    }
-    await cleanupSqliteFile(tempSqlitePath);
-  }
-}
-
-export async function exportSqliteToJson(options: ExportOptions): Promise<string> {
-  const db = new Database(options.sqlitePath, { fileMustExist: true });
-  try {
-    const data = readAppDataFromSqlite(db);
-    await writeJsonAppData(options.exportPath, data);
-    return options.exportPath;
-  } finally {
-    db.close();
-  }
 }
 
 export async function backupSqliteDatabase(options: BackupOptions): Promise<string> {

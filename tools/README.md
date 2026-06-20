@@ -39,7 +39,6 @@ The scripts in this directory are lower-level helpers used by `optools.sh` and c
 ```bash
 ./tools/sqlite-service.sh install
 ./tools/sqlite-service.sh init
-./tools/sqlite-service.sh migrate
 ./tools/sqlite-service.sh backup
 ./tools/sqlite-service.sh restore <backup-file>
 ./tools/sqlite-service.sh status
@@ -100,7 +99,6 @@ Short restore runbook:
 ```bash
 export SCHEDULE_SQLITE_PATH=/var/lib/my-working-schedule/schedule.db
 export SCHEDULE_BACKUP_PATH=/var/backups/my-working-schedule
-export SCHEDULE_DATA_PATH=/var/lib/my-working-schedule/app-data.local.json
 ```
 
 The service user must be able to read and write the database file and backup directory.

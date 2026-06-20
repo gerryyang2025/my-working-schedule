@@ -1,13 +1,12 @@
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
-export type StorageDriver = "json" | "sqlite";
+export type StorageDriver = "sqlite";
 
 export interface ServerConfig {
   host: string;
   port: number;
   storageDriver: StorageDriver;
-  storagePath?: string;
   sqlitePath?: string;
   backupPath?: string;
   adminPassword?: string;
@@ -17,7 +16,6 @@ interface ServerEnv {
   HOST?: string;
   PORT?: string;
   SCHEDULE_STORAGE_DRIVER?: string;
-  SCHEDULE_DATA_PATH?: string;
   SCHEDULE_SQLITE_PATH?: string;
   SCHEDULE_BACKUP_PATH?: string;
   SCHEDULE_ADMIN_PASSWORD?: string;
@@ -28,7 +26,6 @@ interface ServerFileConfig {
   host?: unknown;
   port?: unknown;
   storageDriver?: unknown;
-  storagePath?: unknown;
   sqlitePath?: unknown;
   backupPath?: unknown;
   adminPassword?: unknown;
@@ -67,7 +64,7 @@ function parseStorageDriver(value: unknown): StorageDriver | undefined {
   if (driver === undefined) {
     return undefined;
   }
-  if (driver !== "json" && driver !== "sqlite") {
+  if (driver !== "sqlite") {
     throw new Error("存储驱动配置不正确");
   }
   return driver;
@@ -101,8 +98,7 @@ export function resolveServerConfig(
   return {
     host: nonBlankString(env.HOST) ?? nonBlankString(fileConfig.host) ?? "0.0.0.0",
     port: parsePort(env.PORT) ?? parsePort(fileConfig.port) ?? 3001,
-    storageDriver: parseStorageDriver(env.SCHEDULE_STORAGE_DRIVER) ?? parseStorageDriver(fileConfig.storageDriver) ?? "json",
-    storagePath: nonBlankString(env.SCHEDULE_DATA_PATH) ?? nonBlankString(fileConfig.storagePath),
+    storageDriver: parseStorageDriver(env.SCHEDULE_STORAGE_DRIVER) ?? parseStorageDriver(fileConfig.storageDriver) ?? "sqlite",
     sqlitePath: nonBlankString(env.SCHEDULE_SQLITE_PATH) ?? nonBlankString(fileConfig.sqlitePath),
     backupPath: nonBlankString(env.SCHEDULE_BACKUP_PATH) ?? nonBlankString(fileConfig.backupPath),
     adminPassword: nonBlankString(env.SCHEDULE_ADMIN_PASSWORD) ?? nonBlankString(fileConfig.adminPassword)

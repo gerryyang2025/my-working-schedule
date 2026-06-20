@@ -96,7 +96,6 @@ Usage:
   ./optools.sh data check     Check SQLite storage integrity
   ./optools.sh data backup    Back up SQLite storage
   ./optools.sh data restore <backup-file>
-  ./optools.sh data export-json
   ./optools.sh app init       Initialize production user, directories, and systemd service
   ./optools.sh app doctor     Check API/systemd prerequisites
   ./optools.sh app start      Start the production systemd service
@@ -139,7 +138,6 @@ Environment:
   WEB_PORT                    Web port used by npm run dev:web (default: 5173)
   PUBLIC_HOST                 Host/IP shown for external access (default: detected LAN IP)
   VITE_API_PROXY_TARGET       Vite API proxy target (default: http://127.0.0.1:PORT)
-  SCHEDULE_DATA_PATH          Optional API data file override
   SCHEDULE_CONFIG_PATH        Optional server config file path
   SCHEDULE_ADMIN_PASSWORD     Optional admin password override
 EOF
@@ -646,27 +644,9 @@ run_firewall_helper() {
   esac
 }
 
-run_data_export_json() {
-  if ! command -v npm >/dev/null 2>&1; then
-    echo "data export-json: cannot start" >&2
-    echo "missing command: npm" >&2
-    return 1
-  fi
-
-  (
-    cd "$ROOT_DIR"
-    npm run data:export:json
-  )
-}
-
 run_data_helper() {
   local command="${1:-help}"
   shift || true
-
-  if [[ "$command" == "export-json" ]]; then
-    run_data_export_json "$@"
-    return
-  fi
 
   if [[ ! -f "$SQLITE_SERVICE_SCRIPT" ]]; then
     echo "SQLite helper script not found: $SQLITE_SERVICE_SCRIPT" >&2
@@ -674,7 +654,7 @@ run_data_helper() {
   fi
 
   case "$command" in
-    install|init|migrate|backup|restore|status|check|help|-h|--help)
+    install|init|backup|restore|status|check|help|-h|--help)
       (
         cd "$ROOT_DIR"
         bash "$SQLITE_SERVICE_SCRIPT" "$command" "$@"
@@ -1120,7 +1100,6 @@ run_config_server() {
       host: config.host,
       port: config.port,
       storageDriver: config.storageDriver,
-      storagePath: config.storagePath ?? null,
       sqlitePath: config.sqlitePath ?? null,
       backupPath: config.backupPath ?? null,
       adminPasswordConfigured: Boolean(config.adminPassword)

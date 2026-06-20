@@ -2,7 +2,6 @@
   "host": "127.0.0.1",
   "port": 3001,
   "storageDriver": "sqlite",
-  "storagePath": "data/app-data.local.json",
   "sqlitePath": "/var/lib/my-working-schedule/schedule.db",
   "backupPath": "/var/backups/my-working-schedule",
   "adminPassword": "change-me-via-env-or-local-config"

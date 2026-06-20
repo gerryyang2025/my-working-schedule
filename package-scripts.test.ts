@@ -134,11 +134,11 @@ describe("package scripts", () => {
     };
 
     expect(packageJson.scripts["data:init:sqlite"]).toBe("node --import tsx server/data-cli.ts init");
-    expect(packageJson.scripts["data:migrate:sqlite"]).toBe("node --import tsx server/data-cli.ts migrate");
-    expect(packageJson.scripts["data:export:json"]).toBe("node --import tsx server/data-cli.ts export-json");
     expect(packageJson.scripts["data:backup"]).toBe("node --import tsx server/data-cli.ts backup");
     expect(packageJson.scripts["data:restore"]).toBe("node --import tsx server/data-cli.ts restore");
     expect(packageJson.scripts["data:check:sqlite"]).toBe("node --import tsx server/data-cli.ts check");
     expect(packageJson.scripts["data:preflight"]).toBe("node --import tsx server/data-cli.ts preflight");
+    expect(packageJson.scripts["data:migrate:sqlite"]).toBeUndefined();
+    expect(packageJson.scripts["data:export:json"]).toBeUndefined();
   });
 });

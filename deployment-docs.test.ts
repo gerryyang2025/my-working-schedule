@@ -55,10 +55,10 @@ describe("production deployment docs and examples", () => {
       host: "127.0.0.1",
       port: 3001,
       storageDriver: "sqlite",
-      storagePath: "data/app-data.local.json",
       sqlitePath: "/var/lib/my-working-schedule/schedule.db",
       backupPath: "/var/backups/my-working-schedule"
     });
+    expect(config.storagePath).toBeUndefined();
     expect(config.adminPassword).toBe("change-me-via-env-or-local-config");
     expect(JSON.stringify(config)).not.toContain("123456");
   });

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from "vue";
 import type { AuditLogEntry, AuditLogQuery, ManagedAuthUser, PublicAppData, SaveAuthUserInput, UserRole } from "@/api/client";
+import { formatAuditOccurredAt } from "@/lib/format";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
 const props = defineProps<{
@@ -559,7 +560,11 @@ watch(
         </div>
 
         <el-table :data="auditLogs" size="small" :empty-text="auditEmptyText">
-          <el-table-column prop="occurredAt" label="时间" width="170" />
+          <el-table-column label="时间" width="170">
+            <template #default="{ row }">
+              {{ formatAuditOccurredAt(row.occurredAt) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="username" label="账号" width="100" />
           <el-table-column prop="action" label="操作" width="150" />
           <el-table-column prop="summary" label="摘要" />
@@ -570,7 +575,7 @@ watch(
           <article v-for="entry in auditLogs" :key="entry.id" class="management-mobile-item management-mobile-audit">
             <span class="management-mobile-main">
               <strong>{{ entry.summary }}</strong>
-              <span>{{ entry.occurredAt }}</span>
+              <span>{{ formatAuditOccurredAt(entry.occurredAt) }}</span>
             </span>
             <span class="management-mobile-meta">
               <span>{{ entry.username }}</span>

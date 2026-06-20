@@ -1,6 +1,3 @@
-import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
 import type {
   AppData,
   Holiday,
@@ -18,20 +15,6 @@ export function normalizeAppData(candidate: unknown): { data: unknown; changed: 
 
 export function assertAppData(value: unknown): asserts value is AppData {
   assertAppDataCandidate(value);
-}
-
-export async function readJsonAppData(path: string): Promise<{ data: AppData; changed: boolean }> {
-  const content = await readFile(path, "utf8");
-  const { data, changed } = normalizeAppData(JSON.parse(content));
-  assertAppData(data);
-  return { data, changed };
-}
-
-export async function writeJsonAppData(path: string, data: AppData): Promise<void> {
-  await mkdir(dirname(path), { recursive: true });
-  const tempPath = `${path}.${randomUUID()}.tmp`;
-  await writeFile(tempPath, `${JSON.stringify(data, null, 2)}\n`, "utf8");
-  await rename(tempPath, path);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

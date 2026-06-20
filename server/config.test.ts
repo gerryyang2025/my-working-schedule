@@ -23,29 +23,29 @@ describe("server config", () => {
 
     expect(config.host).toBe("0.0.0.0");
     expect(config.port).toBe(3001);
-    expect(config.storagePath).toBeUndefined();
     expect(config.adminPassword).toBeUndefined();
   });
 
-  it("uses JSON storage by default", () => {
+  it("uses SQLite storage by default", () => {
     const config = resolveServerConfig({}, { defaultConfigPath: null });
 
-    expect(config.storageDriver).toBe("json");
+    expect(config.storageDriver).toBe("sqlite");
     expect(config.sqlitePath).toBeUndefined();
     expect(config.backupPath).toBeUndefined();
   });
 
-  it("allows host, port, storage path, and admin password env overrides", () => {
-    const config = resolveServerConfig({
+  it("allows host, port, and admin password env overrides", () => {
+    const env = {
       HOST: "127.0.0.1",
       PORT: "4100",
-      SCHEDULE_DATA_PATH: "/tmp/schedule.json",
       SCHEDULE_ADMIN_PASSWORD: "env-password"
-    }, { defaultConfigPath: null });
+    };
+    const config = resolveServerConfig(env, { defaultConfigPath: null });
 
     expect(config.host).toBe("127.0.0.1");
     expect(config.port).toBe(4100);
-    expect(config.storagePath).toBe("/tmp/schedule.json");
+    expect("storagePath" in config).toBe(false);
+    expect(config.storageDriver).toBe("sqlite");
     expect(config.adminPassword).toBe("env-password");
   });
 
@@ -91,6 +91,12 @@ describe("server config", () => {
 
   it("rejects unsupported storage drivers", () => {
     withTempConfig({ storageDriver: "postgres" }, (path) => {
+      expect(() => resolveServerConfig({ SCHEDULE_CONFIG_PATH: path })).toThrow("存储驱动配置不正确");
+    });
+  });
+
+  it("rejects the removed JSON runtime storage driver", () => {
+    withTempConfig({ storageDriver: "json" }, (path) => {
       expect(() => resolveServerConfig({ SCHEDULE_CONFIG_PATH: path })).toThrow("存储驱动配置不正确");
     });
   });

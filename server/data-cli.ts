@@ -1,18 +1,14 @@
 import { isAbsolute, resolve } from "node:path";
 import { resolveServerConfig } from "./config";
-import { DEFAULT_STORAGE_PATH } from "./storage";
 import {
   backupSqliteDatabase,
   checkSqliteDatabase,
-  exportSqliteToJson,
   initSqliteDatabase,
-  migrateJsonToSqlite,
   restoreSqliteBackup
 } from "./sqlite/maintenance";
 
 const command = process.argv[2];
 const config = resolveServerConfig();
-const jsonPath = resolve(config.storagePath ?? DEFAULT_STORAGE_PATH);
 const sqlitePath = resolve(config.sqlitePath ?? "data/schedule.db");
 const backupPath = resolve(config.backupPath ?? "backups");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
@@ -41,7 +37,6 @@ async function main() {
         {
           ok: true,
           command: "preflight",
-          jsonPath,
           sqlitePath,
           backupPath
         },
@@ -54,21 +49,6 @@ async function main() {
 
   if (command === "init") {
     console.log(await initSqliteDatabase({ sqlitePath }));
-    return;
-  }
-
-  if (command === "migrate") {
-    const report = await migrateJsonToSqlite({ jsonPath, sqlitePath, backupPath, overwrite: process.argv.includes("--overwrite") });
-    console.log(JSON.stringify(report, null, 2));
-    if (!report.ok) {
-      process.exitCode = 1;
-    }
-    return;
-  }
-
-  if (command === "export-json") {
-    const exportPath = resolve("exports", `app-data-${new Date().toISOString().replace(/[-:]/g, "").slice(0, 15)}.json`);
-    console.log(await exportSqliteToJson({ sqlitePath, exportPath }));
     return;
   }
 
@@ -108,7 +88,7 @@ async function main() {
     return;
   }
 
-  console.error("Usage: node --import tsx server/data-cli.ts <preflight|init|migrate|export-json|backup|restore|check>");
+  console.error("Usage: node --import tsx server/data-cli.ts <preflight|init|backup|restore|check>");
   process.exitCode = 1;
 }
 

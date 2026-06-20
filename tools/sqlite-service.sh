@@ -8,7 +8,6 @@ fi
 ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 SQLITE_PATH="${SCHEDULE_SQLITE_PATH:-/var/lib/my-working-schedule/schedule.db}"
 BACKUP_PATH="${SCHEDULE_BACKUP_PATH:-/var/backups/my-working-schedule}"
-DATA_PATH="${SCHEDULE_DATA_PATH:-$ROOT_DIR/data/app-data.local.json}"
 COMMAND="${1:-help}"
 
 usage() {
@@ -16,7 +15,6 @@ usage() {
 Usage:
   ./tools/sqlite-service.sh install
   ./tools/sqlite-service.sh init
-  ./tools/sqlite-service.sh migrate
   ./tools/sqlite-service.sh backup
   ./tools/sqlite-service.sh restore <backup-file>
   ./tools/sqlite-service.sh status
@@ -198,7 +196,6 @@ sqlite_modified_time() {
 status() {
   printf 'sqlite path: %s\n' "$SQLITE_PATH"
   printf 'backup path: %s\n' "$BACKUP_PATH"
-  printf 'json data path: %s\n' "$DATA_PATH"
   if [ -e "$SQLITE_PATH" ]; then
     if [ ! -f "$SQLITE_PATH" ]; then
       printf 'sqlite path is not ready: %s\n' "$SQLITE_PATH" >&2
@@ -224,7 +221,7 @@ status() {
 
 run_npm_command() {
   cd "$ROOT_DIR"
-  SCHEDULE_DATA_PATH="$DATA_PATH" SCHEDULE_SQLITE_PATH="$SQLITE_PATH" SCHEDULE_BACKUP_PATH="$BACKUP_PATH" npm run "$@"
+  SCHEDULE_SQLITE_PATH="$SQLITE_PATH" SCHEDULE_BACKUP_PATH="$BACKUP_PATH" npm run "$@"
 }
 
 validate_runtime_preflight_output() {
@@ -344,10 +341,6 @@ case "$COMMAND" in
   init)
     ensure_dirs
     run_npm_command data:init:sqlite
-    ;;
-  migrate)
-    ensure_dirs
-    run_npm_command data:migrate:sqlite
     ;;
   backup)
     ensure_dirs
