@@ -9,6 +9,7 @@ export interface AuthUser {
   displayName: string;
   role: UserRole;
   staffId: string | null;
+  managedStaffIds: string[];
 }
 
 export interface ManagedAuthUser extends AuthUser {
@@ -24,6 +25,7 @@ export interface SaveAuthUserInput {
   role: UserRole;
   enabled: boolean;
   staffId?: string | null;
+  managedStaffIds?: string[];
   password?: string;
 }
 

@@ -89,7 +89,9 @@ const testAuthUser = {
   id: "user-admin",
   username: "admin",
   displayName: "系统管理员",
-  role: "admin" as const
+  role: "admin" as const,
+  staffId: null,
+  managedStaffIds: []
 };
 
 const AppToolbarStub = defineComponent({
@@ -157,6 +159,13 @@ const ManagementDrawerStub = defineComponent({
         @click="$emit('saveUser', { id: 'user-scheduler', username: 'scheduler', displayName: '排班管理员', role: 'scheduler', enabled: true, password: 'secret123' })"
       >
         save user
+      </button>
+      <button
+        data-testid="drawer-save-managed-user"
+        type="button"
+        @click="$emit('saveUser', { id: 'user-scheduler', username: 'scheduler', displayName: '排班管理员', role: 'scheduler', enabled: true, staffId: null, managedStaffIds: ['staff-head'] })"
+      >
+        save managed user
       </button>
       <button
         data-testid="drawer-refresh-audit"
@@ -262,6 +271,8 @@ function mountApp(appData: PublicAppData = testData) {
         username: "admin",
         displayName: "系统管理员",
         role: "admin",
+        staffId: null,
+        managedStaffIds: [],
         enabled: true,
         createdAt: "2026-06-19T00:00:00.000Z",
         updatedAt: "2026-06-19T00:00:00.000Z"
@@ -508,6 +519,8 @@ describe("App", () => {
         username: "scheduler",
         displayName: "排班管理员",
         role: "scheduler",
+        staffId: null,
+        managedStaffIds: [],
         enabled: true,
         createdAt: "2026-06-19T00:00:00.000Z",
         updatedAt: "2026-06-19T00:00:00.000Z"
@@ -530,6 +543,39 @@ describe("App", () => {
       password: "secret123"
     });
     expect(apiMocks.listUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it("preserves managed staff ids when saving scheduler users", async () => {
+    apiMocks.saveUser.mockResolvedValue({
+      user: {
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        staffId: null,
+        managedStaffIds: ["staff-head"],
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    });
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-managed-user"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveUser).toHaveBeenCalledWith({
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      enabled: true,
+      staffId: null,
+      managedStaffIds: ["staff-head"]
+    });
   });
 
   it("refreshes latest audit logs after saving management configuration", async () => {

@@ -48,9 +48,10 @@ const InputStub = defineComponent({
 
 const ElSelectStub = defineComponent({
   name: "ElSelect",
-  props: ["modelValue", "placeholder", "disabled"],
+  props: ["modelValue", "placeholder", "disabled", "multiple"],
   emits: ["update:modelValue"],
-  template: '<select :data-placeholder="placeholder" :value="modelValue" @change="$emit(\'update:modelValue\', $event.target.value)"><slot /></select>'
+  template:
+    '<select :multiple="multiple" :data-placeholder="placeholder" :value="modelValue" @change="$emit(\'update:modelValue\', multiple ? Array.from($event.target.selectedOptions).map(option => option.value) : $event.target.value)"><slot /></select>'
 });
 
 const ElOptionStub = defineComponent({
@@ -127,6 +128,7 @@ const users: ManagedAuthUser[] = [
     displayName: "系统管理员",
     role: "admin",
     staffId: null,
+    managedStaffIds: [],
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -137,6 +139,7 @@ const users: ManagedAuthUser[] = [
     displayName: "排班管理员",
     role: "scheduler",
     staffId: "staff-head",
+    managedStaffIds: [],
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -147,6 +150,7 @@ const users: ManagedAuthUser[] = [
     displayName: "停用绑定账号",
     role: "viewer",
     staffId: "staff-disabled",
+    managedStaffIds: [],
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -157,6 +161,7 @@ const users: ManagedAuthUser[] = [
     displayName: "未知绑定账号",
     role: "viewer",
     staffId: "staff-missing",
+    managedStaffIds: [],
     enabled: true,
     createdAt: "2026-06-19T00:00:00.000Z",
     updatedAt: "2026-06-19T00:00:00.000Z"
@@ -278,6 +283,30 @@ describe("ManagementDrawer", () => {
           role: "admin",
           enabled: true,
           staffId: "staff-head"
+        })
+      ]
+    ]);
+  });
+
+  it("renders and emits managed staff ids for scheduler accounts", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.text()).toContain("可管理人员");
+
+    await wrapper
+      .findAll(".management-mobile-user")
+      .find((item) => item.text().includes("排班管理员"))!
+      .trigger("click");
+
+    const managedSelect = wrapper.get('select[data-placeholder="可管理人员"]');
+    await managedSelect.setValue("staff-head");
+    await wrapper.get('[data-testid="save-user-button"]').trigger("click");
+
+    expect(wrapper.emitted("saveUser")).toEqual([
+      [
+        expect.objectContaining({
+          username: "scheduler",
+          managedStaffIds: ["staff-head"]
         })
       ]
     ]);

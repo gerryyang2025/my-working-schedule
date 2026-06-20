@@ -65,6 +65,7 @@ const userDraft = reactive<SaveAuthUserInput>({
   role: "viewer",
   enabled: true,
   staffId: null,
+  managedStaffIds: [],
   password: ""
 });
 
@@ -80,6 +81,9 @@ const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday)
 const isExistingUserDraft = computed(() => props.users.some((user) => user.id === userDraft.id));
 const staffById = computed(() => new Map(props.data.staff.map((staff) => [staff.id, staff])));
 const bindableStaff = computed(() => props.data.staff.filter((staff) => staff.enabled || staff.id === userDraft.staffId));
+const manageableStaff = computed(() =>
+  props.data.staff.filter((staff) => staff.enabled || userDraft.managedStaffIds?.includes(staff.id))
+);
 const hasActiveAuditFilters = computed(() => Boolean(auditFilters.username || auditFilters.action || auditFilters.keyword));
 const auditEmptyText = computed(() =>
   hasActiveAuditFilters.value ? "当前筛选无结果，可清空筛选查看最新审计" : "暂无审计日志"
@@ -118,6 +122,16 @@ function staffBindingLabel(staffId: string | null | undefined): string {
   }
 
   return `${staff.name} / ${staff.jobId}${staff.enabled ? "" : "（已停用）"}`;
+}
+
+function managedStaffLabel(staffIds: string[] | undefined): string {
+  const ids = staffIds ?? [];
+  if (ids.length === 0) {
+    return "未配置";
+  }
+
+  const labels = ids.map((staffId) => staffBindingLabel(staffId));
+  return labels.length > 2 ? `${labels.slice(0, 2).join("、")} 等 ${labels.length} 人` : labels.join("、");
 }
 
 function resetStaffDraft(): void {
@@ -162,6 +176,7 @@ function resetUserDraft(): void {
     role: "viewer",
     enabled: true,
     staffId: null,
+    managedStaffIds: [],
     password: ""
   });
 }
@@ -209,6 +224,7 @@ function loadUserDraft(user: ManagedAuthUser): void {
     role: user.role,
     enabled: user.enabled,
     staffId: user.staffId,
+    managedStaffIds: [...user.managedStaffIds],
     password: ""
   });
 }
@@ -220,7 +236,8 @@ function emitSaveUser(): void {
     displayName: userDraft.displayName,
     role: userDraft.role,
     enabled: userDraft.enabled,
-    staffId: userDraft.staffId || null
+    staffId: userDraft.staffId || null,
+    managedStaffIds: userDraft.role === "scheduler" ? [...(userDraft.managedStaffIds ?? [])] : []
   };
 
   if (userDraft.password) {
@@ -468,6 +485,11 @@ watch(
               {{ staffBindingLabel(row.staffId) }}
             </template>
           </el-table-column>
+          <el-table-column label="可管理人员" width="170">
+            <template #default="{ row }">
+              {{ row.role === "admin" ? "全部人员" : managedStaffLabel(row.managedStaffIds) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="role" label="角色" width="110" />
           <el-table-column prop="enabled" label="启用" width="80" />
         </el-table>
@@ -488,6 +510,7 @@ watch(
             <span class="management-mobile-meta">
               <span>{{ roleLabel(user.role) }}</span>
               <span>{{ staffBindingLabel(user.staffId) }}</span>
+              <span>{{ user.role === "admin" ? "管理全部人员" : managedStaffLabel(user.managedStaffIds) }}</span>
               <span>{{ user.enabled ? "启用" : "停用" }}</span>
             </span>
           </button>
@@ -505,12 +528,31 @@ watch(
               :value="staff.id"
             />
           </el-select>
-          <p class="management-help-text">当前仅建立身份绑定，不会改变账号权限。</p>
+          <p class="management-help-text">
+            绑定人员用于标识账号本人；可管理人员决定排班和月结可操作范围。
+          </p>
           <el-select v-model="userDraft.role" placeholder="角色" :disabled="userSaving">
             <el-option label="系统管理员" value="admin" />
             <el-option label="排班管理员" value="scheduler" />
             <el-option label="只读查看" value="viewer" />
           </el-select>
+          <el-select
+            v-if="userDraft.role === 'scheduler'"
+            v-model="userDraft.managedStaffIds"
+            placeholder="可管理人员"
+            :multiple="true"
+            clearable
+            :disabled="userSaving"
+          >
+            <el-option
+              v-for="staff in manageableStaff"
+              :key="staff.id"
+              :label="`${staff.name} / ${staff.jobId} / ${staffTypeLabel(staff.type)}${staff.enabled ? '' : '（已停用）'}`"
+              :value="staff.id"
+            />
+          </el-select>
+          <p v-else-if="userDraft.role === 'admin'" class="management-help-text">系统管理员默认可管理全部人员。</p>
+          <p v-else class="management-help-text">只读账号可以查看全科排班，但不能编辑排班和月结。</p>
           <el-checkbox v-model="userDraft.enabled" :disabled="userSaving">启用</el-checkbox>
           <el-input
             v-model="userDraft.password"
