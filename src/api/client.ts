@@ -34,6 +34,13 @@ export interface PasswordChangeInput {
   newPassword: string;
 }
 
+export type CopyPreviousWeekMode = "skip" | "overwrite";
+
+export interface CopyPreviousWeekScheduleResult {
+  copied: number;
+  skipped: number;
+}
+
 export interface AuditLogEntry {
   id: string;
   occurredAt: string;
@@ -267,6 +274,19 @@ export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<Pub
     method: "PUT",
     body: JSON.stringify(entry)
   });
+}
+
+export function copyPreviousWeekSchedule(payload: {
+  weekStart: string;
+  mode: CopyPreviousWeekMode;
+}): Promise<{ data: PublicAppData; result: CopyPreviousWeekScheduleResult }> {
+  return requestJson<{ data: PublicAppData; result: CopyPreviousWeekScheduleResult }>(
+    "/api/data/schedule-copy-previous-week",
+    {
+      method: "POST",
+      body: JSON.stringify(payload)
+    }
+  );
 }
 
 export async function saveMonthlySettlement(month: string, bonusPool: number): Promise<PublicAppData> {

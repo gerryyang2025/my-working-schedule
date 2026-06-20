@@ -1,9 +1,9 @@
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { createMonthlySettlement } from "../src/lib/bonus";
 import { calculateMonthlySummary } from "../src/lib/calculation";
-import { getMonthDays } from "../src/lib/date";
+import { addDays, getMonthDays, getWeekRange, listDateKeys } from "../src/lib/date";
 import { validateScheduleShiftIds } from "../src/lib/validation";
-import type { AppData, Holiday, Shift, StaffMember } from "./types";
+import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
 import { AuthStoreError, type AuditLogQuery, type AuthStore, type SaveAuthUserInput } from "./auth-store";
 import { createMemoryAuthStore } from "./auth-store";
@@ -24,6 +24,18 @@ interface ScheduleEntryPayload {
   staffId: string;
   shiftIds: string[];
   note: string | null | undefined;
+}
+
+type CopyPreviousWeekMode = "skip" | "overwrite";
+
+interface CopyPreviousWeekPayload {
+  weekStart: string;
+  mode: CopyPreviousWeekMode;
+}
+
+interface CopyPreviousWeekResult {
+  copied: number;
+  skipped: number;
 }
 
 type PayloadResult<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -458,6 +470,86 @@ function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPa
   }
 
   return { ok: true, value: { date, staffId, shiftIds, note: parsedNote } };
+}
+
+function parseCopyPreviousWeekPayload(body: unknown): PayloadResult<CopyPreviousWeekPayload> {
+  if (!isRecord(body)) {
+    return { ok: false, message: "复制排班信息不完整" };
+  }
+
+  const { weekStart, mode } = body;
+  if (!isNonEmptyString(weekStart) || (mode !== "skip" && mode !== "overwrite")) {
+    return { ok: false, message: "复制排班信息不完整" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      weekStart,
+      mode
+    }
+  };
+}
+
+function copyPreviousWeekEntries(
+  data: AppData,
+  user: AuthUser | undefined,
+  weekStart: string,
+  mode: CopyPreviousWeekMode
+): { data: AppData; result: CopyPreviousWeekResult } {
+  const weekRange = getWeekRange(weekStart);
+  const targetDates = listDateKeys(weekRange.start, weekRange.end);
+  const sourceDatesByTarget = new Map(targetDates.map((targetDate) => [targetDate, addDays(targetDate, -7)]));
+  const enabledManageableStaff = data.staff.filter((staff) => staff.enabled && canManageStaff(user, staff.id));
+  const enabledManageableStaffIds = new Set(enabledManageableStaff.map((staff) => staff.id));
+  const sourceDates = new Set(sourceDatesByTarget.values());
+  const entriesById = new Map(data.scheduleEntries.map((entry) => [entry.id, entry]));
+  let copied = 0;
+  let skipped = 0;
+
+  for (const sourceEntry of data.scheduleEntries) {
+    if (!sourceDates.has(sourceEntry.date) || !enabledManageableStaffIds.has(sourceEntry.staffId)) {
+      continue;
+    }
+
+    const targetDate = addDays(sourceEntry.date, 7);
+    if (!sourceDatesByTarget.has(targetDate)) {
+      continue;
+    }
+
+    const targetId = `${targetDate}__${sourceEntry.staffId}`;
+    if (mode === "skip" && entriesById.has(targetId)) {
+      skipped += 1;
+      continue;
+    }
+
+    if (isMonthSettled(data, getMonthKey(targetDate))) {
+      throw new HttpResponseError(400, "该月份已月结，不能修改排班");
+    }
+
+    const validation = validateScheduleShiftIds(sourceEntry.shiftIds, data.shifts);
+    if (!validation.ok) {
+      throw new HttpResponseError(400, validation.message);
+    }
+
+    const nextEntry: ScheduleEntry = {
+      id: targetId,
+      date: targetDate,
+      staffId: sourceEntry.staffId,
+      shiftIds: [...sourceEntry.shiftIds],
+      note: sourceEntry.note ?? ""
+    };
+    entriesById.set(targetId, nextEntry);
+    copied += 1;
+  }
+
+  return {
+    data: {
+      ...data,
+      scheduleEntries: [...entriesById.values()]
+    },
+    result: { copied, skipped }
+  };
 }
 
 export function createRoutes(storage: StorageAdapter, options: RouteOptions): Router {
@@ -897,6 +989,38 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         `保存排班：${date} ${staffId}`
       );
       response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/data/schedule-copy-previous-week", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const payload = parseCopyPreviousWeekPayload(request.body);
+      if (payload.ok === false) {
+        response.status(400).json({ message: payload.message });
+        return;
+      }
+
+      if (!isValidDateKey(payload.value.weekStart)) {
+        response.status(400).json({ message: "日期格式不正确" });
+        return;
+      }
+
+      let copyResult: CopyPreviousWeekResult = { copied: 0, skipped: 0 };
+      const nextData = await storage.update((data) => {
+        const copied = copyPreviousWeekEntries(data, request.authUser, payload.value.weekStart, payload.value.mode);
+        copyResult = copied.result;
+        return copied.data;
+      });
+      await recordAudit(
+        request,
+        "data.schedule_entry.copy_previous_week",
+        "week",
+        getWeekRange(payload.value.weekStart).start,
+        `复制上一周排班：${getWeekRange(payload.value.weekStart).start}，复制 ${copyResult.copied} 个，跳过 ${copyResult.skipped} 个`
+      );
+      response.json({ data: toPublicData(nextData), result: copyResult });
     } catch (error) {
       handleRouteError(error, response, next);
     }

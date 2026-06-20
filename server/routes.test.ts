@@ -1244,6 +1244,206 @@ describe.sequential("API routes", () => {
     expect(response.body.scheduleEntries).toEqual([]);
   });
 
+  it("copies previous week schedule entries into the selected week", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-08__staff-nurse-001",
+        date: "2026-06-08",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "source monday"
+      },
+      {
+        id: "2026-06-09__staff-nurse-001",
+        date: "2026-06-09",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: ""
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-copy-previous-week")
+      .set(await adminHeaders(app))
+      .send({ weekStart: "2026-06-15", mode: "skip" })
+      .expect(200);
+
+    expect(response.body.result).toEqual({ copied: 2, skipped: 0 });
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: "source monday"
+        }),
+        expect.objectContaining({
+          id: "2026-06-16__staff-nurse-001",
+          date: "2026-06-16",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-p1"],
+          note: ""
+        })
+      ])
+    );
+  });
+
+  it("skips existing target entries when copying previous week in skip mode", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-08__staff-nurse-001",
+        date: "2026-06-08",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "source"
+      },
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "keep target"
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-copy-previous-week")
+      .set(await adminHeaders(app))
+      .send({ weekStart: "2026-06-15", mode: "skip" })
+      .expect(200);
+
+    expect(response.body.result).toEqual({ copied: 0, skipped: 1 });
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "2026-06-15__staff-nurse-001",
+          shiftIds: ["shift-p1"],
+          note: "keep target"
+        })
+      ])
+    );
+  });
+
+  it("overwrites existing target entries when copying previous week in overwrite mode", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-08__staff-nurse-001",
+        date: "2026-06-08",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: "source"
+      },
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "old target"
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-copy-previous-week")
+      .set(await adminHeaders(app))
+      .send({ weekStart: "2026-06-15", mode: "overwrite" })
+      .expect(200);
+
+    expect(response.body.result).toEqual({ copied: 1, skipped: 0 });
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "2026-06-15__staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: "source"
+        })
+      ])
+    );
+  });
+
+  it("copies only scheduler-managed staff from the previous week", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-08__staff-nurse-001",
+        date: "2026-06-08",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: ""
+      },
+      {
+        id: "2026-06-08__staff-head-001",
+        date: "2026-06-08",
+        staffId: "staff-head-001",
+        shiftIds: ["shift-p1"],
+        note: ""
+      }
+    ];
+    const app = createTestApp(initialData);
+    const schedulerHeaders = await createUserAndLogin(app, {
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      managedStaffIds: ["staff-nurse-001"]
+    });
+
+    const response = await request(app)
+      .post("/api/data/schedule-copy-previous-week")
+      .set(schedulerHeaders)
+      .send({ weekStart: "2026-06-15", mode: "skip" })
+      .expect(200);
+
+    expect(response.body.result).toEqual({ copied: 1, skipped: 0 });
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "2026-06-15__staff-nurse-001" })])
+    );
+    expect(response.body.data.scheduleEntries).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "2026-06-15__staff-head-001" })])
+    );
+  });
+
+  it("rejects copying previous week into a settled month", async () => {
+    const initialData = createSeedData();
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-08__staff-nurse-001",
+        date: "2026-06-08",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-a1"],
+        note: ""
+      }
+    ];
+    initialData.monthlySettlements = [
+      {
+        id: "settlement-2026-06",
+        month: "2026-06",
+        monthStart: "2026-06-01",
+        monthEnd: "2026-06-30",
+        totalDays: 30,
+        bonusPool: 0,
+        coefficientTotal: 0,
+        settledAt: "2026-06-30T00:00:00.000Z",
+        rows: []
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-copy-previous-week")
+      .set(await adminHeaders(app))
+      .send({ weekStart: "2026-06-15", mode: "skip" })
+      .expect(400);
+
+    expect(response.body.message).toBe("该月份已月结，不能修改排班");
+  });
+
   it("rejects malformed schedule-entry payloads", async () => {
     const app = createTestApp();
     const response = await request(app)

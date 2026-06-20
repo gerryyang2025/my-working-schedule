@@ -13,6 +13,7 @@ import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
 import {
   changePassword,
+  copyPreviousWeekSchedule,
   deleteHoliday,
   deleteMonthlySettlement,
   getCurrentUser,
@@ -32,6 +33,7 @@ import type {
   AuditLogEntry,
   AuditLogQuery,
   AuthUser,
+  CopyPreviousWeekMode,
   ManagedAuthUser,
   PasswordChangeInput,
   PublicAppData,
@@ -82,6 +84,7 @@ const activeWorkbenchTab = ref<WorkbenchTab>("schedule");
 const passwordDialogOpen = ref(false);
 const passwordChanging = ref(false);
 const passwordChangeError = ref("");
+const copyingPreviousWeek = ref(false);
 
 const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
@@ -159,6 +162,15 @@ const editableStaffIds = computed(() => {
   return [];
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
+const currentWeekEditableEntryCount = computed(() => {
+  if (!data.value) {
+    return 0;
+  }
+
+  const weekDayKeys = new Set(scheduleDays.value.map((day) => day.key));
+  const editableIds = new Set(editableStaffIds.value);
+  return data.value.scheduleEntries.filter((entry) => weekDayKeys.has(entry.date) && editableIds.has(entry.staffId)).length;
+});
 const canOperateCurrentSettlement = computed(() => {
   if (!currentUser.value || isBonusRangeMode.value) {
     return false;
@@ -312,6 +324,62 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     passwordChangeError.value = caughtError instanceof Error ? caughtError.message : "密码修改失败";
   } finally {
     passwordChanging.value = false;
+  }
+}
+
+async function resolveCopyPreviousWeekMode(): Promise<CopyPreviousWeekMode | null> {
+  if (currentWeekEditableEntryCount.value === 0) {
+    return "skip";
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      "当前周已有排班。选择覆盖会用上一周同人员同星期的排班替换已有格子，选择跳过会保留当前周已有格子。",
+      "复制上一周排班",
+      {
+        type: "warning",
+        confirmButtonText: "覆盖已有排班",
+        cancelButtonText: "跳过已有排班",
+        distinguishCancelAndClose: true
+      }
+    );
+    return "overwrite";
+  } catch (action) {
+    return action === "cancel" ? "skip" : null;
+  }
+}
+
+async function handleCopyPreviousWeek(): Promise<void> {
+  if (!data.value || !canEditSchedule.value || copyingPreviousWeek.value) {
+    return;
+  }
+
+  const mode = await resolveCopyPreviousWeekMode();
+  if (!mode) {
+    return;
+  }
+
+  copyingPreviousWeek.value = true;
+  try {
+    const response = await copyPreviousWeekSchedule({ weekStart: selectedWeek.value.start, mode });
+    data.value = response.data;
+    const { copied, skipped } = response.result;
+    if (copied > 0) {
+      const skippedText = skipped > 0 ? `，跳过 ${skipped} 个已有排班` : "";
+      ElMessage.success(`已复制 ${copied} 个排班${skippedText}`);
+      return;
+    }
+
+    if (skipped > 0) {
+      ElMessage.info(`没有新的排班可复制，已跳过 ${skipped} 个已有排班`);
+      return;
+    }
+
+    ElMessage.info("上一周没有可复制的排班");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "复制上一周排班失败");
+  } finally {
+    copyingPreviousWeek.value = false;
   }
 }
 
@@ -818,6 +886,16 @@ onMounted(async () => {
             class="workbench-tab-panel"
             data-testid="workbench-panel-schedule"
           >
+            <div class="schedule-actions">
+              <button
+                data-testid="copy-previous-week-button"
+                type="button"
+                :disabled="!canEditSchedule || copyingPreviousWeek"
+                @click="handleCopyPreviousWeek"
+              >
+                {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
+              </button>
+            </div>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid
               :staff="data.staff"

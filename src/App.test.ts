@@ -5,6 +5,7 @@ import App from "./App.vue";
 import type { AuthUser, PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
+  copyPreviousWeekSchedule: vi.fn(),
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
@@ -30,6 +31,7 @@ const pdfMocks = vi.hoisted(() => ({
 const elementPlusMocks = vi.hoisted(() => ({
   ElMessage: {
     error: vi.fn(),
+    info: vi.fn(),
     success: vi.fn(),
     warning: vi.fn()
   },
@@ -841,6 +843,73 @@ describe("App", () => {
     await nextTick();
 
     expect(wrapper.find('[data-testid="cell-editor"]').exists()).toBe(false);
+  });
+
+  it("copies the previous week in skip mode without confirmation when the current week is empty", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    apiMocks.copyPreviousWeekSchedule.mockResolvedValue({
+      data: structuredClone(testData),
+      result: { copied: 1, skipped: 0 }
+    });
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "2026-06-08__staff-nurse-001",
+          date: "2026-06-08",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: ""
+        }
+      ]
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="copy-previous-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).not.toHaveBeenCalled();
+    expect(apiMocks.copyPreviousWeekSchedule).toHaveBeenCalledWith({ weekStart: "2026-06-15", mode: "skip" });
+    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("已复制 1 个排班");
+    vi.useRealTimers();
+  });
+
+  it("asks before copying previous week over existing current week entries", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
+    apiMocks.copyPreviousWeekSchedule.mockResolvedValue({
+      data: structuredClone(testData),
+      result: { copied: 1, skipped: 0 }
+    });
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "2026-06-08__staff-nurse-001",
+          date: "2026-06-08",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: ""
+        },
+        {
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-rest"],
+          note: "keep or overwrite"
+        }
+      ]
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="copy-previous-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalled();
+    expect(apiMocks.copyPreviousWeekSchedule).toHaveBeenCalledWith({ weekStart: "2026-06-15", mode: "overwrite" });
+    vi.useRealTimers();
   });
 
   it("shows scheduling content by default and switches workbench tabs without changing the selected date", async () => {
