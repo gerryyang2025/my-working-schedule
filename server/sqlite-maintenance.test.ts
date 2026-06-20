@@ -302,4 +302,51 @@ describe("SQLite maintenance", () => {
     expect(check.integrity).toBe("ok");
     expect(check.missingTables).toContain("app_settings");
   });
+
+  it("returns not ok when checking a SQLite database with legacy monthly settlement row columns", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.exec(`
+        drop table monthly_settlement_rows;
+
+        create table monthly_settlement_rows (
+          settlement_id text not null references monthly_settlements(id) on delete cascade,
+          position integer not null,
+          staff_id text not null,
+          staff_name text not null,
+          staff_job_id text not null,
+          staff_type text not null check (staff_type in ('nurse', 'clerk', 'head_nurse')),
+          attendance_shifts integer not null,
+          overtime_shifts integer not null,
+          coefficient_total real,
+          coefficient_excluded_reason text not null,
+          bonus_amount real not null,
+          bonus_excluded_reason text not null,
+          primary key(settlement_id, position),
+          unique(settlement_id, staff_id)
+        );
+      `);
+    } finally {
+      db.close();
+    }
+
+    const legacyCheck = await checkSqliteDatabase({ sqlitePath });
+
+    expect(legacyCheck.ok).toBe(false);
+    expect(legacyCheck.integrity).toBe("ok");
+    expect(legacyCheck.missingTables).toEqual([]);
+    expect(legacyCheck.missingColumns).toEqual([
+      "monthly_settlement_rows.required_shifts",
+      "monthly_settlement_rows.attendance_balance"
+    ]);
+
+    await initSqliteDatabase({ sqlitePath });
+    const migratedCheck = await checkSqliteDatabase({ sqlitePath });
+
+    expect(migratedCheck.ok).toBe(true);
+    expect(migratedCheck.missingColumns).toEqual([]);
+  });
 });

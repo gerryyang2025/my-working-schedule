@@ -4,7 +4,7 @@ import { join } from "node:path";
 import Database from "better-sqlite3";
 import { afterEach, describe, expect, it } from "vitest";
 import { createSqliteAuthStore } from "./sqlite/auth-store";
-import { initializeSqliteSchema, listMissingCoreTables } from "./sqlite/schema";
+import { initializeSqliteSchema, listMissingCoreTables, SQLITE_SCHEMA_VERSION } from "./sqlite/schema";
 
 const tempDirs: string[] = [];
 
@@ -153,8 +153,8 @@ describe("SQLite auth store", () => {
         expect.arrayContaining([expect.objectContaining({ table: "staff", from: "staff_id", to: "id" })])
       );
 
-      const migration = db.prepare("select version from schema_migrations where version = 4").get();
-      expect(migration).toEqual(expect.objectContaining({ version: 4 }));
+      const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
+      expect(migration).toEqual(expect.objectContaining({ version: SQLITE_SCHEMA_VERSION }));
     } finally {
       db.close();
     }
@@ -242,8 +242,8 @@ describe("SQLite auth store", () => {
         ])
       );
 
-      const migration = db.prepare("select version from schema_migrations where version = 4").get();
-      expect(migration).toEqual(expect.objectContaining({ version: 4 }));
+      const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
+      expect(migration).toEqual(expect.objectContaining({ version: SQLITE_SCHEMA_VERSION }));
     } finally {
       db.close();
     }

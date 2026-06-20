@@ -3,7 +3,7 @@ import { existsSync } from "node:fs";
 import * as fsPromises from "node:fs/promises";
 import { dirname, join } from "node:path";
 import Database from "better-sqlite3";
-import { checkSqliteIntegrity, initializeSqliteSchema, listMissingCoreTables } from "./schema";
+import { checkSqliteIntegrity, initializeSqliteSchema, listMissingCoreColumns, listMissingCoreTables } from "./schema";
 
 export const sqliteMaintenanceFs = {
   copyFile: fsPromises.copyFile,
@@ -28,6 +28,13 @@ export interface RestoreOptions {
 
 export interface CheckOptions {
   sqlitePath: string;
+}
+
+export interface CheckResult {
+  ok: boolean;
+  integrity: string;
+  missingTables: string[];
+  missingColumns: string[];
 }
 
 function timestamp(): string {
@@ -88,13 +95,15 @@ function ensureDefaultSettings(db: Database.Database): void {
   db.prepare("insert or ignore into app_settings (key, value) values (?, ?)").run("version", "1");
 }
 
-function checkOpenSqliteDatabase(db: Database.Database): { ok: boolean; integrity: string; missingTables: string[] } {
+function checkOpenSqliteDatabase(db: Database.Database): CheckResult {
   const integrity = checkSqliteIntegrity(db);
   const missingTables = listMissingCoreTables(db);
+  const missingColumns = listMissingCoreColumns(db);
   return {
-    ok: integrity === "ok" && missingTables.length === 0,
+    ok: integrity === "ok" && missingTables.length === 0 && missingColumns.length === 0,
     integrity,
-    missingTables
+    missingTables,
+    missingColumns
   };
 }
 
@@ -102,7 +111,7 @@ function assertValidOpenSqliteDatabase(db: Database.Database, label: string): vo
   const check = checkOpenSqliteDatabase(db);
   if (!check.ok) {
     throw new Error(
-      `${label} is not a valid SQLite database: integrity=${check.integrity}; missingTables=${check.missingTables.join(",")}`
+      `${label} is not a valid SQLite database: integrity=${check.integrity}; missingTables=${check.missingTables.join(",")}; missingColumns=${check.missingColumns.join(",")}`
     );
   }
 }
@@ -171,9 +180,7 @@ export async function restoreSqliteBackup(options: RestoreOptions): Promise<stri
   }
 }
 
-export async function checkSqliteDatabase(
-  options: CheckOptions
-): Promise<{ ok: boolean; integrity: string; missingTables: string[] }> {
+export async function checkSqliteDatabase(options: CheckOptions): Promise<CheckResult> {
   const db = new Database(options.sqlitePath, { fileMustExist: true });
   try {
     return checkOpenSqliteDatabase(db);

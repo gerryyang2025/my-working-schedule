@@ -254,3 +254,13 @@ export function listMissingCoreTables(db: Database.Database): string[] {
   const names = new Set(rows.map((row) => row.name));
   return expected.filter((name) => !names.has(name));
 }
+
+export function listMissingCoreColumns(db: Database.Database): string[] {
+  const expected = [
+    { tableName: "monthly_settlement_rows", columnName: "required_shifts" },
+    { tableName: "monthly_settlement_rows", columnName: "attendance_balance" }
+  ];
+  return expected
+    .filter(({ tableName, columnName }) => !tableHasColumn(db, tableName, columnName))
+    .map(({ tableName, columnName }) => `${tableName}.${columnName}`);
+}
