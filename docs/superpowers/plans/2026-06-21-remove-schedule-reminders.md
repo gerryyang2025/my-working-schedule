@@ -249,10 +249,10 @@ git rm src/lib/schedule-anomalies.ts src/lib/schedule-anomalies.test.ts
 Run:
 
 ```bash
-rg -n "schedule-anomalies|ScheduleAnomaly|calculateWeeklyScheduleAnomalies|schedule-anomaly" src
+rg -n "schedule-anomalies|ScheduleAnomaly|calculateWeeklyScheduleAnomalies|schedule-anomaly" src --glob "!src/App.test.ts"
 ```
 
-Expected: no output.
+Expected: no output. `src/App.test.ts` is excluded because it intentionally keeps the old test ids in a negative regression test.
 
 - [ ] **Step 3: Verify month-end settlement checks still pass**
 
@@ -365,10 +365,10 @@ Delete this CSS block inside the mobile media query:
 Run:
 
 ```bash
-rg -n "schedule-anomaly" src
+rg -n "schedule-anomaly" src --glob "!src/App.test.ts"
 ```
 
-Expected: no output.
+Expected: no output. `src/App.test.ts` is excluded because it intentionally keeps the old test ids in a negative regression test.
 
 - [ ] **Step 4: Commit style cleanup**
 
@@ -401,10 +401,10 @@ Keep this bullet in `### 1.4 月度汇总、奖金分配和月结` unchanged:
 Run:
 
 ```bash
-rg -n "排班提醒|当前周排班异常提醒|schedule-anomaly" docs/功能跟进清单.md src
+rg -n "排班提醒|当前周排班异常提醒|schedule-anomaly" docs/功能跟进清单.md src --glob "!src/App.test.ts"
 ```
 
-Expected: no output.
+Expected: no output. `src/App.test.ts` is excluded because it intentionally keeps the old test ids in a negative regression test.
 
 Run:
 
@@ -461,10 +461,10 @@ Expected: PASS. If `server/routes.test.ts` fails with `listen EPERM` in the sand
 Run:
 
 ```bash
-rg -n "排班提醒|当前周排班异常提醒|schedule-anomaly|schedule-anomalies|ScheduleAnomaly|calculateWeeklyScheduleAnomalies" src docs/功能跟进清单.md
+rg -n "排班提醒|当前周排班异常提醒|schedule-anomaly|schedule-anomalies|ScheduleAnomaly|calculateWeeklyScheduleAnomalies" src docs/功能跟进清单.md --glob "!src/App.test.ts"
 ```
 
-Expected: no output.
+Expected: no output. `src/App.test.ts` is excluded because it intentionally keeps the old test ids in a negative regression test.
 
 - [ ] **Step 5: Commit verification-only cleanup if needed**
 
