@@ -10,6 +10,7 @@ import {
   backupSqliteDatabase,
   checkSqliteDatabase,
   initSqliteDatabase,
+  resetSqliteDatabase,
   restoreSqliteBackup,
   sqliteMaintenanceFs
 } from "./sqlite/maintenance";
@@ -41,6 +42,102 @@ function readSqliteData(sqlitePath: string) {
   } finally {
     db.close();
   }
+}
+
+function readScalarNumber(sqlitePath: string, sql: string): number {
+  const db = new Database(sqlitePath, { fileMustExist: true });
+  try {
+    const row = db.prepare(sql).get() as { value: number };
+    return row.value;
+  } finally {
+    db.close();
+  }
+}
+
+function readRows<T>(sqlitePath: string, sql: string): T[] {
+  const db = new Database(sqlitePath, { fileMustExist: true });
+  try {
+    return db.prepare(sql).all() as T[];
+  } finally {
+    db.close();
+  }
+}
+
+function insertAuthRuntimeRows(sqlitePath: string): void {
+  const db = new Database(sqlitePath, { fileMustExist: true });
+  try {
+    db.pragma("foreign_keys = ON");
+    db.exec(`
+      insert into users (
+        id, username, display_name, role, staff_id, password_hash, enabled, created_at, updated_at
+      ) values (
+        'user-scheduler', 'scheduler', '排班员', 'scheduler', 'staff-nurse-001', 'hash', 1,
+        '2026-06-21T00:00:00.000Z', '2026-06-21T00:00:00.000Z'
+      );
+
+      insert into user_managed_staff (user_id, staff_id, created_at, created_by)
+      values ('user-scheduler', 'staff-nurse-001', '2026-06-21T00:00:00.000Z', null);
+
+      insert into user_sessions (id, user_id, token_hash, created_at, expires_at, revoked_at)
+      values (
+        'session-001', 'user-scheduler', 'token-hash',
+        '2026-06-21T00:00:00.000Z', '2026-06-22T00:00:00.000Z', null
+      );
+
+      insert into audit_logs (
+        id, occurred_at, user_id, username, action, target_type, target_id, summary, ip, user_agent
+      ) values (
+        'audit-001', '2026-06-21T00:00:00.000Z', 'user-scheduler', 'scheduler',
+        'data.schedule.update', 'schedule', '2026-06-15__staff-nurse-001',
+        '保存排班', '127.0.0.1', 'vitest'
+      );
+    `);
+  } finally {
+    db.close();
+  }
+}
+
+function createDataWithRuntimeRows(): AppData {
+  const data = createSeedData();
+  data.scheduleEntries = [
+    {
+      id: "2026-06-15__staff-nurse-001",
+      date: "2026-06-15",
+      staffId: "staff-nurse-001",
+      shiftIds: ["shift-a1"],
+      note: "reset candidate"
+    }
+  ];
+  data.monthlySettlements = [
+    {
+      id: "settlement-2026-06",
+      month: "2026-06",
+      monthStart: "2026-06-01",
+      monthEnd: "2026-06-30",
+      totalDays: 30,
+      bonusPool: 1000,
+      coefficientTotal: 1.5,
+      settledAt: "2026-06-30T00:00:00.000Z",
+      rows: [
+        {
+          staffId: "staff-nurse-001",
+          staffName: "李护士",
+          staffJobId: "100001",
+          staffType: "nurse",
+          attendanceShifts: 1,
+          requiredShifts: 1,
+          attendanceBalance: 0,
+          overtimeShifts: 0,
+          coefficientTotal: 1.5,
+          coefficientExcludedReason: "",
+          bonusAmount: 1000,
+          bonusExcludedReason: ""
+        }
+      ]
+    }
+  ];
+  data.settings.defaultRequiredShiftsPerWeek = 4;
+  return data;
 }
 
 async function listDbBackups(backupPath: string) {
@@ -284,6 +381,66 @@ describe("SQLite maintenance", () => {
     expect(await readFile(sqlitePath)).toEqual(before);
     expect(await listDbBackups(backupPath)).toEqual([]);
     expect(readSqliteData(sqlitePath).scheduleEntries).toEqual(current.scheduleEntries);
+  });
+
+  it("rejects reset when confirmation is false", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const data = createDataWithRuntimeRows();
+    writeSqliteData(sqlitePath, data);
+    const before = await readFile(sqlitePath);
+
+    await expect(resetSqliteDatabase({ sqlitePath, backupPath, confirm: false })).rejects.toThrow(/confirm/i);
+
+    expect(await readFile(sqlitePath)).toEqual(before);
+    expect(await listDbBackups(backupPath)).toEqual([]);
+    expect(readSqliteData(sqlitePath).scheduleEntries).toEqual(data.scheduleEntries);
+  });
+
+  it("backs up the database then clears only runtime data during reset", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const data = createDataWithRuntimeRows();
+    writeSqliteData(sqlitePath, data);
+    insertAuthRuntimeRows(sqlitePath);
+
+    const result = await resetSqliteDatabase({ sqlitePath, backupPath, confirm: true });
+    const backupFiles = await listDbBackups(backupPath);
+    const loaded = readSqliteData(sqlitePath);
+
+    expect(result.sqlitePath).toBe(sqlitePath);
+    expect(result.backupFile.startsWith(backupPath)).toBe(true);
+    expect(result.clearedTables).toEqual([
+      "schedule_entry_shifts",
+      "schedule_entries",
+      "monthly_settlement_rows",
+      "monthly_settlements",
+      "user_sessions",
+      "audit_logs"
+    ]);
+    expect(result.check.ok).toBe(true);
+    expect(backupFiles).toHaveLength(1);
+    expect(readSqliteData(join(backupPath, backupFiles[0])).scheduleEntries).toEqual(data.scheduleEntries);
+    expect(readSqliteData(join(backupPath, backupFiles[0])).monthlySettlements).toEqual(data.monthlySettlements);
+
+    expect(loaded.scheduleEntries).toEqual([]);
+    expect(loaded.monthlySettlements).toEqual([]);
+    expect(loaded.staff).toEqual(data.staff);
+    expect(loaded.shifts).toEqual(data.shifts);
+    expect(loaded.holidays).toEqual(data.holidays);
+    expect(loaded.settings).toEqual(data.settings);
+
+    expect(readScalarNumber(sqlitePath, "select count(*) as value from user_sessions")).toBe(0);
+    expect(readScalarNumber(sqlitePath, "select count(*) as value from audit_logs")).toBe(0);
+    expect(readRows(sqlitePath, "select username, staff_id from users order by username")).toEqual([
+      { username: "scheduler", staff_id: "staff-nurse-001" }
+    ]);
+    expect(readRows(sqlitePath, "select user_id, staff_id from user_managed_staff order by user_id, staff_id")).toEqual([
+      { user_id: "user-scheduler", staff_id: "staff-nurse-001" }
+    ]);
+    expect(readRows(sqlitePath, "pragma foreign_key_check")).toEqual([]);
   });
 
   it("returns not ok when checking a SQLite database with missing tables", async () => {
