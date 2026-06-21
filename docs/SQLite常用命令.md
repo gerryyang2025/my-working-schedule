@@ -110,7 +110,7 @@ sqlite3 /var/lib/my-working-schedule/schedule.db "select count(*) from users;"
 
 ```bash
 sqlite3 /var/lib/my-working-schedule/schedule.db \
-  "select username, display_name, role, staff_id, enabled from users order by username;"
+"select id, username, display_name, role, staff_id, enabled from users order by username;"
 ```
 
 查看已绑定账号及人员姓名、工号：
@@ -132,7 +132,8 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 查看账号可管理人员关系：
 
 ```bash
-sqlite3 /var/lib/my-working-schedule/schedule.db "select user_id, staff_id, created_at, created_by from user_managed_staff order by user_id, staff_id;"
+sqlite3 /var/lib/my-working-schedule/schedule.db \
+"select user_id, staff_id, created_at, created_by from user_managed_staff order by user_id, staff_id;"
 ```
 
 查看可管理人员表结构：
@@ -168,6 +169,13 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 ```bash
 sqlite3 /var/lib/my-working-schedule/schedule.db \
   "select occurred_at, username, action, summary from audit_logs order by occurred_at desc limit 20;"
+```
+
+查看最近账号删除审计日志：
+
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db \
+"select username, action, target_type, target_id, summary from audit_logs where action = 'user.delete' order by occurred_at desc limit 20;"
 ```
 
 按关键词查询审计日志：
