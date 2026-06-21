@@ -47,7 +47,6 @@ import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculati
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
 import { calculateRangeBonusSummary, monthRangeToDates } from "@/lib/range-bonus";
-import { calculateWeeklyScheduleAnomalies, type ScheduleAnomaly } from "@/lib/schedule-anomalies";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
@@ -176,13 +175,6 @@ const currentWeekEditableEntryCount = computed(() => {
   const editableIds = new Set(editableStaffIds.value);
   return data.value.scheduleEntries.filter((entry) => weekDayKeys.has(entry.date) && editableIds.has(entry.staffId)).length;
 });
-const weeklyScheduleAnomalies = computed(() =>
-  data.value ? calculateWeeklyScheduleAnomalies(data.value, scheduleDays.value) : []
-);
-const visibleScheduleAnomalies = computed(() => weeklyScheduleAnomalies.value.slice(0, 8));
-const hiddenScheduleAnomalyCount = computed(() =>
-  Math.max(0, weeklyScheduleAnomalies.value.length - visibleScheduleAnomalies.value.length)
-);
 const restShift = computed(() => findEnabledShift(["休"], ["休息"]));
 const officeShift = computed(() => findEnabledShift(["办公"], ["办公"]));
 const scheduleActionBusy = computed(() => copyingPreviousWeek.value || bulkUpdatingWeek.value);
@@ -688,19 +680,6 @@ function handleEditCell(staffId: string, date: string): void {
   editorOpen.value = true;
 }
 
-function scheduleAnomalyTestId(item: ScheduleAnomaly): string {
-  return item.staffId && item.date ? `schedule-anomaly-item-${item.staffId}-${item.date}` : "schedule-anomaly-item";
-}
-
-function handleScheduleAnomalyClick(item: ScheduleAnomaly): void {
-  if (!item.staffId || !item.date) {
-    return;
-  }
-
-  selectedDate.value = item.date;
-  handleEditCell(item.staffId, item.date);
-}
-
 async function handleEditorSave(shiftIds: string[], note: string): Promise<void> {
   if (!canEditStaffId(editingStaffId.value)) {
     editorOpen.value = false;
@@ -1084,31 +1063,6 @@ onMounted(async () => {
                 批量清空
               </button>
             </div>
-            <section
-              v-if="weeklyScheduleAnomalies.length > 0"
-              class="schedule-anomaly-panel"
-              data-testid="schedule-anomaly-panel"
-            >
-              <div class="schedule-anomaly-summary">
-                <strong>排班提醒 {{ weeklyScheduleAnomalies.length }} 项</strong>
-                <span>仅提醒，不阻止保存。</span>
-              </div>
-              <div class="schedule-anomaly-list">
-                <button
-                  v-for="item in visibleScheduleAnomalies"
-                  :key="`${item.type}-${item.staffId ?? ''}-${item.date ?? ''}-${item.shiftIds?.join('-') ?? ''}`"
-                  class="schedule-anomaly-item"
-                  :data-testid="scheduleAnomalyTestId(item)"
-                  type="button"
-                  @click="handleScheduleAnomalyClick(item)"
-                >
-                  {{ item.message }}
-                </button>
-              </div>
-              <p v-if="hiddenScheduleAnomalyCount > 0" class="schedule-anomaly-more">
-                还有 {{ hiddenScheduleAnomalyCount }} 项提醒，可通过补齐排班后自动消失。
-              </p>
-            </section>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid
               :staff="data.staff"
