@@ -271,4 +271,136 @@ describe("memory auth store", () => {
       expect.objectContaining({ username: "admin", staffId: null })
     );
   });
+
+  it("deletes disabled memory users and clears their sessions while keeping audit logs", async () => {
+    const store = createMemoryAuthStore();
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "测试账号",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password",
+      staffId: "staff-nurse-001",
+      managedStaffIds: ["staff-nurse-001"]
+    });
+    const session = await store.createSession(viewer.id);
+    await store.recordAudit({
+      action: "auth.login.success",
+      actor: viewer,
+      targetType: "user",
+      targetId: viewer.id,
+      summary: "用户 viewer 登录成功",
+      ip: "127.0.0.1",
+      userAgent: "vitest"
+    });
+    await store.saveUser({
+      id: viewer.id,
+      username: "viewer",
+      displayName: "测试账号",
+      role: "viewer",
+      enabled: false,
+      staffId: "staff-nurse-001",
+      managedStaffIds: ["staff-nurse-001"]
+    });
+
+    const deleted = await store.deleteUser({
+      userId: viewer.id,
+      actorUserId: admin!.id,
+      bootstrapUsername: "admin"
+    });
+
+    expect(deleted).toEqual(
+      expect.objectContaining({
+        id: viewer.id,
+        username: "viewer",
+        displayName: "测试账号",
+        role: "viewer",
+        enabled: false,
+        staffId: "staff-nurse-001",
+        managedStaffIds: ["staff-nurse-001"]
+      })
+    );
+    await expect(store.getSession(session.token)).resolves.toBeNull();
+    await expect(store.listUsers()).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: viewer.id })])
+    );
+    await expect(store.listAuditLogs({ username: "viewer", limit: 10 })).resolves.toEqual([
+      expect.objectContaining({
+        action: "auth.login.success",
+        username: "viewer",
+        targetId: viewer.id
+      })
+    ]);
+  });
+
+  it("protects current, bootstrap, enabled, missing, and last-admin memory users from deletion", async () => {
+    const store = createMemoryAuthStore();
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+
+    await expect(
+      store.deleteUser({ userId: admin!.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("不能删除当前登录账号");
+
+    await expect(
+      store.deleteUser({ userId: "missing-user", actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("账号不存在");
+
+    const enabledViewer = await store.saveUser({
+      id: "user-enabled-viewer",
+      username: "enabled-viewer",
+      displayName: "启用账号",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password"
+    });
+    await expect(
+      store.deleteUser({ userId: enabledViewer.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("请先停用账号后再删除");
+
+    const backupAdmin = await store.saveUser({
+      id: "user-backup-admin",
+      username: "backup-admin",
+      displayName: "备用管理员",
+      role: "admin",
+      enabled: true,
+      password: "backup-password"
+    });
+    await store.saveUser({
+      id: backupAdmin.id,
+      username: "backup-admin",
+      displayName: "备用管理员",
+      role: "admin",
+      enabled: false
+    });
+    await expect(
+      store.deleteUser({ userId: backupAdmin.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).resolves.toEqual(expect.objectContaining({ username: "backup-admin" }));
+
+    const secondStore = createMemoryAuthStore();
+    await secondStore.ensureBootstrapAdmin({ username: "root-admin", password: "admin-password" });
+    const rootAdmin = await secondStore.authenticate("root-admin", "admin-password");
+    expect(rootAdmin).not.toBeNull();
+    const bootstrapAdmin = await secondStore.saveUser({
+      id: "user-admin",
+      username: "admin",
+      displayName: "默认管理员",
+      role: "admin",
+      enabled: false,
+      password: "admin-password"
+    });
+    await expect(
+      secondStore.deleteUser({
+        userId: bootstrapAdmin.id,
+        actorUserId: rootAdmin!.id,
+        bootstrapUsername: "admin"
+      })
+    ).rejects.toThrow("默认管理员账号不能删除");
+  });
 });

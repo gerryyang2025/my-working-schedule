@@ -59,6 +59,12 @@ export interface ChangePasswordInput {
   newPassword: string;
 }
 
+export interface DeleteAuthUserInput {
+  userId: string;
+  actorUserId: string;
+  bootstrapUsername: string;
+}
+
 export class AuthStoreError extends Error {
   constructor(
     readonly status: number,
@@ -72,6 +78,7 @@ export interface AuthStore {
   ensureBootstrapAdmin(options: BootstrapAdminOptions): Promise<void>;
   listUsers(): Promise<AuthUser[]>;
   saveUser(input: SaveAuthUserInput): Promise<AuthUser>;
+  deleteUser(input: DeleteAuthUserInput): Promise<AuthUser>;
   authenticate(username: string, password: string): Promise<AuthUser | null>;
   changePassword(input: ChangePasswordInput): Promise<boolean>;
   createSession(userId: string): Promise<AuthSession>;
@@ -202,6 +209,29 @@ export function createMemoryAuthStore(): AuthStore {
     }
   }
 
+  function countOtherEnabledAdmins(userId: string): number {
+    return Array.from(users.values()).filter((user) => user.id !== userId && user.enabled && user.role === "admin").length;
+  }
+
+  function assertCanDeleteUser(input: DeleteAuthUserInput, user: StoredUser | null): StoredUser {
+    if (!user) {
+      throw new AuthStoreError(404, "账号不存在");
+    }
+    if (user.id === input.actorUserId) {
+      throw new AuthStoreError(400, "不能删除当前登录账号");
+    }
+    if (user.username === input.bootstrapUsername.trim()) {
+      throw new AuthStoreError(400, "默认管理员账号不能删除");
+    }
+    if (user.enabled) {
+      throw new AuthStoreError(400, "请先停用账号后再删除");
+    }
+    if (user.role === "admin" && countOtherEnabledAdmins(user.id) === 0) {
+      throw new AuthStoreError(400, "至少需要保留一个启用的系统管理员");
+    }
+    return user;
+  }
+
   return {
     async ensureBootstrapAdmin({ username, password }) {
       const existingUser = getUserByUsername(username);
@@ -276,6 +306,18 @@ export function createMemoryAuthStore(): AuthStore {
       };
       users.set(user.id, user);
       return toAuthUser(user);
+    },
+
+    async deleteUser(input) {
+      const user = assertCanDeleteUser(input, getStoredUserById(input.userId));
+      const deletedUser = toAuthUser(user);
+      users.delete(user.id);
+      for (const [tokenHash, session] of sessions.entries()) {
+        if (session.userId === user.id) {
+          sessions.delete(tokenHash);
+        }
+      }
+      return deletedUser;
     },
 
     async authenticate(username, password) {
