@@ -1045,6 +1045,36 @@ describe("App", () => {
     vi.useRealTimers();
   });
 
+  it("shows current week schedule anomaly reminders and opens editable cells from reminders", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    const wrapper = mountApp({
+      ...testData,
+      scheduleEntries: [
+        {
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1", "shift-rest"],
+          note: ""
+        }
+      ]
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-anomaly-panel"]').text()).toContain("排班提醒");
+    expect(wrapper.get('[data-testid="schedule-anomaly-panel"]').text()).toContain("李护士 2026-06-15 有多个班次");
+    expect(wrapper.get('[data-testid="schedule-anomaly-panel"]').text()).toContain("李护士 2026-06-16 未排班");
+
+    await wrapper.get('[data-testid="schedule-anomaly-item-staff-nurse-001-2026-06-16"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="cell-editor"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="editing-staff-id"]').text()).toBe("staff-nurse-001");
+    vi.useRealTimers();
+  });
+
   it("shows scheduling content by default and switches workbench tabs without changing the selected date", async () => {
     const wrapper = mountApp();
 
