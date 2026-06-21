@@ -243,6 +243,107 @@ describe.sequential("API routes", () => {
     expect(loginResponse.body.user.staffId).toBeNull();
   });
 
+  it("deletes disabled users, refreshes bindings, and records an audit log", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app)
+      .put("/api/users/user-delete-target")
+      .set(headers)
+      .send({
+        username: "delete-target",
+        displayName: "删除测试账号",
+        role: "viewer",
+        enabled: true,
+        password: "delete-password"
+      })
+      .expect(200);
+    await request(app)
+      .put("/api/users/user-delete-target")
+      .set(headers)
+      .send({
+        username: "delete-target",
+        displayName: "删除测试账号",
+        role: "viewer",
+        enabled: false
+      })
+      .expect(200);
+
+    await request(app).delete("/api/users/user-delete-target").set(headers).expect(200, { ok: true });
+
+    const usersResponse = await request(app).get("/api/users").set(headers).expect(200);
+    expect(usersResponse.body.rows).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "user-delete-target" })])
+    );
+
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .query({ action: "user.delete", keyword: "delete-target", limit: "20" })
+      .set(headers)
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual([
+      expect.objectContaining({
+        username: "admin",
+        action: "user.delete",
+        targetType: "user",
+        targetId: "user-delete-target",
+        summary: "删除账号：delete-target，显示名：删除测试账号，角色：viewer"
+      })
+    ]);
+  });
+
+  it("rejects unsafe user deletion requests", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    await request(app).delete("/api/users/missing-user").set(headers).expect(404, { message: "账号不存在" });
+
+    await request(app)
+      .put("/api/users/user-enabled-delete")
+      .set(headers)
+      .send({
+        username: "enabled-delete",
+        displayName: "启用账号",
+        role: "viewer",
+        enabled: true,
+        password: "viewer-password"
+      })
+      .expect(200);
+    await request(app)
+      .delete("/api/users/user-enabled-delete")
+      .set(headers)
+      .expect(400, { message: "请先停用账号后再删除" });
+
+    const loginResponse = await request(app)
+      .post("/api/auth/login")
+      .send({ username: "admin", password: "123456" })
+      .expect(200);
+    await request(app)
+      .delete(`/api/users/${loginResponse.body.user.id}`)
+      .set({ Authorization: `Bearer ${loginResponse.body.token}` })
+      .expect(400, { message: "不能删除当前登录账号" });
+
+    await request(app)
+      .put("/api/users/user-second-admin")
+      .set(headers)
+      .send({
+        username: "second-admin",
+        displayName: "第二管理员",
+        role: "admin",
+        enabled: true,
+        password: "second-password"
+      })
+      .expect(200);
+    const secondAdminLogin = await request(app)
+      .post("/api/auth/login")
+      .send({ username: "second-admin", password: "second-password" })
+      .expect(200);
+    await request(app)
+      .delete(`/api/users/${loginResponse.body.user.id}`)
+      .set({ Authorization: `Bearer ${secondAdminLogin.body.token}` })
+      .expect(400, { message: "默认管理员账号不能删除" });
+  });
+
   it("validates managed staff ids when saving accounts", async () => {
     const app = createTestApp();
     const headers = await adminHeaders(app);

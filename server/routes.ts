@@ -325,6 +325,10 @@ function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null, manage
   return `保存账号：${user.username}，${bindingText}，${formatManagedStaffSummary(user, managedStaff)}`;
 }
 
+function formatUserDeleteSummary(user: AuthUser): string {
+  return `删除账号：${user.username}，显示名：${user.displayName}，角色：${user.role}`;
+}
+
 function assertStaffCanBeDeleted(data: AppData, users: AuthUser[], staff: StaffMember): void {
   if (data.scheduleEntries.some((entry) => entry.staffId === staff.id)) {
     throw new HttpResponseError(400, `人员已有历史排班或月结记录，不能删除，请停用人员：${staff.name}`);
@@ -950,6 +954,27 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         formatUserSaveSummary(user, saveResult.bindingStaff, saveResult.managedStaff)
       );
       response.json({ user: toManagedAuthUser(user) });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.delete("/users/:id", requireAdmin, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const userId = getRouteParam(request, "id");
+      const deletedUser = await authStore.deleteUser({
+        userId,
+        actorUserId: request.authUser!.id,
+        bootstrapUsername: bootstrapAdminUsername
+      });
+      await recordAudit(
+        request,
+        "user.delete",
+        "user",
+        deletedUser.id,
+        formatUserDeleteSummary(deletedUser)
+      );
+      response.json({ ok: true });
     } catch (error) {
       handleRouteError(error, response, next);
     }
