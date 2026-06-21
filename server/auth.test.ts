@@ -383,6 +383,31 @@ describe("memory auth store", () => {
       store.deleteUser({ userId: backupAdmin.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
     ).resolves.toEqual(expect.objectContaining({ username: "backup-admin" }));
 
+    const lastAdminStore = createMemoryAuthStore();
+    const viewerActor = await lastAdminStore.saveUser({
+      id: "user-viewer-actor",
+      username: "viewer-actor",
+      displayName: "只读操作员",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password"
+    });
+    const lastAdmin = await lastAdminStore.saveUser({
+      id: "user-last-admin",
+      username: "last-admin",
+      displayName: "最后管理员",
+      role: "admin",
+      enabled: false,
+      password: "admin-password"
+    });
+    await expect(
+      lastAdminStore.deleteUser({
+        userId: lastAdmin.id,
+        actorUserId: viewerActor.id,
+        bootstrapUsername: "admin"
+      })
+    ).rejects.toThrow("至少需要保留一个启用的系统管理员");
+
     const secondStore = createMemoryAuthStore();
     await secondStore.ensureBootstrapAdmin({ username: "root-admin", password: "admin-password" });
     const rootAdmin = await secondStore.authenticate("root-admin", "admin-password");
