@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount } from "vue";
 import type { CalendarDay } from "@/lib/date";
-import type { Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
+import type { Holiday, ScheduleEntry, Shift, StaffMember, StaffType } from "@/types/domain";
 
 const props = defineProps<{
   staff: StaffMember[];
@@ -18,6 +18,17 @@ const emit = defineEmits<{
   editCell: [staffId: string, date: string];
 }>();
 
+const STAFF_TYPE_LABELS: Record<StaffType, string> = {
+  head_nurse: "护士长",
+  nurse: "护士",
+  clerk: "文员"
+};
+
+const SORT_COLUMN_WIDTH = 54;
+const TYPE_COLUMN_WIDTH = 58;
+const SORT_COLUMN_MOBILE_WIDTH = 42;
+const TYPE_COLUMN_MOBILE_WIDTH = 46;
+
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftMap = computed(() => new Map(props.shifts.map((shift) => [shift.id, shift])));
 const entryMap = computed(() => new Map(props.entries.map((entry) => [`${entry.date}__${entry.staffId}`, entry])));
@@ -33,10 +44,20 @@ const sortedStaff = computed(() =>
 );
 const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
+  const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
+  const personColumnMobileWidth = clamp(Math.ceil(longestNameUnits * 12 + 32), 56, 88);
 
   return {
-    "--person-col-width": `${clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104)}px`,
-    "--person-col-mobile-width": `${clamp(Math.ceil(longestNameUnits * 12 + 32), 56, 88)}px`
+    "--sort-col-width": `${SORT_COLUMN_WIDTH}px`,
+    "--person-col-width": `${personColumnWidth}px`,
+    "--type-col-width": `${TYPE_COLUMN_WIDTH}px`,
+    "--person-col-left": `${SORT_COLUMN_WIDTH}px`,
+    "--type-col-left": `${SORT_COLUMN_WIDTH + personColumnWidth}px`,
+    "--sort-col-mobile-width": `${SORT_COLUMN_MOBILE_WIDTH}px`,
+    "--person-col-mobile-width": `${personColumnMobileWidth}px`,
+    "--type-col-mobile-width": `${TYPE_COLUMN_MOBILE_WIDTH}px`,
+    "--person-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH}px`,
+    "--type-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth}px`
   };
 });
 const clickTimers = new Map<string, number>();
@@ -53,6 +74,10 @@ function measureDisplayUnits(text: string): number {
   return [...text.trim()].reduce((total, character) => {
     return total + (/^[\u0000-\u00ff]$/.test(character) ? 0.55 : 1);
   }, 0);
+}
+
+function staffTypeLabel(staff: StaffMember): string {
+  return STAFF_TYPE_LABELS[staff.type];
 }
 
 function clearClickTimer(key: string): void {
@@ -117,7 +142,9 @@ onBeforeUnmount(() => {
     <table class="schedule-grid" :style="personColumnStyle">
       <thead>
         <tr>
+          <th class="sticky-col sort-col">排序ID</th>
           <th class="sticky-col person-col">人员</th>
+          <th class="sticky-col type-col">类型</th>
           <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
             <span>{{ day.dayOfMonth }}</span>
             <small>{{ day.weekdayName }}</small>
@@ -127,11 +154,13 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="person in sortedStaff" :key="person.id" :class="{ 'disabled-historical-row': !person.enabled }">
+          <th class="sticky-col sort-col">{{ person.sortOrder }}</th>
           <th class="sticky-col person-col">
             <strong>{{ person.name }}</strong>
             <small>{{ person.jobId }}</small>
             <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
           </th>
+          <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
           <td
             v-for="day in days"
             :key="`${person.id}-${day.key}`"

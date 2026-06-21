@@ -70,6 +70,66 @@ afterEach(() => {
 });
 
 describe("ScheduleGrid", () => {
+  it("shows sort id, person and type as the fixed schedule columns", () => {
+    const wrapper = mountGrid([]);
+
+    expect(
+      wrapper
+        .findAll("thead th")
+        .slice(0, 3)
+        .map((cell) => cell.text())
+    ).toEqual(["排序ID", "人员", "类型"]);
+
+    const firstRow = wrapper.get("tbody tr");
+    expect(firstRow.get(".sort-col").text()).toBe("1");
+    expect(firstRow.get(".person-col").text()).toContain("在职护士");
+    expect(firstRow.get(".person-col").text()).toContain("N001");
+    expect(firstRow.get(".type-col").text()).toBe("护士");
+  });
+
+  it("shows all configured staff type labels and keeps rows sorted by sort id", () => {
+    const wrapper = mountGrid([], {
+      staff: [
+        {
+          id: "staff-head",
+          jobId: "H001",
+          name: "段护士长",
+          type: "head_nurse",
+          isAdmin: true,
+          enabled: true,
+          sortOrder: 3
+        },
+        {
+          id: "staff-clerk",
+          jobId: "C001",
+          name: "王文员",
+          type: "clerk",
+          isAdmin: false,
+          enabled: true,
+          sortOrder: 1
+        },
+        {
+          id: "staff-nurse",
+          jobId: "N001",
+          name: "李护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: true,
+          sortOrder: 2
+        }
+      ],
+      editableStaffIds: ["staff-head", "staff-clerk", "staff-nurse"]
+    });
+
+    const rows = wrapper.findAll("tbody tr");
+
+    expect(rows.map((row) => row.get(".sort-col").text())).toEqual(["1", "2", "3"]);
+    expect(rows.map((row) => row.get(".type-col").text())).toEqual(["文员", "护士", "护士长"]);
+    expect(rows[0].get(".person-col").text()).toContain("王文员");
+    expect(rows[1].get(".person-col").text()).toContain("李护士");
+    expect(rows[2].get(".person-col").text()).toContain("段护士长");
+  });
+
   it("shows disabled staff with historical entries in the visible days and marks them", () => {
     const wrapper = mountGrid([
       {
@@ -138,6 +198,14 @@ describe("ScheduleGrid", () => {
 
     expect(tableStyle.getPropertyValue("--person-col-width")).toBe("88px");
     expect(tableStyle.getPropertyValue("--person-col-mobile-width")).toBe("80px");
+    expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("54px");
+    expect(tableStyle.getPropertyValue("--type-col-width")).toBe("58px");
+    expect(tableStyle.getPropertyValue("--person-col-left")).toBe("54px");
+    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("142px");
+    expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("42px");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("46px");
+    expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("42px");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("122px");
   });
 
   it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {
@@ -164,12 +232,12 @@ describe("ScheduleGrid", () => {
     ]);
     const disabledRow = wrapper.findAll("tbody tr").find((row) => row.text().includes("停用护士"));
     expect(disabledRow).toBeDefined();
-    const cell = disabledRow?.find("td");
-    expect(cell?.classes()).not.toContain("editable");
+    const cell = wrapper.get('[data-testid="schedule-cell-staff-disabled-2026-06-19"]');
+    expect(cell.classes()).not.toContain("editable");
 
-    await cell?.trigger("click");
+    await cell.trigger("click");
     vi.advanceTimersByTime(200);
-    await cell?.trigger("dblclick");
+    await cell.trigger("dblclick");
 
     expect(wrapper.emitted("quickFill")).toBeUndefined();
     expect(wrapper.emitted("editCell")).toBeUndefined();
