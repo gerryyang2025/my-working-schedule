@@ -131,13 +131,17 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 
 查看账号可管理人员关系：
 
-    sqlite3 /var/lib/my-working-schedule/schedule.db "select user_id, staff_id, created_at, created_by from user_managed_staff order by user_id, staff_id;"
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db "select user_id, staff_id, created_at, created_by from user_managed_staff order by user_id, staff_id;"
+```
 
 查看可管理人员表结构：
 
-    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma table_info(user_managed_staff);"
-    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma foreign_key_list(user_managed_staff);"
-    sqlite3 /var/lib/my-working-schedule/schedule.db "pragma index_list(user_managed_staff);"
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db "pragma table_info(user_managed_staff);"
+sqlite3 /var/lib/my-working-schedule/schedule.db "pragma foreign_key_list(user_managed_staff);"
+sqlite3 /var/lib/my-working-schedule/schedule.db "pragma index_list(user_managed_staff);"
+```
 
 查看排班记录数量：
 
@@ -175,13 +179,25 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 
 ## 一键初始化前后检查
 
-一键初始化命令：
+执行前先查看当前数据库和备份路径：
+
+```bash
+./optools.sh data status
+```
+
+一键初始化会自动备份当前 SQLite 数据库，并清空排班、月结快照、登录会话和审计日志。人员、班次、节假日、系统配置、账号和账号管理范围会保留。
+
+未显式确认时命令会拒绝执行：
+
+```bash
+./optools.sh data reset
+```
+
+确认重新录入时执行：
 
 ```bash
 CONFIRM_RESET=yes ./optools.sh data reset
 ```
-
-该命令会自动备份当前 SQLite 数据库，并清空排班、月结快照、登录会话和审计日志。人员、班次、节假日、系统配置、账号和账号管理范围会保留。
 
 初始化前可查看运行数据数量：
 
