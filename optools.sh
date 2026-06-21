@@ -98,6 +98,7 @@ Usage:
   ./optools.sh data check     Check SQLite storage integrity
   ./optools.sh data backup    Back up SQLite storage
   ./optools.sh data restore <backup-file>
+  ./optools.sh data reset    Back up SQLite storage, then clear runtime data for re-entry
   ./optools.sh app init       Initialize production user, directories, and systemd service
   ./optools.sh app doctor     Check API/systemd prerequisites
   ./optools.sh app start      Start the production systemd service
@@ -657,7 +658,7 @@ run_data_helper() {
   fi
 
   case "$command" in
-    install|init|backup|restore|status|check|help|-h|--help)
+    install|init|backup|restore|reset|status|check|help|-h|--help)
       (
         cd "$ROOT_DIR"
         bash "$SQLITE_SERVICE_SCRIPT" "$command" "$@"

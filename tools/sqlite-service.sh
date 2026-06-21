@@ -17,6 +17,7 @@ Usage:
   ./tools/sqlite-service.sh init
   ./tools/sqlite-service.sh backup
   ./tools/sqlite-service.sh restore <backup-file>
+  ./tools/sqlite-service.sh reset
   ./tools/sqlite-service.sh status
   ./tools/sqlite-service.sh check
 USAGE
@@ -374,6 +375,14 @@ case "$COMMAND" in
     esac
     ensure_dirs
     run_npm_command data:restore -- "$RESTORE_BACKUP_FILE"
+    ;;
+  reset)
+    if [ "${CONFIRM_RESET:-}" != "yes" ]; then
+      printf 'Reset is a high-risk operation. Set CONFIRM_RESET=yes to continue.\n' >&2
+      exit 1
+    fi
+    ensure_dirs
+    run_npm_command data:reset
     ;;
   status)
     status

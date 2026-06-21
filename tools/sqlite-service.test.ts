@@ -83,6 +83,7 @@ async function createFakeNpmBin(dir: string) {
   const fakeBin = join(dir, "bin");
   await mkdir(fakeBin);
   await createNodeProxyExecutable(join(fakeBin, "node"));
+  await createFakeExecutable(join(fakeBin, "mkdir"), 'exec /bin/mkdir "$@"\n');
   await createFakeExecutable(
     join(fakeBin, "npm"),
     `{
@@ -126,6 +127,56 @@ describe("tools/sqlite-service.sh", () => {
     expect(result.code).toBe(0);
     expect(result.stdout).toContain("./tools/sqlite-service.sh install");
     expect(result.stdout).toContain("./tools/sqlite-service.sh restore <backup-file>");
+  });
+
+  it("prints reset usage", async () => {
+    const result = await runTool(["help"]);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("./tools/sqlite-service.sh reset");
+  });
+
+  it("rejects reset before invoking npm when confirmation is missing", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const logPath = join(dir, "reset-missing-confirm.log");
+
+    const result = await runTool(["reset"], {
+      PATH: fakeBin,
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: join(dir, "schedule.db"),
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(resetGuidance);
+    await expect(readLog(logPath)).rejects.toThrow();
+  });
+
+  it("delegates reset to the npm data reset command when confirmation is explicit", async () => {
+    const dir = await createTempDir();
+    const fakeBin = await createFakeNpmBin(dir);
+    const sqlitePath = join(dir, "sqlite", "schedule.db");
+    const backupPath = join(dir, "backups");
+    const logPath = join(dir, "reset-confirmed.log");
+
+    const result = await runTool(["reset"], {
+      PATH: fakeBin,
+      CONFIRM_RESET: "yes",
+      NPM_LOG: logPath,
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect((await readLog(logPath)).trimEnd().split("\n")).toEqual([
+      `cwd=${process.cwd()}`,
+      `SCHEDULE_SQLITE_PATH=${sqlitePath}`,
+      `SCHEDULE_BACKUP_PATH=${backupPath}`,
+      "argc=2",
+      "arg1=run",
+      "arg2=data:reset"
+    ]);
   });
 
   it("reports status using configured paths", async () => {

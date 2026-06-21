@@ -96,6 +96,7 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh logrotate install");
     expect(result.stdout).toContain("./optools.sh firewall status");
     expect(result.stdout).toContain("./optools.sh data check");
+    expect(result.stdout).toContain("./optools.sh data reset");
     expect(result.stdout).toContain("./optools.sh app init");
     expect(result.stdout).toContain("./optools.sh app doctor");
     expect(result.stdout).toContain("./optools.sh app status");
@@ -479,6 +480,41 @@ printf 'asset\\n' > dist/assets/app.js
         "argc=2",
         "arg1=restore",
         "arg2=schedule.db",
+        ""
+      ].join("\n")
+    );
+  });
+
+  it("delegates SQLite data reset to the data helper script", async () => {
+    const stateDir = await createStateDir();
+    const fakeDataHelper = join(stateDir, "sqlite-service.sh");
+    const logPath = join(stateDir, "data-reset.log");
+
+    await createExecutable(
+      fakeDataHelper,
+      `{
+  printf 'cwd=%s\\n' "$PWD"
+  printf 'argc=%s\\n' "$#"
+  index=1
+  for arg in "$@"; do
+    printf 'arg%s=%s\\n' "$index" "$arg"
+    index=$((index + 1))
+  done
+} >> "$DATA_LOG"
+`
+    );
+
+    const result = await runOptools(["data", "reset"], {
+      OPTOOLS_SQLITE_SERVICE_SCRIPT: fakeDataHelper,
+      DATA_LOG: logPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(logPath, "utf8")).toBe(
+      [
+        `cwd=${process.cwd()}`,
+        "argc=1",
+        "arg1=reset",
         ""
       ].join("\n")
     );
