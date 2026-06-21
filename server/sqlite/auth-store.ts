@@ -10,6 +10,7 @@ import {
   type AuthStore,
   type BootstrapAdminOptions,
   type ChangePasswordInput,
+  type DeleteAuthUserInput,
   type SaveAuthUserInput
 } from "../auth-store";
 import { initializeSqliteSchema } from "./schema";
@@ -246,6 +247,36 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
     }
   }
 
+  function countOtherEnabledAdmins(db: Database.Database, userId: string): number {
+    const row = db
+      .prepare("select count(*) as count from users where id <> ? and role = 'admin' and enabled = 1")
+      .get(userId) as { count: number };
+    return row.count;
+  }
+
+  function assertCanDeleteUser(
+    db: Database.Database,
+    input: DeleteAuthUserInput,
+    user: (AuthUser & { passwordHash: string }) | null
+  ): AuthUser & { passwordHash: string } {
+    if (!user) {
+      throw new AuthStoreError(404, "账号不存在");
+    }
+    if (user.id === input.actorUserId) {
+      throw new AuthStoreError(400, "不能删除当前登录账号");
+    }
+    if (user.username === input.bootstrapUsername.trim()) {
+      throw new AuthStoreError(400, "默认管理员账号不能删除");
+    }
+    if (user.enabled) {
+      throw new AuthStoreError(400, "请先停用账号后再删除");
+    }
+    if (user.role === "admin" && countOtherEnabledAdmins(db, user.id) === 0) {
+      throw new AuthStoreError(400, "至少需要保留一个启用的系统管理员");
+    }
+    return user;
+  }
+
   return {
     async ensureBootstrapAdmin({ username, password }: BootstrapAdminOptions) {
       const db = openDatabase();
@@ -393,6 +424,23 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
           createdAt: timestamp,
           updatedAt: timestamp
         };
+      } finally {
+        db.close();
+      }
+    },
+
+    async deleteUser(input: DeleteAuthUserInput) {
+      const db = openDatabase();
+      try {
+        const user = assertCanDeleteUser(db, input, readUserById(db, input.userId));
+        const deletedUser = sanitizeUser(user);
+        db.transaction(() => {
+          db.prepare("delete from user_sessions where user_id = ?").run(user.id);
+          db.prepare("delete from user_managed_staff where user_id = ?").run(user.id);
+          db.prepare("update user_managed_staff set created_by = null where created_by = ?").run(user.id);
+          db.prepare("delete from users where id = ?").run(user.id);
+        })();
+        return deletedUser;
       } finally {
         db.close();
       }

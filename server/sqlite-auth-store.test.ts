@@ -577,4 +577,248 @@ describe("SQLite auth store", () => {
       expect.objectContaining({ username: "admin", role: "admin", staffId: null })
     );
   });
+
+  it("deletes disabled SQLite users while cleaning sessions and user staff relations", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-001", "100001", "李护士", "nurse", 0, 1, 1);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-002", "100002", "王护士", "nurse", 0, 1, 2);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+    const viewer = await store.saveUser({
+      id: "user-viewer",
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password",
+      staffId: "staff-nurse-001",
+      managedStaffIds: ["staff-nurse-002"]
+    });
+    const session = await store.createSession(viewer.id);
+    await store.recordAudit({
+      action: "auth.login.success",
+      actor: viewer,
+      targetType: "user",
+      targetId: viewer.id,
+      summary: "用户 viewer 登录成功",
+      ip: "127.0.0.1",
+      userAgent: "vitest"
+    });
+    await store.saveUser({
+      id: viewer.id,
+      username: "viewer",
+      displayName: "只读用户",
+      role: "viewer",
+      enabled: false,
+      staffId: "staff-nurse-001",
+      managedStaffIds: ["staff-nurse-002"]
+    });
+
+    const deleted = await store.deleteUser({
+      userId: viewer.id,
+      actorUserId: admin!.id,
+      bootstrapUsername: "admin"
+    });
+
+    expect(deleted).toEqual(
+      expect.objectContaining({
+        id: viewer.id,
+        username: "viewer",
+        staffId: "staff-nurse-001",
+        managedStaffIds: ["staff-nurse-002"],
+        enabled: false
+      })
+    );
+    await expect(store.getSession(session.token)).resolves.toBeNull();
+    await expect(store.listUsers()).resolves.not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: viewer.id })])
+    );
+    await expect(store.listAuditLogs({ username: "viewer", limit: 10 })).resolves.toEqual([
+      expect.objectContaining({
+        action: "auth.login.success",
+        username: "viewer",
+        targetId: viewer.id
+      })
+    ]);
+
+    const verificationDb = new Database(sqlitePath);
+    try {
+      expect(verificationDb.prepare("select count(*) as count from user_sessions where user_id = ?").get(viewer.id)).toEqual({
+        count: 0
+      });
+      expect(
+        verificationDb.prepare("select count(*) as count from user_managed_staff where user_id = ?").get(viewer.id)
+      ).toEqual({ count: 0 });
+      expect(verificationDb.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      verificationDb.close();
+    }
+  });
+
+  it("clears SQLite managed-staff created_by references before deleting users", async () => {
+    const sqlitePath = await createTempDbPath();
+    const db = new Database(sqlitePath);
+    try {
+      initializeSqliteSchema(db);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-001", "100001", "李护士", "nurse", 0, 1, 1);
+      db.prepare(
+        "insert into staff (id, job_id, name, type, is_admin, enabled, sort_order) values (?, ?, ?, ?, ?, ?, ?)"
+      ).run("staff-nurse-002", "100002", "王护士", "nurse", 0, 1, 2);
+    } finally {
+      db.close();
+    }
+
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+    const testAdmin = await store.saveUser({
+      id: "user-test-admin",
+      username: "test-admin",
+      displayName: "测试管理员",
+      role: "admin",
+      enabled: true,
+      password: "test-admin-password"
+    });
+    await store.saveUser({
+      id: "user-scheduler",
+      username: "scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      enabled: true,
+      password: "scheduler-password",
+      managedStaffIds: ["staff-nurse-001"],
+      managedStaffUpdatedBy: testAdmin.id
+    });
+    await store.saveUser({
+      id: testAdmin.id,
+      username: "test-admin",
+      displayName: "测试管理员",
+      role: "admin",
+      enabled: false
+    });
+
+    await store.deleteUser({
+      userId: testAdmin.id,
+      actorUserId: admin!.id,
+      bootstrapUsername: "admin"
+    });
+
+    const verificationDb = new Database(sqlitePath);
+    try {
+      expect(
+        verificationDb.prepare("select created_by from user_managed_staff where user_id = ?").get("user-scheduler")
+      ).toEqual({ created_by: null });
+      expect(verificationDb.prepare("pragma foreign_key_check").all()).toEqual([]);
+    } finally {
+      verificationDb.close();
+    }
+  });
+
+  it("protects current, bootstrap, enabled, missing, and last-admin SQLite users from deletion", async () => {
+    const sqlitePath = await createTempDbPath();
+    const store = createSqliteAuthStore(sqlitePath);
+    await store.ensureBootstrapAdmin({ username: "admin", password: "admin-password" });
+    const admin = await store.authenticate("admin", "admin-password");
+    expect(admin).not.toBeNull();
+
+    await expect(
+      store.deleteUser({ userId: admin!.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("不能删除当前登录账号");
+
+    await expect(
+      store.deleteUser({ userId: "missing-user", actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("账号不存在");
+
+    const enabledViewer = await store.saveUser({
+      id: "user-enabled-viewer",
+      username: "enabled-viewer",
+      displayName: "启用账号",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password"
+    });
+    await expect(
+      store.deleteUser({ userId: enabledViewer.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).rejects.toThrow("请先停用账号后再删除");
+
+    const backupAdmin = await store.saveUser({
+      id: "user-backup-admin",
+      username: "backup-admin",
+      displayName: "备用管理员",
+      role: "admin",
+      enabled: true,
+      password: "backup-password"
+    });
+    await store.saveUser({
+      id: backupAdmin.id,
+      username: "backup-admin",
+      displayName: "备用管理员",
+      role: "admin",
+      enabled: false
+    });
+    await expect(
+      store.deleteUser({ userId: backupAdmin.id, actorUserId: admin!.id, bootstrapUsername: "admin" })
+    ).resolves.toEqual(expect.objectContaining({ username: "backup-admin" }));
+
+    const lastAdminStore = createSqliteAuthStore(await createTempDbPath());
+    const viewerActor = await lastAdminStore.saveUser({
+      id: "user-viewer-actor",
+      username: "viewer-actor",
+      displayName: "只读操作员",
+      role: "viewer",
+      enabled: true,
+      password: "viewer-password"
+    });
+    const lastAdmin = await lastAdminStore.saveUser({
+      id: "user-last-admin",
+      username: "last-admin",
+      displayName: "最后管理员",
+      role: "admin",
+      enabled: false,
+      password: "last-admin-password"
+    });
+    await expect(
+      lastAdminStore.deleteUser({
+        userId: lastAdmin.id,
+        actorUserId: viewerActor.id,
+        bootstrapUsername: "admin"
+      })
+    ).rejects.toThrow("至少需要保留一个启用的系统管理员");
+
+    const secondStore = createSqliteAuthStore(await createTempDbPath());
+    await secondStore.ensureBootstrapAdmin({ username: "root-admin", password: "admin-password" });
+    const rootAdmin = await secondStore.authenticate("root-admin", "admin-password");
+    expect(rootAdmin).not.toBeNull();
+    const bootstrapNamedAdmin = await secondStore.saveUser({
+      id: "user-admin",
+      username: "admin",
+      displayName: "默认管理员",
+      role: "viewer",
+      enabled: false,
+      password: "admin-password"
+    });
+    await expect(
+      secondStore.deleteUser({
+        userId: bootstrapNamedAdmin.id,
+        actorUserId: rootAdmin!.id,
+        bootstrapUsername: "admin"
+      })
+    ).rejects.toThrow("默认管理员账号不能删除");
+  });
 });
