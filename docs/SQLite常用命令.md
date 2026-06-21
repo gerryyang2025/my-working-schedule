@@ -188,7 +188,9 @@ CONFIRM_RESET=yes ./optools.sh data reset
 ```bash
 sqlite3 /var/lib/my-working-schedule/schedule.db \
   "select 'schedule_entries' as table_name, count(*) from schedule_entries
+   union all select 'schedule_entry_shifts', count(*) from schedule_entry_shifts
    union all select 'monthly_settlements', count(*) from monthly_settlements
+   union all select 'monthly_settlement_rows', count(*) from monthly_settlement_rows
    union all select 'user_sessions', count(*) from user_sessions
    union all select 'audit_logs', count(*) from audit_logs;"
 ```
@@ -198,7 +200,9 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
 ```bash
 sqlite3 /var/lib/my-working-schedule/schedule.db \
   "select 'schedule_entries' as table_name, count(*) from schedule_entries
+   union all select 'schedule_entry_shifts', count(*) from schedule_entry_shifts
    union all select 'monthly_settlements', count(*) from monthly_settlements
+   union all select 'monthly_settlement_rows', count(*) from monthly_settlement_rows
    union all select 'user_sessions', count(*) from user_sessions
    union all select 'audit_logs', count(*) from audit_logs;"
 ```
@@ -210,6 +214,7 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
   "select 'staff' as table_name, count(*) from staff
    union all select 'shifts', count(*) from shifts
    union all select 'holidays', count(*) from holidays
+   union all select 'app_settings', count(*) from app_settings
    union all select 'users', count(*) from users
    union all select 'user_managed_staff', count(*) from user_managed_staff;"
 ```
