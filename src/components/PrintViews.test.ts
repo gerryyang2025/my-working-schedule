@@ -271,7 +271,7 @@ describe("PrintViews", () => {
       }
     });
 
-    const monthHeader = wrapper.get(".print-month thead th:nth-child(2)");
+    const monthHeader = wrapper.get(".print-month-detail-table thead .print-day-col");
     expect(monthHeader.text()).toContain("19");
     expect(monthHeader.text()).toContain("周五");
     expect(monthHeader.text()).toContain("端午节");
@@ -349,9 +349,27 @@ describe("PrintViews", () => {
       }
     });
 
-    const personnelHeader = wrapper.get(".print-month tbody th");
+    const personnelHeader = wrapper.get(".print-month-detail-table tbody .print-person-col");
 
     expectPersonCellText(personnelHeader.text(), "王护士", "N001");
+  });
+
+  it("prints sort id and staff type in month schedule detail rows", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary
+      }
+    });
+
+    const monthDetailHeaders = wrapper.findAll(".print-month-detail-table thead th").map((cell) => cell.text());
+    expect(monthDetailHeaders.slice(0, 3)).toEqual(["排序ID", "人员", "类型"]);
+
+    const firstMonthDetailRow = wrapper.get(".print-month-detail-table tbody tr");
+    expect(firstMonthDetailRow.get(".print-sort-col").text()).toBe("1");
+    expectPersonCellText(firstMonthDetailRow.get(".print-person-col").text(), "王护士", "N001");
+    expect(firstMonthDetailRow.get(".print-type-col").text()).toBe("护士");
   });
 
   it("prints monthly attendance and coefficient summary below the month schedule", () => {
@@ -555,8 +573,13 @@ describe("PrintViews", () => {
     expect(detailTable.text()).toContain("王护士");
     expect(detailTable.text()).toContain("白");
     expect(detailTable.text()).toContain("夜");
-    const personnelHeader = detailTable.get("tbody th");
+    const personnelHeader = detailTable.get("tbody .print-person-col");
     expectPersonCellText(personnelHeader.text(), "王护士", "N001");
+    expect(detailTable.findAll("thead th").slice(0, 3).map((cell) => cell.text())).toEqual(["排序ID", "人员", "类型"]);
+    const firstDetailRow = detailTable.get("tbody tr");
+    expect(firstDetailRow.get(".print-sort-col").text()).toBe("1");
+    expectPersonCellText(firstDetailRow.get(".print-person-col").text(), "王护士", "N001");
+    expect(firstDetailRow.get(".print-type-col").text()).toBe("护士");
   });
 
   it("prints staff job IDs in weekly summary rows", () => {

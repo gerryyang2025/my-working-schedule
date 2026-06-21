@@ -113,6 +113,11 @@ function getStaffTypeLabel(staffType: StaffType): string {
   return STAFF_TYPE_LABELS[staffType];
 }
 
+function getStaffSortOrder(staffId: string): string {
+  const sortOrder = staffById.value.get(staffId)?.sortOrder;
+  return typeof sortOrder === "number" ? String(sortOrder) : "";
+}
+
 function formatMoney(value: number): string {
   return value.toFixed(2);
 }
@@ -150,8 +155,10 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
     <table class="print-table print-month-detail-table">
       <thead>
         <tr>
-          <th>人员</th>
-          <th v-for="day in days" :key="day.key">
+          <th class="print-sort-col">排序ID</th>
+          <th class="print-person-col">人员</th>
+          <th class="print-type-col">类型</th>
+          <th v-for="day in days" :key="day.key" class="print-day-col">
             <span class="print-day-heading">
               <span>{{ day.dayOfMonth }}</span>
               <span>{{ day.weekdayName }}</span>
@@ -162,14 +169,16 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
       </thead>
       <tbody>
         <tr v-for="staff in printedStaff" :key="staff.id" :class="{ 'disabled-historical-row': !staff.enabled }">
-          <th>
+          <th class="print-sort-col">{{ staff.sortOrder }}</th>
+          <th class="print-person-col">
             <span class="print-person">
               <strong>{{ staff.name }}</strong>
               <small>{{ staff.jobId }}</small>
             </span>
             <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
           </th>
-          <td v-for="day in days" :key="`${staff.id}-${day.key}`">
+          <td class="print-type-col">{{ getStaffTypeLabel(staff.type) }}</td>
+          <td v-for="day in days" :key="`${staff.id}-${day.key}`" class="print-day-col">
             <span class="print-cell-shifts">
               <span
                 v-for="shift in getCellShifts(staff.id, day.key)"
@@ -274,11 +283,13 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
 
     <section class="print-week-detail">
       <h2>周排班明细</h2>
-      <table class="print-table">
+      <table class="print-table print-week-detail-table">
         <thead>
           <tr>
-            <th>人员</th>
-            <th v-for="day in weekDays" :key="day.key">
+            <th class="print-sort-col">排序ID</th>
+            <th class="print-person-col">人员</th>
+            <th class="print-type-col">类型</th>
+            <th v-for="day in weekDays" :key="day.key" class="print-day-col">
               <span class="print-day-heading">
                 <span>{{ day.dayOfMonth }}</span>
                 <span>{{ day.weekdayName }}</span>
@@ -289,13 +300,15 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         </thead>
         <tbody>
           <tr v-for="row in summary.rows" :key="row.staffId">
-            <th>
+            <th class="print-sort-col">{{ getStaffSortOrder(row.staffId) }}</th>
+            <th class="print-person-col">
               <span class="print-person">
                 <strong>{{ row.staffName }}</strong>
                 <small>{{ row.staffJobId }}</small>
               </span>
             </th>
-            <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`">
+            <td class="print-type-col">{{ getStaffTypeLabel(row.staffType) }}</td>
+            <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`" class="print-day-col">
               <span class="print-cell-shifts">
                 <span
                   v-for="shift in getCellShifts(row.staffId, day.key)"
