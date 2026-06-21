@@ -97,6 +97,19 @@ function insertAuthRuntimeRows(sqlitePath: string): void {
   }
 }
 
+function insertPreservedForeignKeyViolation(sqlitePath: string): void {
+  const db = new Database(sqlitePath, { fileMustExist: true });
+  try {
+    db.pragma("foreign_keys = OFF");
+    db.exec(`
+      insert into user_managed_staff (user_id, staff_id, created_at, created_by)
+      values ('missing-user', 'missing-staff', '2026-06-21T00:00:00.000Z', null);
+    `);
+  } finally {
+    db.close();
+  }
+}
+
 function createDataWithRuntimeRows(): AppData {
   const data = createSeedData();
   data.scheduleEntries = [
@@ -441,6 +454,19 @@ describe("SQLite maintenance", () => {
       { user_id: "user-scheduler", staff_id: "staff-nurse-001" }
     ]);
     expect(readRows(sqlitePath, "pragma foreign_key_check")).toEqual([]);
+  });
+
+  it("rolls back reset when post-reset validation fails", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    const data = createDataWithRuntimeRows();
+    writeSqliteData(sqlitePath, data);
+    insertPreservedForeignKeyViolation(sqlitePath);
+
+    await expect(resetSqliteDatabase({ sqlitePath, backupPath, confirm: true })).rejects.toThrow(/foreign key/i);
+
+    expect(readSqliteData(sqlitePath).scheduleEntries).toEqual(data.scheduleEntries);
   });
 
   it("returns not ok when checking a SQLite database with missing tables", async () => {

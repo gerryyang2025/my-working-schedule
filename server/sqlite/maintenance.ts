@@ -223,7 +223,7 @@ export async function resetSqliteDatabase(options: ResetOptions): Promise<ResetR
     db.pragma("foreign_keys = ON");
     assertValidOpenSqliteDatabase(db, "SQLite database");
 
-    const reset = db.transaction(() => {
+    const reset = db.transaction((): CheckResult => {
       db.exec(`
         delete from schedule_entry_shifts;
         delete from schedule_entries;
@@ -232,16 +232,18 @@ export async function resetSqliteDatabase(options: ResetOptions): Promise<ResetR
         delete from user_sessions;
         delete from audit_logs;
       `);
+
+      assertNoForeignKeyViolations(db, "SQLite database after reset");
+      const check = checkOpenSqliteDatabase(db);
+      if (!check.ok) {
+        throw new Error(
+          `SQLite database after reset is invalid: integrity=${check.integrity}; missingTables=${check.missingTables.join(",")}; missingColumns=${check.missingColumns.join(",")}`
+        );
+      }
+      return check;
     });
 
-    reset();
-    assertNoForeignKeyViolations(db, "SQLite database after reset");
-    const check = checkOpenSqliteDatabase(db);
-    if (!check.ok) {
-      throw new Error(
-        `SQLite database after reset is invalid: integrity=${check.integrity}; missingTables=${check.missingTables.join(",")}; missingColumns=${check.missingColumns.join(",")}`
-      );
-    }
+    const check = reset();
 
     return {
       sqlitePath: options.sqlitePath,
