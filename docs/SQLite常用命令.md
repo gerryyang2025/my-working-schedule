@@ -173,6 +173,47 @@ sqlite3 /var/lib/my-working-schedule/schedule.db \
   "select occurred_at, username, action, summary from audit_logs where summary like '%绑定人员%' order by occurred_at desc limit 20;"
 ```
 
+## 一键初始化前后检查
+
+一键初始化命令：
+
+```bash
+CONFIRM_RESET=yes ./optools.sh data reset
+```
+
+该命令会自动备份当前 SQLite 数据库，并清空排班、月结快照、登录会话和审计日志。人员、班次、节假日、系统配置、账号和账号管理范围会保留。
+
+初始化前可查看运行数据数量：
+
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db \
+  "select 'schedule_entries' as table_name, count(*) from schedule_entries
+   union all select 'monthly_settlements', count(*) from monthly_settlements
+   union all select 'user_sessions', count(*) from user_sessions
+   union all select 'audit_logs', count(*) from audit_logs;"
+```
+
+初始化后确认运行数据已清空：
+
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db \
+  "select 'schedule_entries' as table_name, count(*) from schedule_entries
+   union all select 'monthly_settlements', count(*) from monthly_settlements
+   union all select 'user_sessions', count(*) from user_sessions
+   union all select 'audit_logs', count(*) from audit_logs;"
+```
+
+初始化后确认基础数据仍保留：
+
+```bash
+sqlite3 /var/lib/my-working-schedule/schedule.db \
+  "select 'staff' as table_name, count(*) from staff
+   union all select 'shifts', count(*) from shifts
+   union all select 'holidays', count(*) from holidays
+   union all select 'users', count(*) from users
+   union all select 'user_managed_staff', count(*) from user_managed_staff;"
+```
+
 ## 备份与恢复
 
 手动备份：
