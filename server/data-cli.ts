@@ -4,6 +4,7 @@ import {
   backupSqliteDatabase,
   checkSqliteDatabase,
   initSqliteDatabase,
+  resetSqliteDatabase,
   restoreSqliteBackup
 } from "./sqlite/maintenance";
 
@@ -12,6 +13,7 @@ const config = resolveServerConfig();
 const sqlitePath = resolve(config.sqlitePath ?? "data/schedule.db");
 const backupPath = resolve(config.backupPath ?? "backups");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
+const resetGuidance = "Reset is a high-risk operation. Set CONFIRM_RESET=yes to continue.";
 const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
 
 function resolveRestoreBackupFile(backupFile: string): string | null {
@@ -88,7 +90,18 @@ async function main() {
     return;
   }
 
-  console.error("Usage: node --import tsx server/data-cli.ts <preflight|init|backup|restore|check>");
+  if (command === "reset") {
+    if (process.env.CONFIRM_RESET !== "yes") {
+      console.error(resetGuidance);
+      process.exitCode = 1;
+      return;
+    }
+    const result = await resetSqliteDatabase({ sqlitePath, backupPath, confirm: true });
+    console.log(JSON.stringify(result, null, 2));
+    return;
+  }
+
+  console.error("Usage: node --import tsx server/data-cli.ts <preflight|init|backup|restore|reset|check>");
   process.exitCode = 1;
 }
 

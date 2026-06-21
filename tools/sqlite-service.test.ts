@@ -17,6 +17,7 @@ const tempFiles: string[] = [];
 const bashPath = "/bin/bash";
 const scriptPath = resolve(process.cwd(), "tools/sqlite-service.sh");
 const restoreGuidance = "Restore is a high-risk operation. Set CONFIRM_RESTORE=yes to continue.";
+const resetGuidance = "Reset is a high-risk operation. Set CONFIRM_RESET=yes to continue.";
 const invalidRestoreFilenameMessage = "restore backup filename must be a simple filename under backup path";
 
 async function createTempDir() {
@@ -1179,5 +1180,47 @@ exit 0
     expect(result.stderr).toContain(invalidRestoreFilenameMessage);
     expect(existsSync(sqliteDir)).toBe(false);
     expect(existsSync(backupDir)).toBe(false);
+  });
+
+  it("rejects data-cli reset without explicit confirmation", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    await createValidSqliteBackup(sqlitePath);
+
+    const result = await runDataCli(["reset"], {
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: join(dir, "backups")
+    });
+
+    expect(result.code).toBe(1);
+    expect(result.stderr).toContain(resetGuidance);
+  });
+
+  it("runs data-cli reset when confirmation is explicit", async () => {
+    const dir = await createTempDir();
+    const sqlitePath = join(dir, "schedule.db");
+    const backupPath = join(dir, "backups");
+    await createValidSqliteBackup(sqlitePath);
+
+    const result = await runDataCli(["reset"], {
+      CONFIRM_RESET: "yes",
+      SCHEDULE_SQLITE_PATH: sqlitePath,
+      SCHEDULE_BACKUP_PATH: backupPath
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    const parsed = JSON.parse(result.stdout) as {
+      sqlitePath: string;
+      backupFile: string;
+      clearedTables: string[];
+      check: { ok: boolean };
+      message: string;
+    };
+    expect(parsed.sqlitePath).toBe(sqlitePath);
+    expect(parsed.backupFile.startsWith(backupPath)).toBe(true);
+    expect(parsed.clearedTables).toContain("schedule_entries");
+    expect(parsed.clearedTables).toContain("audit_logs");
+    expect(parsed.check.ok).toBe(true);
+    expect(parsed.message).toContain("users must log in again");
   });
 });

@@ -16,6 +16,7 @@
     "data:init:sqlite": "node --import tsx server/data-cli.ts init",
     "data:backup": "node --import tsx server/data-cli.ts backup",
     "data:restore": "node --import tsx server/data-cli.ts restore",
+    "data:reset": "node --import tsx server/data-cli.ts reset",
     "data:check:sqlite": "node --import tsx server/data-cli.ts check",
     "data:preflight": "node --import tsx server/data-cli.ts preflight"
   },
