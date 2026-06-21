@@ -76,7 +76,8 @@ const ElButtonStub = defineComponent({
 const ElPopconfirmStub = defineComponent({
   name: "ElPopconfirm",
   emits: ["confirm"],
-  template: '<span @click="$emit(\'confirm\')"><slot name="reference" /></span>'
+  template:
+    '<span><slot name="reference" /><button data-testid="confirm-popconfirm" type="button" @click="$emit(\'confirm\')">confirm</button></span>'
 });
 
 const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
@@ -223,6 +224,12 @@ function mountDrawer() {
   });
 }
 
+function getConfirmButtonFor(wrapper: ReturnType<typeof mountDrawer>, selector: string) {
+  return wrapper
+    .findAll('[data-testid="confirm-popconfirm"]')
+    .find((button) => button.element.parentElement?.querySelector(selector));
+}
+
 describe("ManagementDrawer", () => {
   it("adds mobile-friendly drawer and compact list hooks", () => {
     const wrapper = mountDrawer();
@@ -244,6 +251,7 @@ describe("ManagementDrawer", () => {
 
     await wrapper.get(".management-mobile-staff").trigger("click");
     await wrapper.get('[data-testid="delete-staff-button"]').trigger("click");
+    await getConfirmButtonFor(wrapper, '[data-testid="delete-staff-button"]')!.trigger("click");
 
     expect(wrapper.emitted("deleteStaff")).toEqual([["staff-head"]]);
   });
@@ -273,8 +281,15 @@ describe("ManagementDrawer", () => {
   it("emits deleteUser for existing account deletion", async () => {
     const wrapper = mountDrawer();
 
-    await wrapper.get(".management-mobile-user").trigger("click");
+    await wrapper
+      .findAll(".management-mobile-user")
+      .find((item) => item.text().includes("系统管理员"))!
+      .trigger("click");
     await wrapper.get('[data-testid="delete-user-button"]').trigger("click");
+
+    expect(wrapper.emitted("deleteUser")).toBeUndefined();
+
+    await getConfirmButtonFor(wrapper, '[data-testid="delete-user-button"]')!.trigger("click");
 
     expect(wrapper.emitted("deleteUser")).toEqual([["user-admin"]]);
   });
