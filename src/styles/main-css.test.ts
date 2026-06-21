@@ -66,6 +66,38 @@ describe("main.css schedule grid sticky column rules", () => {
     expect(ruleBlocks(".shift-dot")).toHaveLength(0);
   });
 
+  it("lays out the schedule staff search controls without crowding the grid", () => {
+    const searchRules = ruleBlocks(".schedule-search")[0] ?? "";
+    const inputRules = ruleBlocks(".schedule-search-input")[0] ?? "";
+    const countRules = ruleBlocks(".schedule-search-count")[0] ?? "";
+    const clearRules = ruleBlocks(".schedule-search-clear")[0] ?? "";
+    const emptyRules = ruleBlocks(".schedule-search-empty")[0] ?? "";
+
+    expect(searchRules).toContain("display: flex");
+    expect(searchRules).toContain("flex-wrap: wrap");
+    expect(searchRules).toContain("align-items: center");
+    expect(searchRules).toContain("gap: 8px");
+    expect(searchRules).toContain("margin: 0 0 8px");
+    expect(inputRules).toContain("flex: 1 1 220px");
+    expect(inputRules).toContain("min-height: 34px");
+    expect(countRules).toContain("white-space: nowrap");
+    expect(clearRules).toContain("min-height: 34px");
+    expect(emptyRules).toContain("text-align: center");
+  });
+
+  it("stacks the schedule staff search controls on mobile", () => {
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const mobileSearch = ruleBlockIn(mobileCss, ".schedule-search");
+    const mobileInput = ruleBlockIn(mobileCss, ".schedule-search-input");
+    const mobileClear = ruleBlockIn(mobileCss, ".schedule-search-clear");
+
+    expect(mobileSearch).toContain("display: grid");
+    expect(mobileSearch).toContain("grid-template-columns: 1fr");
+    expect(mobileInput).toContain("width: 100%");
+    expect(mobileInput).toContain("min-width: 0");
+    expect(mobileClear).toContain("width: 100%");
+  });
+
   it("keeps sort id, staff and type columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";
