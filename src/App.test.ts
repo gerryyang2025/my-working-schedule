@@ -7,6 +7,7 @@ import type { AuthUser, PublicAppData } from "@/api/client";
 const apiMocks = vi.hoisted(() => ({
   bulkUpdateWeekSchedule: vi.fn(),
   copyPreviousWeekSchedule: vi.fn(),
+  deleteUser: vi.fn(),
   deleteStaff: vi.fn(),
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
@@ -301,7 +302,7 @@ const CellEditorDialogStub = defineComponent({
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
   props: ["modelValue", "users", "auditLogs"],
-  emits: ["saveStaff", "deleteStaff", "saveUser", "refreshAuditLogs"],
+  emits: ["saveStaff", "deleteStaff", "saveUser", "deleteUser", "refreshAuditLogs"],
   template: `
     <section v-if="modelValue" data-testid="management-drawer">
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
@@ -333,6 +334,13 @@ const ManagementDrawerStub = defineComponent({
         @click="$emit('saveUser', { id: 'user-scheduler', username: 'scheduler', displayName: '排班管理员', role: 'scheduler', enabled: true, staffId: null, managedStaffIds: ['staff-head'] })"
       >
         save managed user
+      </button>
+      <button
+        data-testid="drawer-delete-user"
+        type="button"
+        @click="$emit('deleteUser', 'user-scheduler')"
+      >
+        delete user
       </button>
       <button
         data-testid="drawer-refresh-audit"
@@ -764,6 +772,21 @@ describe("App", () => {
       staffId: null,
       managedStaffIds: ["staff-head"]
     });
+  });
+
+  it("deletes users from the management drawer and refreshes users and audit logs", async () => {
+    apiMocks.deleteUser.mockResolvedValue({ ok: true });
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-delete-user"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.deleteUser).toHaveBeenCalledWith("user-scheduler");
+    expect(apiMocks.listUsers).toHaveBeenCalledTimes(2);
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledWith({ limit: 100 });
   });
 
   it("refreshes latest audit logs after saving management configuration", async () => {

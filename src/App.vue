@@ -15,6 +15,7 @@ import {
   bulkUpdateWeekSchedule,
   changePassword,
   copyPreviousWeekSchedule,
+  deleteUser,
   deleteStaff,
   deleteHoliday,
   deleteMonthlySettlement,
@@ -794,6 +795,24 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
   }
 }
 
+async function handleDeleteUser(userId: string): Promise<void> {
+  if (userSaving.value) {
+    return;
+  }
+
+  userSaving.value = true;
+  try {
+    await deleteUser(userId);
+    await refreshUsers();
+    await refreshLatestAuditLogs();
+    ElMessage.success("账号已删除");
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号删除失败");
+  } finally {
+    userSaving.value = false;
+  }
+}
+
 async function handleConfirmSettlement(payload: { month: string; bonusPool: number }): Promise<void> {
   if (settlementSaving.value || settlementCanceling.value) {
     return;
@@ -1006,6 +1025,7 @@ onMounted(async () => {
           @save-holiday="handleSaveHoliday"
           @delete-holiday="handleDeleteHoliday"
           @save-user="handleSaveUser"
+          @delete-user="handleDeleteUser"
           @refresh-audit-logs="refreshAuditLogs"
         />
 
