@@ -282,7 +282,7 @@ function rowNote(row: MonthlySettlementRow): string {
         <strong>{{ formatMoney(displayedBonusPool) }}</strong>
       </div>
       <div class="settlement-meta-item">
-        <span>普通人员总系数</span>
+        <span>护士与文员总系数</span>
         <strong>{{ formatCoefficient(displayedCoefficientTotal) }}</strong>
       </div>
       <div v-if="settlement" class="settlement-meta-item">

@@ -443,6 +443,8 @@ describe("PrintViews", () => {
     expectPersonCellText(bonusSummaryRows[1].findAll("td")[0].text(), "李文员", "C001");
     expect(bonusSummary.text()).toContain("奖金分配");
     expect(bonusSummary.text()).toContain("奖金总额 2000.00");
+    expect(bonusSummary.text()).toContain("护士与文员总系数 7.90");
+    expect(bonusSummary.text()).not.toContain("普通人员总系数");
     expect(bonusSummary.text()).toContain("月结时间 2026-06-30 18:00");
     expect(bonusSummary.text()).toContain("王护士");
     expect(bonusSummary.text()).toContain("1392.41");

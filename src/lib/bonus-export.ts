@@ -70,7 +70,7 @@ export function createBonusAllocationCsv(input: BonusAllocationCsvInput): string
     csvRow(["导出范围", input.title]),
     csvRow(["状态", input.status]),
     csvRow(["奖金总额", formatMoney(input.bonusPool)]),
-    csvRow(["普通人员总系数", formatCoefficient(input.coefficientTotal)])
+    csvRow(["护士与文员总系数", formatCoefficient(input.coefficientTotal)])
   ];
 
   if (input.sourceMonths.length > 0) {

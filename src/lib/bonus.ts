@@ -1,6 +1,6 @@
 import type { MonthlySettlement, MonthlySettlementRow, MonthlySummary } from "@/types/domain";
 
-const ZERO_COEFFICIENT_MESSAGE = "普通人员月总系数合计为 0，无法按系数分配奖金";
+const ZERO_COEFFICIENT_MESSAGE = "护士与文员月总系数合计为 0，无法按系数分配奖金";
 const INVALID_BONUS_POOL_MESSAGE = "奖金总额格式不正确";
 
 export interface BonusAllocation {

@@ -225,7 +225,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
       <h2>奖金分配</h2>
       <div class="print-bonus-meta">
         <p>奖金总额 {{ formatMoney(monthlySettlement.bonusPool) }}</p>
-        <p>普通人员总系数 {{ formatCoefficient(monthlySettlement.coefficientTotal) }}</p>
+        <p>护士与文员总系数 {{ formatCoefficient(monthlySettlement.coefficientTotal) }}</p>
         <p>月结时间 {{ formatSettledAt(monthlySettlement.settledAt) }}</p>
       </div>
       <table class="print-table print-summary-table">

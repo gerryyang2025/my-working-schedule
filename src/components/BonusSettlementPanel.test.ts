@@ -164,6 +164,8 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.text()).toContain("2026-06");
     expect(wrapper.text()).toContain("未月结");
     expect(wrapper.text()).toContain("李护士");
+    expect(wrapper.text()).toContain("护士与文员总系数");
+    expect(wrapper.text()).not.toContain("普通人员总系数");
     expect(wrapper.text()).toContain("1000.00");
     expect(wrapper.text()).toContain("段护士长");
     expect(wrapper.text()).toContain("护士长绩效单独核算");
@@ -272,7 +274,7 @@ describe("BonusSettlementPanel", () => {
 
     await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
 
-    expect(wrapper.text()).toContain("普通人员月总系数合计为 0，无法按系数分配奖金");
+    expect(wrapper.text()).toContain("护士与文员月总系数合计为 0，无法按系数分配奖金");
     expect(wrapper.get('[data-testid="confirm-settlement-button"]').attributes("disabled")).toBeDefined();
   });
 
@@ -342,7 +344,7 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.find(".settlement-meta").exists()).toBe(false);
     expect(wrapper.find(".bonus-table").exists()).toBe(false);
     expect(wrapper.text()).not.toContain("奖金总额格式不正确");
-    expect(wrapper.text()).not.toContain("普通人员月总系数合计为 0，无法按系数分配奖金");
+    expect(wrapper.text()).not.toContain("护士与文员月总系数合计为 0，无法按系数分配奖金");
     expect(wrapper.text()).not.toContain("李护士");
     expect(wrapper.text()).not.toContain("段护士长");
   });

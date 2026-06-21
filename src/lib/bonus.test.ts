@@ -206,7 +206,7 @@ describe("calculateBonusAllocation", () => {
     );
 
     expect(allocation.canSettle).toBe(false);
-    expect(allocation.message).toBe("普通人员月总系数合计为 0，无法按系数分配奖金");
+    expect(allocation.message).toBe("护士与文员月总系数合计为 0，无法按系数分配奖金");
     expect(allocation.rows.map((row) => row.bonusAmount)).toEqual([0, 0, 0]);
   });
 });
@@ -290,7 +290,7 @@ describe("createMonthlySettlement", () => {
         bonusPool: 100,
         settledAt: "2026-06-30T10:00:00.000Z"
       })
-    ).toThrow("普通人员月总系数合计为 0，无法按系数分配奖金");
+    ).toThrow("护士与文员月总系数合计为 0，无法按系数分配奖金");
   });
 
   it("throws when raw bonus pool is negative before rounding", () => {
