@@ -66,24 +66,48 @@ describe("main.css schedule grid sticky column rules", () => {
     expect(ruleBlocks(".shift-dot")).toHaveLength(0);
   });
 
-  it("keeps the staff column fixed and layered above scrolling day headers", () => {
+  it("keeps sort id, staff and type columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";
+    const sortColumnRules = ruleBlocks(".schedule-grid .sort-col");
     const personColumnRules = ruleBlocks(".schedule-grid .person-col");
+    const typeColumnRules = ruleBlocks(".schedule-grid .type-col");
 
     expect(stickyColumn).toContain("position: sticky");
     expect(stickyColumn).toContain("left: 0");
     expect(stickyHeader).toContain("z-index: 6");
+
+    expect(sortColumnRules).toHaveLength(2);
+    expect(sortColumnRules[0]).toContain("width: var(--sort-col-width, 54px)");
+    expect(sortColumnRules[0]).toContain("min-width: var(--sort-col-width, 54px)");
+    expect(sortColumnRules[0]).toContain("max-width: var(--sort-col-width, 54px)");
+    expect(sortColumnRules[0]).toContain("left: 0");
+    expect(sortColumnRules[1]).toContain("width: var(--sort-col-mobile-width, 42px)");
+    expect(sortColumnRules[1]).toContain("min-width: var(--sort-col-mobile-width, 42px)");
+    expect(sortColumnRules[1]).toContain("max-width: var(--sort-col-mobile-width, 42px)");
+
     expect(personColumnRules).toHaveLength(2);
     expect(personColumnRules[0]).toContain("width: var(--person-col-width, 88px)");
     expect(personColumnRules[0]).toContain("min-width: var(--person-col-width, 88px)");
     expect(personColumnRules[0]).toContain("max-width: var(--person-col-width, 88px)");
+    expect(personColumnRules[0]).toContain("left: var(--person-col-left, 54px)");
     expect(personColumnRules[0]).toContain("text-align: left");
     expect(personColumnRules[0]).toContain("padding: 0 6px");
     expect(personColumnRules[1]).toContain("width: var(--person-col-mobile-width, 72px)");
     expect(personColumnRules[1]).toContain("min-width: var(--person-col-mobile-width, 72px)");
     expect(personColumnRules[1]).toContain("max-width: var(--person-col-mobile-width, 72px)");
+    expect(personColumnRules[1]).toContain("left: var(--person-col-mobile-left, 42px)");
     expect(personColumnRules[1]).toContain("padding: 0 5px");
+
+    expect(typeColumnRules).toHaveLength(2);
+    expect(typeColumnRules[0]).toContain("width: var(--type-col-width, 58px)");
+    expect(typeColumnRules[0]).toContain("min-width: var(--type-col-width, 58px)");
+    expect(typeColumnRules[0]).toContain("max-width: var(--type-col-width, 58px)");
+    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 142px)");
+    expect(typeColumnRules[1]).toContain("width: var(--type-col-mobile-width, 46px)");
+    expect(typeColumnRules[1]).toContain("min-width: var(--type-col-mobile-width, 46px)");
+    expect(typeColumnRules[1]).toContain("max-width: var(--type-col-mobile-width, 46px)");
+    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 114px)");
   });
 
   it("renders live shift marks as centered text without chip boxes", () => {
@@ -114,6 +138,62 @@ describe("main.css print month layout rules", () => {
     expect(monthTable).toContain("min-width: 1120px");
     expect(monthTable).toContain("table-layout: fixed");
     expect(monthCells).toContain("padding: 4px 2px");
+  });
+
+  it("keeps legacy month detail width fallbacks before class width rules", () => {
+    const previewPersonFallbackSelector =
+      ".print-preview-content .print-month .print-month-detail-table :where(th:first-child, td:first-child)";
+    const previewDayFallbackSelector =
+      ".print-preview-content .print-month .print-month-detail-table :where(th:not(:first-child), td:not(:first-child))";
+    const previewSortSelector = ".print-preview-content .print-month .print-month-detail-table .print-sort-col";
+    const printMedia = mediaBlock("print");
+    const printPersonFallbackSelector = ".print-month-detail-table :where(th:first-child, td:first-child)";
+    const printSortSelector = ".print-month-detail-table .print-sort-col,\n  .print-week-detail-table .print-sort-col";
+
+    const previewPersonFallback = ruleBlockIn(css, previewPersonFallbackSelector);
+    const previewDayFallback = ruleBlockIn(css, previewDayFallbackSelector);
+    const previewSortColumn = ruleBlockIn(css, previewSortSelector);
+    const printPersonFallback = ruleBlockIn(printMedia, printPersonFallbackSelector);
+    const printSortColumn = ruleBlockIn(printMedia, printSortSelector);
+
+    expect(previewPersonFallbackSelector).toContain(":where(");
+    expect(previewDayFallbackSelector).toContain(":where(");
+    expect(printPersonFallbackSelector).toContain(":where(");
+    expect(previewPersonFallback).toContain("width: 86px");
+    expect(previewPersonFallback).toContain("min-width: 86px");
+    expect(previewPersonFallback).toContain("max-width: 86px");
+    expect(previewDayFallback).toContain("width: 34px");
+    expect(previewDayFallback).toContain("min-width: 34px");
+    expect(previewDayFallback).toContain("max-width: 34px");
+    expect(previewSortColumn).toContain("width: 42px");
+    expect(css.indexOf(previewPersonFallbackSelector)).toBeLessThan(css.indexOf(previewSortSelector));
+    expect(css.indexOf(previewDayFallbackSelector)).toBeLessThan(css.indexOf(previewSortSelector));
+
+    expect(printPersonFallback).toContain("width: 68px");
+    expect(printSortColumn).toContain("width: 34px");
+    expect(printMedia.indexOf(printPersonFallbackSelector)).toBeLessThan(printMedia.indexOf(printSortSelector));
+  });
+
+  it("sets explicit preview widths for month detail sort, person, type and day columns", () => {
+    const sortColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-sort-col");
+    const personColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-person-col");
+    const typeColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-type-col");
+    const dayColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-day-col");
+
+    expect(sortColumn).toContain("width: 42px");
+    expect(sortColumn).toContain("min-width: 42px");
+    expect(sortColumn).toContain("max-width: 42px");
+    expect(personColumn).toContain("width: 86px");
+    expect(typeColumn).toContain("width: 52px");
+    expect(dayColumn).toContain("width: 34px");
+  });
+
+  it("sets print widths for month and week detail identity columns", () => {
+    const printMedia = mediaBlock("print");
+
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-sort-col,\n  .print-week-detail-table .print-sort-col")).toContain("width: 34px");
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-person-col,\n  .print-week-detail-table .print-person-col")).toContain("width: 68px");
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-type-col,\n  .print-week-detail-table .print-type-col")).toContain("width: 42px");
   });
 
   it("renders preview and print shift marks without chip boxes", () => {

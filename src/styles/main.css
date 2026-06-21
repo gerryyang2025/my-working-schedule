@@ -358,12 +358,33 @@ body {
   background: #f8fafc;
 }
 
+.schedule-grid .sort-col {
+  width: var(--sort-col-width, 54px);
+  min-width: var(--sort-col-width, 54px);
+  max-width: var(--sort-col-width, 54px);
+  left: 0;
+  text-align: center;
+  padding: 0 4px;
+}
+
 .schedule-grid .person-col {
   width: var(--person-col-width, 88px);
   min-width: var(--person-col-width, 88px);
   max-width: var(--person-col-width, 88px);
+  left: var(--person-col-left, 54px);
   text-align: left;
   padding: 0 6px;
+}
+
+.schedule-grid .type-col {
+  width: var(--type-col-width, 58px);
+  min-width: var(--type-col-width, 58px);
+  max-width: var(--type-col-width, 58px);
+  left: var(--type-col-left, 142px);
+  text-align: center;
+  padding: 0 4px;
+  font-weight: 700;
+  color: #334155;
 }
 
 .person-col strong,
@@ -651,15 +672,37 @@ body {
   word-break: keep-all;
 }
 
-.print-preview-content .print-month .print-month-detail-table th:first-child,
-.print-preview-content .print-month .print-month-detail-table td:first-child {
+.print-preview-content .print-month .print-month-detail-table :where(th:first-child, td:first-child) {
   width: 86px;
   min-width: 86px;
   max-width: 86px;
 }
 
-.print-preview-content .print-month .print-month-detail-table th:not(:first-child),
-.print-preview-content .print-month .print-month-detail-table td:not(:first-child) {
+.print-preview-content .print-month .print-month-detail-table :where(th:not(:first-child), td:not(:first-child)) {
+  width: 34px;
+  min-width: 34px;
+  max-width: 34px;
+}
+
+.print-preview-content .print-month .print-month-detail-table .print-sort-col {
+  width: 42px;
+  min-width: 42px;
+  max-width: 42px;
+}
+
+.print-preview-content .print-month .print-month-detail-table .print-person-col {
+  width: 86px;
+  min-width: 86px;
+  max-width: 86px;
+}
+
+.print-preview-content .print-month .print-month-detail-table .print-type-col {
+  width: 52px;
+  min-width: 52px;
+  max-width: 52px;
+}
+
+.print-preview-content .print-month .print-month-detail-table .print-day-col {
   width: 34px;
   min-width: 34px;
   max-width: 34px;
@@ -934,11 +977,27 @@ body {
     height: 52px;
   }
 
+  .schedule-grid .sort-col {
+    width: var(--sort-col-mobile-width, 42px);
+    min-width: var(--sort-col-mobile-width, 42px);
+    max-width: var(--sort-col-mobile-width, 42px);
+    padding: 0 3px;
+  }
+
   .schedule-grid .person-col {
     width: var(--person-col-mobile-width, 72px);
     min-width: var(--person-col-mobile-width, 72px);
     max-width: var(--person-col-mobile-width, 72px);
+    left: var(--person-col-mobile-left, 42px);
     padding: 0 5px;
+  }
+
+  .schedule-grid .type-col {
+    width: var(--type-col-mobile-width, 46px);
+    min-width: var(--type-col-mobile-width, 46px);
+    max-width: var(--type-col-mobile-width, 46px);
+    left: var(--type-col-mobile-left, 114px);
+    padding: 0 3px;
   }
 
   .shift-chip {
@@ -1191,9 +1250,23 @@ body {
     vertical-align: middle;
   }
 
-  .print-month-detail-table th:first-child,
-  .print-month-detail-table td:first-child {
+  .print-month-detail-table :where(th:first-child, td:first-child) {
     width: 68px;
+  }
+
+  .print-month-detail-table .print-sort-col,
+  .print-week-detail-table .print-sort-col {
+    width: 34px;
+  }
+
+  .print-month-detail-table .print-person-col,
+  .print-week-detail-table .print-person-col {
+    width: 68px;
+  }
+
+  .print-month-detail-table .print-type-col,
+  .print-week-detail-table .print-type-col {
+    width: 42px;
   }
 
   .print-table .historical-staff-label {
