@@ -270,6 +270,21 @@ describe("ManagementDrawer", () => {
     ]);
   });
 
+  it("emits deleteUser for existing account deletion", async () => {
+    const wrapper = mountDrawer();
+
+    await wrapper.get(".management-mobile-user").trigger("click");
+    await wrapper.get('[data-testid="delete-user-button"]').trigger("click");
+
+    expect(wrapper.emitted("deleteUser")).toEqual([["user-admin"]]);
+  });
+
+  it("does not show delete user button for new account drafts", () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.find('[data-testid="delete-user-button"]').exists()).toBe(false);
+  });
+
   it("shows account staff bindings and emits selected staff ids", async () => {
     const wrapper = mountDrawer();
 

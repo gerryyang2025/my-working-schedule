@@ -235,6 +235,12 @@ export function saveUser(user: SaveAuthUserInput): Promise<{ user: ManagedAuthUs
   });
 }
 
+export function deleteUser(id: string): Promise<{ ok: true }> {
+  return requestJson<{ ok: true }>(`/api/users/${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+}
+
 export function changePassword(payload: PasswordChangeInput): Promise<{ ok: true }> {
   return requestJson<{ ok: true }>("/api/auth/password", {
     method: "PUT",
