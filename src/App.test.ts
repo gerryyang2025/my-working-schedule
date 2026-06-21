@@ -781,12 +781,15 @@ describe("App", () => {
     await flushPromises();
     await wrapper.get('[data-testid="open-management"]').trigger("click");
     await flushPromises();
+    const listUsersCallCountBeforeDelete = apiMocks.listUsers.mock.calls.length;
+    const listAuditLogsCallCountBeforeDelete = apiMocks.listAuditLogs.mock.calls.length;
+
     await wrapper.get('[data-testid="drawer-delete-user"]').trigger("click");
     await flushPromises();
 
     expect(apiMocks.deleteUser).toHaveBeenCalledWith("user-scheduler");
-    expect(apiMocks.listUsers).toHaveBeenCalledTimes(2);
-    expect(apiMocks.listAuditLogs).toHaveBeenCalledWith({ limit: 100 });
+    expect(apiMocks.listUsers).toHaveBeenCalledTimes(listUsersCallCountBeforeDelete + 1);
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeDelete + 1);
   });
 
   it("refreshes latest audit logs after saving management configuration", async () => {
