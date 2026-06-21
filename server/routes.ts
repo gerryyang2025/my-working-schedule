@@ -325,6 +325,20 @@ function formatUserSaveSummary(user: AuthUser, staff: StaffMember | null, manage
   return `保存账号：${user.username}，${bindingText}，${formatManagedStaffSummary(user, managedStaff)}`;
 }
 
+function assertStaffCanBeDeleted(data: AppData, users: AuthUser[], staff: StaffMember): void {
+  if (data.scheduleEntries.some((entry) => entry.staffId === staff.id)) {
+    throw new HttpResponseError(400, `人员已有历史排班或月结记录，不能删除，请停用人员：${staff.name}`);
+  }
+
+  if (data.monthlySettlements.some((settlement) => settlement.rows.some((row) => row.staffId === staff.id))) {
+    throw new HttpResponseError(400, `人员已有历史排班或月结记录，不能删除，请停用人员：${staff.name}`);
+  }
+
+  if (users.some((user) => user.staffId === staff.id || user.managedStaffIds.includes(staff.id))) {
+    throw new HttpResponseError(400, `人员已被账号绑定或纳入可管理人员，请先调整账号后再删除：${staff.name}`);
+  }
+}
+
 function validateUserStaffBinding(
   data: AppData,
   users: AuthUser[],
@@ -963,6 +977,39 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         staff: upsertById(data.staff, staffMember)
       }));
       await recordAudit(request, "data.staff.save", "staff", staffMember.id, `保存人员：${staffMember.name}`);
+      response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.delete("/data/staff/:id", requireAdmin, async (request, response, next) => {
+    try {
+      const staffId = getRouteParam(request, "id");
+      let deletedStaff: StaffMember | undefined;
+
+      const nextData = await storage.update(async (data) => {
+        const staff = data.staff.find((item) => item.id === staffId);
+        if (!staff) {
+          throw new HttpResponseError(404, "人员不存在");
+        }
+
+        const users = await authStore.listUsers();
+        assertStaffCanBeDeleted(data, users, staff);
+        deletedStaff = staff;
+
+        return {
+          ...data,
+          staff: data.staff.filter((item) => item.id !== staffId)
+        };
+      });
+
+      const staffForAudit = deletedStaff;
+      if (!staffForAudit) {
+        throw new Error("人员删除失败");
+      }
+
+      await recordAudit(request, "data.staff.delete", "staff", staffForAudit.id, `删除人员：${staffForAudit.name}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);

@@ -75,7 +75,8 @@ const ElButtonStub = defineComponent({
 
 const ElPopconfirmStub = defineComponent({
   name: "ElPopconfirm",
-  template: "<span><slot name=\"reference\" /></span>"
+  emits: ["confirm"],
+  template: '<span @click="$emit(\'confirm\')"><slot name="reference" /></span>'
 });
 
 const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
@@ -234,6 +235,17 @@ describe("ManagementDrawer", () => {
     expect(wrapper.get(".management-mobile-shift").text()).toContain("系数 1.5");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("2026-06-19");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("端午节");
+  });
+
+  it("emits deleteStaff only for an existing staff draft", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.find('[data-testid="delete-staff-button"]').exists()).toBe(false);
+
+    await wrapper.get(".management-mobile-staff").trigger("click");
+    await wrapper.get('[data-testid="delete-staff-button"]').trigger("click");
+
+    expect(wrapper.emitted("deleteStaff")).toEqual([["staff-head"]]);
   });
 
   it("renders account management and emits account saves", async () => {

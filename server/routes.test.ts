@@ -854,6 +854,55 @@ describe.sequential("API routes", () => {
     expect(response.body.settings.adminPassword).toBeUndefined();
   });
 
+  it("deletes unused test staff and records an audit log", async () => {
+    const data = createSeedData();
+    data.staff.push({
+      id: "staff-test",
+      jobId: "T001",
+      name: "测试人员",
+      type: "nurse",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 99
+    });
+    const app = createTestApp(data);
+
+    const response = await request(app).delete("/api/data/staff/staff-test").set(await adminHeaders(app)).expect(200);
+
+    expect(response.body.staff.some((staff: StaffMember) => staff.id === "staff-test")).toBe(false);
+
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .set(await adminHeaders(app))
+      .query({ action: "data.staff.delete", keyword: "测试人员", limit: "20" })
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "data.staff.delete",
+          summary: "删除人员：测试人员"
+        })
+      ])
+    );
+  });
+
+  it("rejects deleting staff with historical schedule entries", async () => {
+    const data = createSeedData();
+    data.scheduleEntries.push({
+      id: "2026-06-15__staff-nurse-001",
+      date: "2026-06-15",
+      staffId: "staff-nurse-001",
+      shiftIds: ["shift-a1"],
+      note: ""
+    });
+    const app = createTestApp(data);
+
+    await request(app)
+      .delete("/api/data/staff/staff-nurse-001")
+      .set(await adminHeaders(app))
+      .expect(400, { message: "人员已有历史排班或月结记录，不能删除，请停用人员：李护士" });
+  });
+
   it("upserts shifts", async () => {
     const app = createTestApp();
     const response = await request(app)
@@ -1729,7 +1778,7 @@ describe.sequential("API routes", () => {
       .send({ month: "2026-06", bonusPool: 1000 })
       .expect(400);
 
-    expect(response.body.message).toBe("普通人员月总系数合计为 0，无法按系数分配奖金");
+    expect(response.body.message).toBe("护士与文员月总系数合计为 0，无法按系数分配奖金");
   });
 
   it("rejects schedule writes in a settled month", async () => {

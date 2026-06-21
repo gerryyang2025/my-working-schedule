@@ -7,6 +7,7 @@ import type { AuthUser, PublicAppData } from "@/api/client";
 const apiMocks = vi.hoisted(() => ({
   bulkUpdateWeekSchedule: vi.fn(),
   copyPreviousWeekSchedule: vi.fn(),
+  deleteStaff: vi.fn(),
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
@@ -300,7 +301,7 @@ const CellEditorDialogStub = defineComponent({
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
   props: ["modelValue", "users", "auditLogs"],
-  emits: ["saveStaff", "saveUser", "refreshAuditLogs"],
+  emits: ["saveStaff", "deleteStaff", "saveUser", "refreshAuditLogs"],
   template: `
     <section v-if="modelValue" data-testid="management-drawer">
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
@@ -311,6 +312,13 @@ const ManagementDrawerStub = defineComponent({
         @click="$emit('saveStaff', { id: 'staff-nurse-001', jobId: '100001', name: '李护士', type: 'nurse', isAdmin: false, enabled: true, sortOrder: 1 })"
       >
         save staff
+      </button>
+      <button
+        data-testid="drawer-delete-staff"
+        type="button"
+        @click="$emit('deleteStaff', 'staff-nurse-001')"
+      >
+        delete staff
       </button>
       <button
         data-testid="drawer-save-user"
@@ -777,6 +785,21 @@ describe("App", () => {
       enabled: true,
       sortOrder: 1
     });
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ limit: 100 });
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
+  });
+
+  it("refreshes latest audit logs after deleting a staff member", async () => {
+    apiMocks.deleteStaff.mockResolvedValue(structuredClone({ ...testData, staff: [] }));
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-delete-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.deleteStaff).toHaveBeenCalledWith("staff-nurse-001");
     expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ limit: 100 });
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
   });

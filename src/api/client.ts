@@ -268,6 +268,12 @@ export function saveStaff(staff: StaffMember): Promise<PublicAppData> {
   });
 }
 
+export function deleteStaff(id: string): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/staff/${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+}
+
 export function saveShift(shift: Shift): Promise<PublicAppData> {
   return requestJson<PublicAppData>(`/api/data/shift/${shift.id}`, {
     method: "PUT",

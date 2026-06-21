@@ -15,6 +15,7 @@ import {
   bulkUpdateWeekSchedule,
   changePassword,
   copyPreviousWeekSchedule,
+  deleteStaff,
   deleteHoliday,
   deleteMonthlySettlement,
   getCurrentUser,
@@ -728,6 +729,23 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
   }
 }
 
+async function handleDeleteStaff(staffId: string): Promise<void> {
+  if (staffSaving.value) {
+    return;
+  }
+
+  staffSaving.value = true;
+  try {
+    data.value = await deleteStaff(staffId);
+    staffSaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
+  } catch (caughtError) {
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员删除失败");
+  } finally {
+    staffSaving.value = false;
+  }
+}
+
 async function handleSaveShift(shift: Shift): Promise<void> {
   if (shiftSaving.value) {
     return;
@@ -1004,6 +1022,7 @@ onMounted(async () => {
           :user-saving="userSaving"
           :audit-loading="auditLoading"
           @save-staff="handleSaveStaff"
+          @delete-staff="handleDeleteStaff"
           @save-shift="handleSaveShift"
           @save-holiday="handleSaveHoliday"
           @delete-holiday="handleDeleteHoliday"
