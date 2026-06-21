@@ -100,6 +100,7 @@ describe("optools.sh", () => {
     expect(result.stdout).toContain("./optools.sh app doctor");
     expect(result.stdout).toContain("./optools.sh app status");
     expect(result.stdout).toContain("./optools.sh doctor");
+    expect(result.stdout).toContain("./optools.sh doctor guide");
     expect(result.stdout).toContain("HOST");
     expect(result.stdout).toContain("WEB_HOST");
     expect(result.stdout).toContain("PUBLIC_HOST");
@@ -1091,6 +1092,32 @@ fi
     expect(await readFile(logPath, "utf8")).toContain("data check");
     expect(await readFile(logPath, "utf8")).toContain("logrotate status");
     expect(await readFile(logPath, "utf8")).toContain("firewall status");
+  });
+
+  it("prints doctor troubleshooting guidance", async () => {
+    const result = await runOptools(["doctor", "guide"]);
+
+    expect(result.code).toBe(0);
+    expect(result.stdout).toContain("doctor guide: production runtime checks");
+    expect(result.stdout).toContain("[fail] data check");
+    expect(result.stdout).toContain("./optools.sh data status");
+    expect(result.stdout).toContain("./optools.sh data check");
+    expect(result.stdout).toContain("[fail] nginx test");
+    expect(result.stdout).toContain("./optools.sh nginx status");
+    expect(result.stdout).toContain("./optools.sh nginx test");
+    expect(result.stdout).toContain("[skip] nginx https config");
+    expect(result.stdout).toContain("HTTP + IP");
+    expect(result.stdout).toContain("[fail] logrotate status");
+    expect(result.stdout).toContain("./optools.sh logrotate status");
+    expect(result.stdout).toContain("./optools.sh logrotate install");
+    expect(result.stdout).toContain("./optools.sh logrotate test");
+    expect(result.stdout).toContain("[fail] firewall status");
+    expect(result.stdout).toContain("./optools.sh firewall status");
+    expect(result.stdout).toContain("./optools.sh firewall guide");
+    expect(result.stdout).toContain("[fail] api health");
+    expect(result.stdout).toContain("./optools.sh app status");
+    expect(result.stdout).toContain("./optools.sh app health");
+    expect(result.stdout).toContain("journalctl -u my-working-schedule -n 100 --no-pager");
   });
 
   it("reports stopped when no dev pid exists", async () => {

@@ -107,6 +107,7 @@ Usage:
   ./optools.sh app logs       Show production service logs
   ./optools.sh app health     Check production API health
   ./optools.sh doctor         Run full production runtime checks
+  ./optools.sh doctor guide   Explain doctor checks and common fixes
   ./optools.sh help           Show this help
 
 Environment:
@@ -1217,6 +1218,47 @@ run_doctor() {
   return 1
 }
 
+run_doctor_guide() {
+  cat <<EOF
+doctor guide: production runtime checks
+
+[fail] data check
+  Inspect SQLite storage paths and helper output:
+    ./optools.sh data status
+    ./optools.sh data check
+  Common fixes: initialize or repair the data directory, confirm permissions for ${APP_USER}, and restore from a known-good backup if integrity fails.
+
+[fail] nginx test
+  Inspect generated nginx config and validate syntax:
+    ./optools.sh nginx status
+    ./optools.sh nginx test
+  Common fixes: rerun nginx configuration, fix conflicting server blocks, then reload nginx after the test passes.
+
+[skip] nginx https config
+  This is expected during the HTTP + IP phase. Accept the skip until a formal domain and certificate are available, then run HTTPS configuration and include it in final acceptance.
+
+[fail] logrotate status
+  Install or refresh the app logrotate config:
+    ./optools.sh logrotate status
+    ./optools.sh logrotate install
+    ./optools.sh logrotate test
+  Common fixes: verify log paths exist, run the logrotate dry-run, and confirm the helper can read the installed config.
+
+[fail] firewall status
+  Review host firewall and cloud security group rules:
+    ./optools.sh firewall status
+    ./optools.sh firewall guide
+  Common fixes: allow HTTP now, add HTTPS after certificate setup, and keep the API port private behind nginx.
+
+[fail] api health
+  Inspect the production service, recent logs, and local health endpoint:
+    ./optools.sh app status
+    ./optools.sh app health
+    journalctl -u ${APP_SERVICE_NAME} -n 100 --no-pager
+  Common fixes: restart the app service, confirm server config paths, and check that nginx proxies to the configured API port.
+EOF
+}
+
 main() {
   local scope="${1:-help}"
   local command="${2:-}"
@@ -1256,7 +1298,20 @@ main() {
       run_app_helper "$@"
       ;;
     doctor)
-      run_doctor
+      shift || true
+      case "${1:-}" in
+        "")
+          run_doctor
+          ;;
+        guide)
+          run_doctor_guide
+          ;;
+        *)
+          echo "Unknown doctor command: $1" >&2
+          usage
+          return 1
+          ;;
+      esac
       ;;
     dev)
       case "$command" in

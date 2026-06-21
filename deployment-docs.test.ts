@@ -54,6 +54,33 @@ describe("production deployment docs and examples", () => {
     expect(runbook).toContain("/api/health");
   });
 
+  it("documents production acceptance and backup restore rehearsal records", async () => {
+    const runbook = await readProjectFile("docs/正式部署运行手册.md");
+    const checklist = await readProjectFile("docs/正式上线验收清单.md");
+    const rehearsal = await readProjectFile("docs/备份恢复演练记录模板.md");
+
+    expect(runbook).toContain("[正式上线验收清单](./正式上线验收清单.md)");
+    expect(runbook).toContain("[备份恢复演练记录模板](./备份恢复演练记录模板.md)");
+    expect(runbook).toContain("./optools.sh doctor guide");
+
+    expect(checklist).toContain("# 正式上线验收清单");
+    expect(checklist).toContain("当前阶段：HTTP + 服务器公网 IP");
+    expect(checklist).toContain("./optools.sh deploy");
+    expect(checklist).toContain("./optools.sh doctor");
+    expect(checklist).toContain("./optools.sh doctor guide");
+    expect(checklist).toContain("./optools.sh data backup");
+    expect(checklist).toContain("CONFIRM_RESTORE=yes ./optools.sh data restore");
+    expect(checklist).toContain("公网访问 http://<server-ip>/");
+    expect(checklist).toContain("不要求 HTTPS 验收通过");
+
+    expect(rehearsal).toContain("# 备份恢复演练记录模板");
+    expect(rehearsal).toContain("演练时间");
+    expect(rehearsal).toContain("备份文件");
+    expect(rehearsal).toContain("./optools.sh data check");
+    expect(rehearsal).toContain("CONFIRM_RESTORE=yes ./optools.sh data restore");
+    expect(rehearsal).toContain("恢复后验证结论");
+  });
+
   it("keeps production config examples on SQLite without committed secrets", async () => {
     const config = JSON.parse(await readProjectFile("config/server.production.example.json")) as Record<string, unknown>;
 
