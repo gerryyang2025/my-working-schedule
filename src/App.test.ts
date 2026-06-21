@@ -123,6 +123,22 @@ const twoStaffData: PublicAppData = {
   ]
 };
 
+const mixedCaseStaffData: PublicAppData = {
+  ...twoStaffData,
+  staff: [
+    ...twoStaffData.staff,
+    {
+      id: "staff-clerk-abc",
+      jobId: "AbC003",
+      name: "陈文员",
+      type: "clerk",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 3
+    }
+  ]
+};
+
 const managedSettlementRow: PublicAppData["monthlySettlements"][number]["rows"][number] = {
   staffId: "staff-nurse-001",
   staffName: "李护士",
@@ -893,6 +909,88 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
     expect(wrapper.get('[data-testid="schedule-editable-staff-ids"]').text()).toBe("");
+  });
+
+  it("filters schedule staff by name and restores all staff when cleared", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
+
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("王护士");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-002");
+    expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 1 / 2 人");
+
+    await wrapper.get('[data-testid="clear-schedule-staff-search"]').trigger("click");
+    await nextTick();
+
+    expect((wrapper.get('[data-testid="schedule-staff-search"]').element as HTMLInputElement).value).toBe("");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
+    expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
+  });
+
+  it("filters schedule staff by trimmed case-insensitive job id", async () => {
+    const wrapper = mountApp(mixedCaseStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue(" abc003 ");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-clerk-abc");
+    expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 1 / 3 人");
+  });
+
+  it("shows an empty state when schedule staff search has no matches", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("不存在");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="schedule-staff-ids"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="schedule-staff-search-empty"]').text()).toBe("未找到匹配人员");
+    expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 0 / 2 人");
+  });
+
+  it("keeps weekly summary available when schedule staff search has no matches", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("不存在");
+    await wrapper.get('[data-testid="workbench-tab-weekly"]').trigger("click");
+    await nextTick();
+
+    expectPanelVisible(wrapper, "workbench-panel-weekly");
+    expect(wrapper.get('[data-testid="weekly-summary"]').text()).toContain("2026-06-15-2026-06-21");
+    vi.useRealTimers();
+  });
+
+  it("does not narrow batch week operations to the staff search result", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(twoStaffData),
+      result: { updated: 14, skipped: 0 }
+    });
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("王护士");
+    await wrapper.get('[data-testid="batch-rest-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "set-shift",
+      shiftId: "shift-rest",
+      mode: "overwrite"
+    });
+    vi.useRealTimers();
   });
 
   it("blocks unmanaged scheduler schedule edits even if the grid emits them", async () => {

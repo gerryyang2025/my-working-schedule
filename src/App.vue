@@ -65,6 +65,7 @@ const loginError = ref("");
 const selectedDate = ref(today);
 const managementOpen = ref(false);
 const selectedShiftId = ref("");
+const scheduleStaffQuery = ref("");
 const editorOpen = ref(false);
 const editingStaffId = ref("");
 const editingDate = ref("");
@@ -141,6 +142,39 @@ const editingEntry = computed(
     data.value?.scheduleEntries.find((entry) => entry.staffId === editingStaffId.value && entry.date === editingDate.value) ??
     null
 );
+const currentWeekScheduleDateKeys = computed(() => new Set(scheduleDays.value.map((day) => day.key)));
+const scheduleStaffWithVisibleEntries = computed(() => {
+  if (!data.value) {
+    return new Set<string>();
+  }
+
+  return new Set(
+    data.value.scheduleEntries
+      .filter((entry) => currentWeekScheduleDateKeys.value.has(entry.date))
+      .map((entry) => entry.staffId)
+  );
+});
+const scheduleVisibleStaff = computed<StaffMember[]>(() => {
+  if (!data.value) {
+    return [];
+  }
+
+  return data.value.staff.filter((staff) => staff.enabled || scheduleStaffWithVisibleEntries.value.has(staff.id));
+});
+const normalizedScheduleStaffQuery = computed(() => scheduleStaffQuery.value.trim().toLowerCase());
+const filteredScheduleStaff = computed<StaffMember[]>(() => {
+  const query = normalizedScheduleStaffQuery.value;
+
+  if (!query) {
+    return scheduleVisibleStaff.value;
+  }
+
+  return scheduleVisibleStaff.value.filter(
+    (staff) => staff.name.toLowerCase().includes(query) || staff.jobId.toLowerCase().includes(query)
+  );
+});
+const hasScheduleStaffSearch = computed(() => normalizedScheduleStaffQuery.value.length > 0);
+const hasScheduleStaffSearchResults = computed(() => filteredScheduleStaff.value.length > 0);
 const shiftCoefficientDescriptions = computed(() =>
   (data.value?.shifts ?? [])
     .filter((shift) => shift.enabled)
@@ -663,6 +697,10 @@ function canEditStaffId(staffId: string): boolean {
   return editableStaffIds.value.includes(staffId);
 }
 
+function clearScheduleStaffSearch(): void {
+  scheduleStaffQuery.value = "";
+}
+
 async function handleQuickFill(staffId: string, date: string): Promise<void> {
   if (!canEditStaffId(staffId) || !selectedShiftId.value) {
     return;
@@ -1083,9 +1121,40 @@ onMounted(async () => {
                 批量清空
               </button>
             </div>
+            <div class="schedule-search" role="search" aria-label="排班人员搜索">
+              <label class="schedule-search-label" for="schedule-staff-search">搜索人员</label>
+              <input
+                id="schedule-staff-search"
+                v-model="scheduleStaffQuery"
+                class="schedule-search-input"
+                data-testid="schedule-staff-search"
+                type="search"
+                placeholder="输入姓名或工号"
+              />
+              <span class="schedule-search-count" data-testid="schedule-staff-search-count">
+                已显示 {{ filteredScheduleStaff.length }} / {{ scheduleVisibleStaff.length }} 人
+              </span>
+              <button
+                v-if="hasScheduleStaffSearch"
+                class="schedule-search-clear"
+                data-testid="clear-schedule-staff-search"
+                type="button"
+                @click="clearScheduleStaffSearch"
+              >
+                清空
+              </button>
+              <p
+                v-if="hasScheduleStaffSearch && !hasScheduleStaffSearchResults"
+                class="schedule-search-empty"
+                data-testid="schedule-staff-search-empty"
+              >
+                未找到匹配人员
+              </p>
+            </div>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid
-              :staff="data.staff"
+              v-if="!hasScheduleStaffSearch || hasScheduleStaffSearchResults"
+              :staff="filteredScheduleStaff"
               :days="scheduleDays"
               :holidays="data.holidays"
               :shifts="data.shifts"
