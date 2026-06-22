@@ -139,6 +139,52 @@ const mixedCaseStaffData: PublicAppData = {
   ]
 };
 
+const queryStaffData: PublicAppData = {
+  ...mixedCaseStaffData,
+  staff: [
+    ...mixedCaseStaffData.staff,
+    {
+      id: "staff-retired-004",
+      jobId: "900004",
+      name: "赵历史",
+      type: "nurse",
+      isAdmin: false,
+      enabled: false,
+      sortOrder: 4
+    }
+  ],
+  scheduleEntries: [
+    {
+      id: "2026-06-18__staff-nurse-001",
+      date: "2026-06-18",
+      staffId: "staff-nurse-001",
+      shiftIds: ["shift-a1"],
+      note: ""
+    },
+    {
+      id: "2026-06-24__staff-nurse-002",
+      date: "2026-06-24",
+      staffId: "staff-nurse-002",
+      shiftIds: ["shift-a1"],
+      note: ""
+    },
+    {
+      id: "2026-06-24__staff-retired-004",
+      date: "2026-06-24",
+      staffId: "staff-retired-004",
+      shiftIds: ["shift-rest"],
+      note: "historical"
+    },
+    {
+      id: "2026-07-01__staff-retired-004",
+      date: "2026-07-01",
+      staffId: "staff-retired-004",
+      shiftIds: ["shift-a1"],
+      note: "outside first query"
+    }
+  ]
+};
+
 const managedSettlementRow: PublicAppData["monthlySettlements"][number]["rows"][number] = {
   staffId: "staff-nurse-001",
   staffName: "李护士",
@@ -288,6 +334,35 @@ const ScheduleGridStub = defineComponent({
         @click="$emit('editCell', 'staff-nurse-002', '2026-06-15')"
       >
         unmanaged edit
+      </button>
+    </section>
+  `
+});
+
+const ScheduleQueryResultsStub = defineComponent({
+  name: "ScheduleQueryResults",
+  props: ["weekGroups", "staff", "entries"],
+  emits: ["quickFill", "editCell"],
+  template: `
+    <section data-testid="schedule-query-results">
+      <span data-testid="query-week-groups">
+        {{ weekGroups.map((group) => group.start + '-' + group.end + ':' + group.days.map((day) => day.key).join('|')).join(';') }}
+      </span>
+      <span data-testid="query-staff-ids">{{ staff.map((person) => person.id).join(",") }}</span>
+      <span data-testid="query-entry-count">{{ entries.length }}</span>
+      <button
+        data-testid="emit-query-quick-fill"
+        type="button"
+        @click="$emit('quickFill', 'staff-nurse-001', '2026-06-18')"
+      >
+        query quick fill
+      </button>
+      <button
+        data-testid="emit-query-edit-cell"
+        type="button"
+        @click="$emit('editCell', 'staff-nurse-001', '2026-06-18')"
+      >
+        query edit
       </button>
     </section>
   `
@@ -518,6 +593,7 @@ function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null =
         PasswordChangeDialog: PasswordChangeDialogStub,
         PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
+        ScheduleQueryResults: ScheduleQueryResultsStub,
         ShiftPalette: ShiftPaletteStub,
         WeeklySummary: WeeklySummaryStub
       }
@@ -532,6 +608,10 @@ async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
 
 async function openBonusTab(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="workbench-tab-bonus"]').trigger("click");
+}
+
+async function openQueryTab(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('[data-testid="workbench-tab-query"]').trigger("click");
 }
 
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
@@ -968,6 +1048,189 @@ describe("App", () => {
     expectPanelVisible(wrapper, "workbench-panel-weekly");
     expect(wrapper.get('[data-testid="weekly-summary"]').text()).toContain("2026-06-15-2026-06-21");
     vi.useRealTimers();
+  });
+
+  it("adds the query tab between schedule and weekly with the current week selected by default", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+
+    expect(wrapper.findAll(".workbench-tabs button").map((button) => button.text())).toEqual([
+      "排班",
+      "查询",
+      "周统计",
+      "月结与奖金"
+    ]);
+
+    await openQueryTab(wrapper);
+    await nextTick();
+
+    expectPanelVisible(wrapper, "workbench-panel-query");
+    expectPanelHidden(wrapper, "workbench-panel-weekly");
+    expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 2 / 2 人；日期 7 天；共 1 周");
+    expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(true);
+  });
+
+  it("splits a custom query range by natural week", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-06-18");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-24");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="query-week-groups"]').text()).toBe(
+      "2026-06-18-2026-06-21:2026-06-18|2026-06-19|2026-06-20|2026-06-21;" +
+        "2026-06-22-2026-06-24:2026-06-22|2026-06-23|2026-06-24"
+    );
+    expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 2 / 2 人；日期 7 天；共 2 周");
+  });
+
+  it("filters query staff by trimmed case-insensitive name or job id", async () => {
+    const wrapper = mountApp(mixedCaseStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="schedule-query-staff-search"]').setValue(" abc003 ");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="query-staff-ids"]').text()).toBe("staff-clerk-abc");
+    expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 1 / 3 人；日期 7 天；共 1 周");
+
+    await wrapper.get('[data-testid="schedule-query-staff-search"]').setValue(" 王护士 ");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="query-staff-ids"]').text()).toBe("staff-nurse-002");
+
+    await wrapper.get('[data-testid="schedule-query-staff-search"]').setValue("不存在");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="schedule-query-empty"]').text()).toBe("未找到匹配人员");
+  });
+
+  it("shows disabled historical staff only when the query range contains their entries", async () => {
+    const wrapper = mountApp(queryStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-06-18");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-24");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="query-staff-ids"]').text()).toBe(
+      "staff-nurse-001,staff-nurse-002,staff-clerk-abc,staff-retired-004"
+    );
+    expect(wrapper.get('[data-testid="query-entry-count"]').text()).toBe("3");
+
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-23");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="query-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002,staff-clerk-abc");
+    expect(wrapper.get('[data-testid="query-entry-count"]').text()).toBe("1");
+  });
+
+  it("warns for long query ranges while still rendering results", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-01-01");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-07-01");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-query-warning"]').text()).toBe(
+      "当前查询范围较长，结果较多，加载和滚动可能变慢。"
+    );
+    expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 2 / 2 人；日期 182 天；共 27 周");
+    expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(true);
+  });
+
+  it("shows range errors and hides stale query results", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-06-24");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-18");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-query-error"]').text()).toBe("开始日期不能晚于结束日期");
+    expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(false);
+  });
+
+  it("clears query conditions and resumes syncing the query range with the selected week", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    const defaultQueryStartDate = (wrapper.get('[data-testid="schedule-query-start-date"]').element as HTMLInputElement)
+      .value;
+    const defaultQueryEndDate = (wrapper.get('[data-testid="schedule-query-end-date"]').element as HTMLInputElement).value;
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-06-01");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-30");
+    await wrapper.get('[data-testid="schedule-query-staff-search"]').setValue("王护士");
+    await wrapper.get('[data-testid="clear-schedule-query"]').trigger("click");
+    await nextTick();
+
+    expect((wrapper.get('[data-testid="schedule-query-start-date"]').element as HTMLInputElement).value).toBe(
+      defaultQueryStartDate
+    );
+    expect((wrapper.get('[data-testid="schedule-query-end-date"]').element as HTMLInputElement).value).toBe(
+      defaultQueryEndDate
+    );
+    expect((wrapper.get('[data-testid="schedule-query-staff-search"]').element as HTMLInputElement).value).toBe("");
+
+    await wrapper.get('[data-testid="jump-date"]').trigger("click");
+    await nextTick();
+
+    expect((wrapper.get('[data-testid="schedule-query-start-date"]').element as HTMLInputElement).value).toBe("2026-06-29");
+    expect((wrapper.get('[data-testid="schedule-query-end-date"]').element as HTMLInputElement).value).toBe("2026-07-05");
+  });
+
+  it("keeps query results read-only even if the child emits edit events", async () => {
+    apiMocks.saveScheduleEntry.mockResolvedValue(structuredClone(twoStaffData));
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="select-shift-a1"]').trigger("click");
+    await wrapper.get('[data-testid="emit-query-quick-fill"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveScheduleEntry).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="emit-query-edit-cell"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="cell-editor"]').exists()).toBe(false);
+  });
+
+  it("keeps query range changes from changing current-week batch office operations", async () => {
+    apiMocks.bulkUpdateWeekSchedule.mockResolvedValue({
+      data: structuredClone(officeShiftData),
+      result: { updated: 7, skipped: 0 }
+    });
+    const wrapper = mountApp(officeShiftData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="jump-same-month-date"]').trigger("click");
+    await openQueryTab(wrapper);
+    await wrapper.get('[data-testid="schedule-query-start-date"]').setValue("2026-06-01");
+    await wrapper.get('[data-testid="schedule-query-end-date"]').setValue("2026-06-30");
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+    await wrapper.get('[data-testid="batch-office-week-button"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.bulkUpdateWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      operation: "set-shift",
+      shiftId: "shift-office",
+      mode: "overwrite"
+    });
   });
 
   it("does not narrow batch week operations to the staff search result", async () => {

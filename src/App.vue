@@ -9,6 +9,7 @@ import ManagementDrawer from "@/components/ManagementDrawer.vue";
 import PasswordChangeDialog from "@/components/PasswordChangeDialog.vue";
 import PrintViews from "@/components/PrintViews.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
+import ScheduleQueryResults from "@/components/ScheduleQueryResults.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
 import WeeklySummary from "@/components/WeeklySummary.vue";
 import {
@@ -48,10 +49,11 @@ import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculati
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
 import { calculateRangeBonusSummary, monthRangeToDates } from "@/lib/range-bonus";
+import { validateScheduleQueryRange } from "@/lib/schedule-query";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
-type WorkbenchTab = "schedule" | "weekly" | "bonus";
+type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -66,6 +68,10 @@ const selectedDate = ref(today);
 const managementOpen = ref(false);
 const selectedShiftId = ref("");
 const scheduleStaffQuery = ref("");
+const scheduleQueryStartDate = ref(getWeekRange(today).start);
+const scheduleQueryEndDate = ref(getWeekRange(today).end);
+const scheduleQueryStaffQuery = ref("");
+const scheduleQueryRangeDirty = ref(false);
 const editorOpen = ref(false);
 const editingStaffId = ref("");
 const editingDate = ref("");
@@ -94,6 +100,7 @@ const bulkUpdatingWeek = ref(false);
 
 const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
+  { key: "query", label: "查询" },
   { key: "weekly", label: "周统计" },
   { key: "bonus", label: "月结与奖金" }
 ];
@@ -175,6 +182,64 @@ const filteredScheduleStaff = computed<StaffMember[]>(() => {
 });
 const hasScheduleStaffSearch = computed(() => normalizedScheduleStaffQuery.value.length > 0);
 const hasScheduleStaffSearchResults = computed(() => filteredScheduleStaff.value.length > 0);
+const scheduleQueryRange = computed(() =>
+  validateScheduleQueryRange(scheduleQueryStartDate.value, scheduleQueryEndDate.value)
+);
+const scheduleQueryDays = computed(() => scheduleQueryRange.value.days);
+const scheduleQueryWeekGroups = computed(() => scheduleQueryRange.value.weekGroups);
+const scheduleQueryDateKeys = computed(() => new Set(scheduleQueryDays.value.map((day) => day.key)));
+const scheduleQueryStaffWithEntries = computed(() => {
+  if (!data.value || !scheduleQueryRange.value.ok) {
+    return new Set<string>();
+  }
+
+  return new Set(
+    data.value.scheduleEntries
+      .filter((entry) => scheduleQueryDateKeys.value.has(entry.date))
+      .map((entry) => entry.staffId)
+  );
+});
+const scheduleQueryVisibleStaff = computed<StaffMember[]>(() => {
+  if (!data.value || !scheduleQueryRange.value.ok) {
+    return [];
+  }
+
+  return data.value.staff.filter((staff) => staff.enabled || scheduleQueryStaffWithEntries.value.has(staff.id));
+});
+const normalizedScheduleQueryStaffQuery = computed(() => scheduleQueryStaffQuery.value.trim().toLowerCase());
+const filteredScheduleQueryStaff = computed<StaffMember[]>(() => {
+  const query = normalizedScheduleQueryStaffQuery.value;
+
+  if (!query) {
+    return scheduleQueryVisibleStaff.value;
+  }
+
+  return scheduleQueryVisibleStaff.value.filter(
+    (staff) => staff.name.toLowerCase().includes(query) || staff.jobId.toLowerCase().includes(query)
+  );
+});
+const hasScheduleQueryStaffSearch = computed(() => normalizedScheduleQueryStaffQuery.value.length > 0);
+const scheduleQueryEntries = computed(() => {
+  if (!data.value || !scheduleQueryRange.value.ok) {
+    return [];
+  }
+
+  const visibleStaffIds = new Set(filteredScheduleQueryStaff.value.map((staff) => staff.id));
+  return data.value.scheduleEntries.filter(
+    (entry) => scheduleQueryDateKeys.value.has(entry.date) && visibleStaffIds.has(entry.staffId)
+  );
+});
+const hasScheduleQueryResults = computed(() => scheduleQueryRange.value.ok && filteredScheduleQueryStaff.value.length > 0);
+const scheduleQuerySummary = computed(
+  () =>
+    `已显示 ${filteredScheduleQueryStaff.value.length} / ${scheduleQueryVisibleStaff.value.length} 人；日期 ${scheduleQueryDays.value.length} 天；共 ${scheduleQueryWeekGroups.value.length} 周`
+);
+const scheduleQueryWarning = computed(() =>
+  scheduleQueryRange.value.ok && scheduleQueryRange.value.isLongRange
+    ? "当前查询范围较长，结果较多，加载和滚动可能变慢。"
+    : ""
+);
+const scheduleQueryError = computed(() => (scheduleQueryRange.value.ok ? "" : scheduleQueryRange.value.message));
 const shiftCoefficientDescriptions = computed(() =>
   (data.value?.shifts ?? [])
     .filter((shift) => shift.enabled)
@@ -259,6 +324,15 @@ watch(selectedMonth, (nextMonth, previousMonth) => {
 
   bonusStartMonth.value = nextMonth;
   bonusEndMonth.value = nextMonth;
+});
+
+watch(selectedWeek, (nextWeek) => {
+  if (scheduleQueryRangeDirty.value) {
+    return;
+  }
+
+  scheduleQueryStartDate.value = nextWeek.start;
+  scheduleQueryEndDate.value = nextWeek.end;
 });
 
 async function refreshData(): Promise<void> {
@@ -699,6 +773,17 @@ function canEditStaffId(staffId: string): boolean {
 
 function clearScheduleStaffSearch(): void {
   scheduleStaffQuery.value = "";
+}
+
+function markScheduleQueryRangeDirty(): void {
+  scheduleQueryRangeDirty.value = true;
+}
+
+function clearScheduleQuery(): void {
+  scheduleQueryStaffQuery.value = "";
+  scheduleQueryStartDate.value = selectedWeek.value.start;
+  scheduleQueryEndDate.value = selectedWeek.value.end;
+  scheduleQueryRangeDirty.value = false;
 }
 
 async function handleQuickFill(staffId: string, date: string): Promise<void> {
@@ -1163,6 +1248,69 @@ onMounted(async () => {
               :editable-staff-ids="editableStaffIds"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
+            />
+          </section>
+          <section v-show="activeWorkbenchTab === 'query'" class="workbench-tab-panel" data-testid="workbench-panel-query">
+            <div class="schedule-search" role="search" aria-label="排班区间查询">
+              <label class="schedule-search-label" for="schedule-query-start-date">开始日期</label>
+              <input
+                id="schedule-query-start-date"
+                v-model="scheduleQueryStartDate"
+                class="schedule-search-input"
+                data-testid="schedule-query-start-date"
+                type="date"
+                @input="markScheduleQueryRangeDirty"
+              />
+              <label class="schedule-search-label" for="schedule-query-end-date">结束日期</label>
+              <input
+                id="schedule-query-end-date"
+                v-model="scheduleQueryEndDate"
+                class="schedule-search-input"
+                data-testid="schedule-query-end-date"
+                type="date"
+                @input="markScheduleQueryRangeDirty"
+              />
+              <label class="schedule-search-label" for="schedule-query-staff-search">搜索人员</label>
+              <input
+                id="schedule-query-staff-search"
+                v-model="scheduleQueryStaffQuery"
+                class="schedule-search-input"
+                data-testid="schedule-query-staff-search"
+                type="search"
+                placeholder="输入姓名或工号"
+              />
+              <button
+                class="schedule-search-clear"
+                data-testid="clear-schedule-query"
+                type="button"
+                @click="clearScheduleQuery"
+              >
+                清空
+              </button>
+              <span class="schedule-search-count" data-testid="schedule-query-summary">
+                {{ scheduleQuerySummary }}
+              </span>
+              <p v-if="scheduleQueryError" class="schedule-search-empty" data-testid="schedule-query-error">
+                {{ scheduleQueryError }}
+              </p>
+              <p v-if="scheduleQueryWarning" class="schedule-search-empty" data-testid="schedule-query-warning">
+                {{ scheduleQueryWarning }}
+              </p>
+              <p
+                v-if="scheduleQueryRange.ok && hasScheduleQueryStaffSearch && !hasScheduleQueryResults"
+                class="schedule-search-empty"
+                data-testid="schedule-query-empty"
+              >
+                未找到匹配人员
+              </p>
+            </div>
+            <ScheduleQueryResults
+              v-if="hasScheduleQueryResults"
+              :week-groups="scheduleQueryWeekGroups"
+              :staff="filteredScheduleQueryStaff"
+              :holidays="data.holidays"
+              :shifts="data.shifts"
+              :entries="scheduleQueryEntries"
             />
           </section>
           <section v-show="activeWorkbenchTab === 'weekly'" class="workbench-tab-panel" data-testid="workbench-panel-weekly">
