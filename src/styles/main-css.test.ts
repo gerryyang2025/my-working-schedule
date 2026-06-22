@@ -98,6 +98,66 @@ describe("main.css schedule grid sticky column rules", () => {
     expect(mobileClear).toContain("width: 100%");
   });
 
+  it("styles the schedule query controls and week blocks", () => {
+    const panelRules = ruleBlocks(".schedule-query-panel")[0] ?? "";
+    const controlsRules = ruleBlocks(".schedule-query-controls")[0] ?? "";
+    const fieldRules = ruleBlockIn(css, ".schedule-query-date-field,\n.schedule-query-staff-field");
+    const dateFieldRules = ruleBlocks(".schedule-query-date-field").find((rules) => rules.includes("flex:")) ?? "";
+    const staffFieldRules = ruleBlocks(".schedule-query-staff-field").find((rules) => rules.includes("flex:")) ?? "";
+    const metaRules = ruleBlocks(".schedule-query-meta")[0] ?? "";
+    const warningRules = ruleBlocks(".schedule-query-warning")[0] ?? "";
+    const resultsRules = ruleBlocks(".schedule-query-results")[0] ?? "";
+    const weekRules = ruleBlocks(".schedule-query-week")[0] ?? "";
+    const titleRules = ruleBlocks(".schedule-query-week-title")[0] ?? "";
+    const gridWrapRules = ruleBlocks(".schedule-query-grid-wrap")[0] ?? "";
+    const gridRules = ruleBlocks(".schedule-query-grid")[0] ?? "";
+    const gridCellRules = ruleBlocks(".schedule-query-grid td")[0] ?? "";
+
+    expect(panelRules).toContain("display: grid");
+    expect(panelRules).toContain("gap: 12px");
+    expect(controlsRules).toContain("align-items: end");
+    expect(fieldRules).toContain("display: grid");
+    expect(fieldRules).toContain("gap: 4px");
+    expect(dateFieldRules).toContain("flex: 0 1 170px");
+    expect(staffFieldRules).toContain("flex: 1 1 220px");
+    expect(metaRules).toContain("color: #334155");
+    expect(metaRules).toContain("font-size: 13px");
+    expect(metaRules).toContain("font-weight: 800");
+    expect(metaRules).toContain("white-space: nowrap");
+    expect(warningRules).toContain("margin: 0");
+    expect(warningRules).toContain("border: 1px solid #fde68a");
+    expect(warningRules).toContain("background: #fffbeb");
+    expect(warningRules).toContain("padding: 10px 12px");
+    expect(warningRules).toContain("color: #92400e");
+    expect(warningRules).toContain("font-weight: 800");
+    expect(resultsRules).toContain("display: grid");
+    expect(resultsRules).toContain("gap: 12px");
+    expect(weekRules).toContain("border: 1px solid #dbe3ef");
+    expect(weekRules).toContain("background: #ffffff");
+    expect(titleRules).toContain("margin: 0");
+    expect(titleRules).toContain("border-bottom: 1px solid #dbe3ef");
+    expect(titleRules).toContain("background: #f8fafc");
+    expect(titleRules).toContain("padding: 10px 12px");
+    expect(titleRules).toContain("color: #1e3a8a");
+    expect(titleRules).toContain("font-size: 15px");
+    expect(titleRules).toContain("font-weight: 900");
+    expect(gridWrapRules).toContain("border: 0");
+    expect(gridRules).toContain("margin: 0");
+    expect(gridCellRules).toContain("cursor: default");
+  });
+
+  it("stacks schedule query controls on mobile", () => {
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const mobileControls = ruleBlockIn(mobileCss, ".schedule-query-controls");
+    const mobileField = ruleBlockIn(mobileCss, ".schedule-query-date-field,\n  .schedule-query-staff-field");
+    const mobileMeta = ruleBlockIn(mobileCss, ".schedule-query-meta");
+
+    expect(mobileControls).toContain("display: grid");
+    expect(mobileControls).toContain("grid-template-columns: 1fr");
+    expect(mobileField).toContain("width: 100%");
+    expect(mobileMeta).toContain("white-space: normal");
+  });
+
   it("keeps sort id, staff and type columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";

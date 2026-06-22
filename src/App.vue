@@ -1251,49 +1251,57 @@ onMounted(async () => {
             />
           </section>
           <section v-show="activeWorkbenchTab === 'query'" class="workbench-tab-panel" data-testid="workbench-panel-query">
-            <div class="schedule-search" role="search" aria-label="排班区间查询">
-              <label class="schedule-search-label" for="schedule-query-start-date">开始日期</label>
-              <input
-                id="schedule-query-start-date"
-                v-model="scheduleQueryStartDate"
-                class="schedule-search-input"
-                data-testid="schedule-query-start-date"
-                type="date"
-                @input="markScheduleQueryRangeDirty"
-              />
-              <label class="schedule-search-label" for="schedule-query-end-date">结束日期</label>
-              <input
-                id="schedule-query-end-date"
-                v-model="scheduleQueryEndDate"
-                class="schedule-search-input"
-                data-testid="schedule-query-end-date"
-                type="date"
-                @input="markScheduleQueryRangeDirty"
-              />
-              <label class="schedule-search-label" for="schedule-query-staff-search">搜索人员</label>
-              <input
-                id="schedule-query-staff-search"
-                v-model="scheduleQueryStaffQuery"
-                class="schedule-search-input"
-                data-testid="schedule-query-staff-search"
-                type="search"
-                placeholder="输入姓名或工号"
-              />
-              <button
-                class="schedule-search-clear"
-                data-testid="clear-schedule-query"
-                type="button"
-                @click="clearScheduleQuery"
-              >
-                清空
-              </button>
-              <span class="schedule-search-count" data-testid="schedule-query-summary">
-                {{ scheduleQuerySummary }}
-              </span>
-              <p v-if="scheduleQueryError" class="schedule-search-empty" data-testid="schedule-query-error">
+            <section class="schedule-query-panel">
+              <div class="schedule-search schedule-query-controls" role="search" aria-label="排班区间查询">
+                <label class="schedule-search-label schedule-query-date-field" for="schedule-query-start-date">
+                  开始日期
+                  <input
+                    id="schedule-query-start-date"
+                    v-model="scheduleQueryStartDate"
+                    class="schedule-search-input"
+                    data-testid="schedule-query-start-date"
+                    type="date"
+                    @input="markScheduleQueryRangeDirty"
+                  />
+                </label>
+                <label class="schedule-search-label schedule-query-date-field" for="schedule-query-end-date">
+                  结束日期
+                  <input
+                    id="schedule-query-end-date"
+                    v-model="scheduleQueryEndDate"
+                    class="schedule-search-input"
+                    data-testid="schedule-query-end-date"
+                    type="date"
+                    @input="markScheduleQueryRangeDirty"
+                  />
+                </label>
+                <label class="schedule-search-label schedule-query-staff-field" for="schedule-query-staff-search">
+                  搜索人员
+                  <input
+                    id="schedule-query-staff-search"
+                    v-model="scheduleQueryStaffQuery"
+                    class="schedule-search-input"
+                    data-testid="schedule-query-staff-search"
+                    type="search"
+                    placeholder="输入姓名或工号"
+                  />
+                </label>
+                <button
+                  class="schedule-search-clear"
+                  data-testid="clear-schedule-query"
+                  type="button"
+                  @click="clearScheduleQuery"
+                >
+                  清空
+                </button>
+                <span class="schedule-query-meta" data-testid="schedule-query-summary">
+                  {{ scheduleQuerySummary }}
+                </span>
+              </div>
+              <p v-if="scheduleQueryError" class="schedule-search-empty schedule-query-error" data-testid="schedule-query-error">
                 {{ scheduleQueryError }}
               </p>
-              <p v-if="scheduleQueryWarning" class="schedule-search-empty" data-testid="schedule-query-warning">
+              <p v-if="scheduleQueryWarning" class="schedule-query-warning" data-testid="schedule-query-warning">
                 {{ scheduleQueryWarning }}
               </p>
               <p
@@ -1303,15 +1311,15 @@ onMounted(async () => {
               >
                 未找到匹配人员
               </p>
-            </div>
-            <ScheduleQueryResults
-              v-if="hasScheduleQueryResults"
-              :week-groups="scheduleQueryWeekGroups"
-              :staff="filteredScheduleQueryStaff"
-              :holidays="data.holidays"
-              :shifts="data.shifts"
-              :entries="scheduleQueryEntries"
-            />
+              <ScheduleQueryResults
+                v-if="hasScheduleQueryResults"
+                :week-groups="scheduleQueryWeekGroups"
+                :staff="filteredScheduleQueryStaff"
+                :holidays="data.holidays"
+                :shifts="data.shifts"
+                :entries="scheduleQueryEntries"
+              />
+            </section>
           </section>
           <section v-show="activeWorkbenchTab === 'weekly'" class="workbench-tab-panel" data-testid="workbench-panel-weekly">
             <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />

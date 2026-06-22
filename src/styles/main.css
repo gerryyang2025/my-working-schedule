@@ -325,6 +325,77 @@ body {
   font-weight: 700;
 }
 
+.schedule-query-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-query-controls {
+  align-items: end;
+}
+
+.schedule-query-date-field,
+.schedule-query-staff-field {
+  display: grid;
+  gap: 4px;
+}
+
+.schedule-query-date-field {
+  flex: 0 1 170px;
+}
+
+.schedule-query-staff-field {
+  flex: 1 1 220px;
+}
+
+.schedule-query-meta {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.schedule-query-warning {
+  margin: 0;
+  border: 1px solid #fde68a;
+  background: #fffbeb;
+  padding: 10px 12px;
+  color: #92400e;
+  font-weight: 800;
+}
+
+.schedule-query-results {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-query-week {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+}
+
+.schedule-query-week-title {
+  margin: 0;
+  border-bottom: 1px solid #dbe3ef;
+  background: #f8fafc;
+  padding: 10px 12px;
+  color: #1e3a8a;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.schedule-query-grid-wrap {
+  border: 0;
+}
+
+.schedule-query-grid {
+  margin: 0;
+}
+
+.schedule-query-grid td {
+  cursor: default;
+}
+
 .shift-palette {
   display: flex;
   align-items: center;
@@ -1014,6 +1085,20 @@ body {
 
   .schedule-search-clear {
     width: 100%;
+  }
+
+  .schedule-query-controls {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-query-date-field,
+  .schedule-query-staff-field {
+    width: 100%;
+  }
+
+  .schedule-query-meta {
+    white-space: normal;
   }
 
   .shift-palette {
