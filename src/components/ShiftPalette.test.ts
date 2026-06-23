@@ -202,6 +202,67 @@ describe("ShiftPalette", () => {
     expect(groupButtonTexts(wrapper, "shift-palette-group-normal")).toEqual(["培训"]);
   });
 
+  it("keeps fixed normal rest and leave shifts out of the common rest rule", () => {
+    const wrapper = mountPalette({
+      selectedShiftId: "shift-public-rest",
+      shifts: [
+        shift({
+          id: "shift-maternity-rest",
+          name: "产假/休",
+          shortName: "产假/休",
+          countsAttendance: false,
+          coefficient: 0,
+          sortOrder: 1
+        }),
+        shift({
+          id: "shift-public-rest",
+          name: "公休",
+          shortName: "公休",
+          countsAttendance: false,
+          coefficient: 0,
+          sortOrder: 99
+        }),
+        shift({
+          id: "shift-rest",
+          name: "休息",
+          shortName: "休",
+          countsAttendance: false,
+          coefficient: 0,
+          sortOrder: 50
+        })
+      ]
+    });
+
+    expect(groupButtonTexts(wrapper, "shift-palette-group-common")).toEqual(["休"]);
+    expect(groupButtonTexts(wrapper, "shift-palette-group-normal")).toEqual(["公休", "产假/休"]);
+  });
+
+  it("keeps A10 in normal fallback after fixed normal shifts while preserving A-series color", () => {
+    const wrapper = mountPalette({
+      selectedShiftId: "shift-a10",
+      shifts: [
+        shift({
+          id: "shift-a10",
+          name: "A10",
+          shortName: "A10",
+          color: "#111827",
+          sortOrder: 1
+        }),
+        shift({
+          id: "shift-training",
+          name: "培训",
+          shortName: "培训",
+          color: "#B45309",
+          sortOrder: 99
+        })
+      ]
+    });
+
+    expect(wrapper.find('[data-testid="shift-palette-group-common"]').exists()).toBe(false);
+    expect(groupButtonTexts(wrapper, "shift-palette-group-normal")).toEqual(["培训", "A10"]);
+    expect(buttonColor(wrapper, "shift-a10")).toBe("rgb(37, 99, 235)");
+  });
+
   it("uses display-only fallback colors when A/P/N series is only in the name", () => {
     const wrapper = mountPalette({
       selectedShiftId: "shift-name-a1",

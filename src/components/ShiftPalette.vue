@@ -25,41 +25,47 @@ interface PaletteGroup {
   shifts: PaletteShift[];
 }
 
+interface ShiftOrderRule {
+  keys: string[];
+  containsName?: boolean;
+  codeNameMatch?: boolean;
+}
+
 const COMMON_SHIFT_RULES = [
-  ["常班"],
-  ["A1", "A1组长"],
-  ["A2"],
-  ["A3", "A3组长"],
-  ["A4"],
-  ["A5"],
-  ["A6"],
-  ["A7"],
-  ["P1"],
-  ["P2"],
-  ["P3"],
-  ["N1"],
-  ["N2"],
-  ["办公"],
-  ["休"],
-  ["带检"]
-];
+  { keys: ["常班"] },
+  { keys: ["A1", "A1组长"], codeNameMatch: true },
+  { keys: ["A2"], codeNameMatch: true },
+  { keys: ["A3", "A3组长"], codeNameMatch: true },
+  { keys: ["A4"], codeNameMatch: true },
+  { keys: ["A5"], codeNameMatch: true },
+  { keys: ["A6"], codeNameMatch: true },
+  { keys: ["A7"], codeNameMatch: true },
+  { keys: ["P1"], codeNameMatch: true },
+  { keys: ["P2"], codeNameMatch: true },
+  { keys: ["P3"], codeNameMatch: true },
+  { keys: ["N1"], codeNameMatch: true },
+  { keys: ["N2"], codeNameMatch: true },
+  { keys: ["办公"], containsName: true },
+  { keys: ["休", "休息"] },
+  { keys: ["带检"], containsName: true }
+] satisfies ShiftOrderRule[];
 
 const NORMAL_SHIFT_RULES = [
-  ["护理总值"],
-  ["进修"],
-  ["备1"],
-  ["备2"],
-  ["培训"],
-  ["公休"],
-  ["婚假"],
-  ["育儿假"],
-  ["病假"],
-  ["产假"],
-  ["事假"],
-  ["丧假"],
-  ["产假/休"],
-  ["保健"]
-];
+  { keys: ["护理总值"] },
+  { keys: ["进修"] },
+  { keys: ["备1"] },
+  { keys: ["备2"] },
+  { keys: ["培训"] },
+  { keys: ["公休"] },
+  { keys: ["婚假"] },
+  { keys: ["育儿假"] },
+  { keys: ["病假"] },
+  { keys: ["产假"] },
+  { keys: ["事假"] },
+  { keys: ["丧假"] },
+  { keys: ["产假/休"] },
+  { keys: ["保健"] }
+] satisfies ShiftOrderRule[];
 
 const PALETTE_GROUPS: Array<{ key: PaletteGroupKey; label: string }> = [
   { key: "common", label: "常用" },
@@ -76,27 +82,46 @@ function normalizeShiftText(value: string) {
   return value.trim().toUpperCase();
 }
 
-function getRuleOrder(shift: Shift, rules: string[][]) {
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function matchesCodeName(normalizedName: string, normalizedToken: string) {
+  if (!/^[APN]\d+$/.test(normalizedToken)) {
+    return false;
+  }
+
+  return new RegExp(`${escapeRegExp(normalizedToken)}(?!\\d)`).test(normalizedName);
+}
+
+function getRuleOrder(shift: Shift, rules: ShiftOrderRule[]) {
   const normalizedShortName = normalizeShiftText(shift.shortName);
   const normalizedName = normalizeShiftText(shift.name);
-  const shortNameOrder = rules.findIndex((tokens) =>
-    tokens.some((token) => normalizeShiftText(token) === normalizedShortName)
+  const shortNameOrder = rules.findIndex((rule) =>
+    rule.keys.some((token) => normalizeShiftText(token) === normalizedShortName)
   );
 
   if (shortNameOrder >= 0) {
     return shortNameOrder;
   }
 
-  const exactNameOrder = rules.findIndex((tokens) =>
-    tokens.some((token) => normalizeShiftText(token) === normalizedName)
+  const exactNameOrder = rules.findIndex((rule) =>
+    rule.keys.some((token) => normalizeShiftText(token) === normalizedName)
   );
 
   if (exactNameOrder >= 0) {
     return exactNameOrder;
   }
 
-  return rules.findIndex((tokens) =>
-    tokens.some((token) => normalizedName.includes(normalizeShiftText(token)))
+  return rules.findIndex((rule) =>
+    rule.keys.some((token) => {
+      const normalizedToken = normalizeShiftText(token);
+
+      return (
+        (rule.containsName && normalizedName.includes(normalizedToken)) ||
+        (rule.codeNameMatch && matchesCodeName(normalizedName, normalizedToken))
+      );
+    })
   );
 }
 
