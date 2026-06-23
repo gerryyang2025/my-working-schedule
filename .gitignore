@@ -5,6 +5,7 @@
 .idea/
 .vscode/
 .superpowers/
+.worktrees/
 *.swp
 *.swo
 
