@@ -47,18 +47,28 @@ function mediaBlock(query: string): string {
 }
 
 describe("main.css schedule grid sticky column rules", () => {
-  it("keeps the shift palette compact in one horizontal toolbar", () => {
+  it("lays out the shift palette as grouped wrapping rows", () => {
     const paletteRules = ruleBlocks(".shift-palette");
     const paletteTitle = ruleBlocks(".shift-palette h2")[0] ?? "";
+    const paletteBodyRules = ruleBlocks(".shift-palette-body")[0] ?? "";
+    const paletteGroupRules = ruleBlocks(".shift-palette-group")[0] ?? "";
+    const paletteGroupLabelRules = ruleBlocks(".shift-palette-group-label")[0] ?? "";
     const shiftListRules = ruleBlocks(".shift-list")[0] ?? "";
     const shiftButtonRules = ruleBlocks(".shift-button")[0] ?? "";
 
-    expect(paletteRules[0]).toContain("display: flex");
-    expect(paletteRules[0]).toContain("align-items: center");
+    expect(paletteRules[0]).toContain("display: grid");
     expect(paletteRules[0]).toContain("gap: 8px");
     expect(paletteTitle).toContain("white-space: nowrap");
+    expect(paletteBodyRules).toContain("display: grid");
+    expect(paletteBodyRules).toContain("gap: 8px");
+    expect(paletteGroupRules).toContain("display: grid");
+    expect(paletteGroupRules).toContain("grid-template-columns: 44px minmax(0, 1fr)");
+    expect(paletteGroupRules).toContain("align-items: start");
+    expect(paletteGroupLabelRules).toContain("font-weight: 800");
+    expect(paletteGroupLabelRules).toContain("white-space: nowrap");
     expect(shiftListRules).toContain("display: flex");
-    expect(shiftListRules).toContain("overflow-x: auto");
+    expect(shiftListRules).toContain("flex-wrap: wrap");
+    expect(shiftListRules).not.toContain("overflow-x: auto");
     expect(shiftButtonRules).toContain("min-width: 44px");
     expect(shiftButtonRules).toContain("height: 30px");
     expect(shiftButtonRules).toContain("border: 0");

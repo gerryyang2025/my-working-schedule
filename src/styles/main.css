@@ -397,8 +397,7 @@ body {
 }
 
 .shift-palette {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: 8px;
   position: sticky;
   top: 12px;
@@ -414,14 +413,35 @@ body {
   white-space: nowrap;
 }
 
+.shift-palette-body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.shift-palette-group {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-width: 0;
+}
+
+.shift-palette-group-label {
+  padding-top: 6px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .shift-list {
   display: flex;
   flex: 1;
+  flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
-  overflow-x: auto;
-  padding-bottom: 2px;
-  -webkit-overflow-scrolling: touch;
+  padding-bottom: 0;
 }
 
 .shift-button {
@@ -1110,6 +1130,20 @@ body {
   }
 
   .shift-palette h2 {
+    font-size: 12px;
+  }
+
+  .shift-palette-body {
+    gap: 7px;
+  }
+
+  .shift-palette-group {
+    grid-template-columns: 38px minmax(0, 1fr);
+    gap: 6px;
+  }
+
+  .shift-palette-group-label {
+    padding-top: 6px;
     font-size: 12px;
   }
 
