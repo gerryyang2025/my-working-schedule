@@ -72,20 +72,32 @@ const SERIES_COLORS: Record<string, string> = {
   N: "#DC2626"
 };
 
+function normalizeShiftText(value: string) {
+  return value.trim().toUpperCase();
+}
+
 function getRuleOrder(shift: Shift, rules: string[][]) {
-  const shortNameOrder = rules.findIndex((tokens) => tokens.includes(shift.shortName));
+  const normalizedShortName = normalizeShiftText(shift.shortName);
+  const normalizedName = normalizeShiftText(shift.name);
+  const shortNameOrder = rules.findIndex((tokens) =>
+    tokens.some((token) => normalizeShiftText(token) === normalizedShortName)
+  );
 
   if (shortNameOrder >= 0) {
     return shortNameOrder;
   }
 
-  const exactNameOrder = rules.findIndex((tokens) => tokens.includes(shift.name));
+  const exactNameOrder = rules.findIndex((tokens) =>
+    tokens.some((token) => normalizeShiftText(token) === normalizedName)
+  );
 
   if (exactNameOrder >= 0) {
     return exactNameOrder;
   }
 
-  return rules.findIndex((tokens) => tokens.some((token) => shift.name.startsWith(token)));
+  return rules.findIndex((tokens) =>
+    tokens.some((token) => normalizedName.includes(normalizeShiftText(token)))
+  );
 }
 
 function comparePaletteShift(left: PaletteShift, right: PaletteShift) {
@@ -101,7 +113,10 @@ function comparePaletteShift(left: PaletteShift, right: PaletteShift) {
 }
 
 function getPaletteColor(shift: Shift) {
-  const series = shift.shortName.trim().match(/^([APN])\d/)?.[1];
+  const series = [shift.shortName, shift.name]
+    .map(normalizeShiftText)
+    .map((value) => value.match(/([APN])\d/)?.[1])
+    .find(Boolean);
 
   return series ? SERIES_COLORS[series] : shift.color;
 }
