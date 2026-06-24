@@ -47,6 +47,47 @@ function mediaBlock(query: string): string {
 }
 
 describe("main.css schedule grid sticky column rules", () => {
+  it("styles the header account identity without using the old week chip", () => {
+    const headerUserRules = ruleBlocks(".header-user")[0] || "";
+
+    expect(headerUserRules).toContain("border: 1px solid #dbe3ef");
+    expect(headerUserRules).toContain("background: #ffffff");
+    expect(headerUserRules).toContain("font-weight: 700");
+    expect(headerUserRules).toContain("white-space: nowrap");
+    expect(ruleBlocks(".week-chip")).toHaveLength(0);
+    expect(ruleBlocks(".toolbar-user")).toHaveLength(0);
+  });
+
+  it("styles the help page as compact full-width guidance content", () => {
+    const helpPageRules = ruleBlocks(".help-page")[0] || "";
+    const helpSectionRules = ruleBlocks(".help-section")[0] || "";
+    const helpHeadingRules = ruleBlocks(".help-section h2")[0] || "";
+    const helpListRules = ruleBlocks(".help-list")[0] || "";
+    const helpRuleListRules = ruleBlocks(".help-rule-list")[0] || "";
+
+    expect(helpPageRules).toContain("display: grid");
+    expect(helpPageRules).toContain("gap: 12px");
+    expect(helpPageRules).toContain("border: 1px solid #dbe3ef");
+    expect(helpPageRules).toContain("background: #ffffff");
+    expect(helpSectionRules).toContain("display: grid");
+    expect(helpSectionRules).toContain("gap: 8px");
+    expect(helpHeadingRules).toContain("font-size: 15px");
+    expect(helpHeadingRules).toContain("font-weight: 900");
+    expect(helpListRules).toContain("margin: 0");
+    expect(helpListRules).toContain("line-height: 1.7");
+    expect(helpRuleListRules).toContain("margin: 0");
+    expect(helpRuleListRules).toContain("color: #475569");
+  });
+
+  it("lets the header account identity wrap naturally on mobile", () => {
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const mobileHeaderUser = ruleBlockIn(mobileCss, ".header-user");
+
+    expect(mobileHeaderUser).toContain("width: 100%");
+    expect(mobileHeaderUser).toContain("text-align: center");
+    expect(mobileHeaderUser).toContain("white-space: normal");
+  });
+
   it("lays out the shift palette as grouped wrapping rows", () => {
     const paletteRules = ruleBlocks(".shift-palette");
     const paletteTitle = ruleBlocks(".shift-palette h2")[0] ?? "";
