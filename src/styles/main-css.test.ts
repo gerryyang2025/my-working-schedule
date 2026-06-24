@@ -20,6 +20,10 @@ function ruleBlockIn(source: string, selector: string): string {
   return ruleBlocksIn(source, selector)[0] ?? "";
 }
 
+function expectSelectorAbsent(selector: string): void {
+  expect(css).not.toMatch(new RegExp(`(^|[,\\s])${escapeSelector(selector)}(?=[\\s,{])`, "m"));
+}
+
 function mediaBlock(query: string): string {
   const marker = `@media ${query}`;
   const markerIndex = css.indexOf(marker);
@@ -46,7 +50,7 @@ function mediaBlock(query: string): string {
   return "";
 }
 
-describe("main.css schedule grid sticky column rules", () => {
+describe("main.css layout rules", () => {
   it("styles the header account identity without using the old week chip", () => {
     const headerUserRules = ruleBlocks(".header-user")[0] || "";
 
@@ -56,6 +60,10 @@ describe("main.css schedule grid sticky column rules", () => {
     expect(headerUserRules).toContain("white-space: nowrap");
     expect(ruleBlocks(".week-chip")).toHaveLength(0);
     expect(ruleBlocks(".toolbar-user")).toHaveLength(0);
+    expectSelectorAbsent(".week-chip");
+    expectSelectorAbsent(".toolbar-user");
+    expectSelectorAbsent(".app-info-panel");
+    expectSelectorAbsent(".admin-mode-banner");
   });
 
   it("styles the help page as compact full-width guidance content", () => {
