@@ -2,13 +2,11 @@
 import { computed } from "vue";
 import { CalendarDays, ChevronLeft, ChevronRight, Expand, KeyRound, LogOut, Printer, Settings } from "lucide-vue-next";
 import { addWeeks, getWeekRange, toDateKey } from "@/lib/date";
-import type { AuthUser } from "@/api/client";
 
 const props = defineProps<{
   selectedDate: string;
   adminMode: boolean;
   canManageConfig: boolean;
-  currentUser: AuthUser;
 }>();
 
 const emit = defineEmits<{
@@ -28,20 +26,6 @@ function handleSelectedDateUpdate(value: unknown): void {
 }
 
 const selectedWeek = computed(() => getWeekRange(props.selectedDate));
-const roleLabel = computed(() => {
-  if (props.currentUser.role === "admin") {
-    return "系统管理员";
-  }
-  if (props.currentUser.role === "scheduler") {
-    return "排班管理员";
-  }
-  return "只读查看";
-});
-const userIdentityLabel = computed(() => {
-  const displayName = props.currentUser.displayName.trim();
-  const fallbackName = displayName && displayName !== roleLabel.value ? displayName : props.currentUser.username;
-  return `${fallbackName} · ${roleLabel.value}`;
-});
 
 function moveWeek(offset: number): void {
   emit("update:selectedDate", addWeeks(props.selectedDate, offset));
@@ -76,7 +60,6 @@ function moveToCurrentWeek(): void {
     </div>
 
     <div class="toolbar-actions">
-      <span class="toolbar-user">{{ userIdentityLabel }}</span>
       <el-button :icon="KeyRound" data-testid="open-password-change" @click="emit('openPasswordChange')">修改密码</el-button>
       <el-button :icon="Settings" :disabled="!canManageConfig" @click="emit('openManagement')">配置</el-button>
       <el-button :icon="CalendarDays" @click="emit('printWeek')">打印周表</el-button>

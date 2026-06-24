@@ -2,7 +2,6 @@ import { mount } from "@vue/test-utils";
 import { defineComponent } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import AppToolbar from "./AppToolbar.vue";
-import type { AuthUser } from "@/api/client";
 import { getWeekRange, toDateKey } from "@/lib/date";
 
 const ElButtonStub = defineComponent({
@@ -52,23 +51,12 @@ const ElTooltipStub = defineComponent({
   template: "<span><slot /></span>"
 });
 
-function mountToolbar(
-  selectedDate = "2026-06-17",
-  currentUser: AuthUser = {
-    id: "user-admin",
-    username: "admin",
-    displayName: "系统管理员",
-    role: "admin" as const,
-    staffId: null,
-    managedStaffIds: []
-  }
-) {
+function mountToolbar(selectedDate = "2026-06-17") {
   return mount(AppToolbar, {
     props: {
       selectedDate,
       adminMode: true,
-      canManageConfig: true,
-      currentUser
+      canManageConfig: true
     },
     global: {
       stubs: {
@@ -134,29 +122,10 @@ describe("AppToolbar", () => {
     expect(wrapper.emitted("openPasswordChange")).toEqual([[]]);
   });
 
-  it("uses username when display name duplicates the role label", () => {
-    const wrapper = mountToolbar("2026-06-17", {
-      id: "user-admin",
-      username: "admin",
-      displayName: "系统管理员",
-      role: "admin",
-      staffId: null,
-      managedStaffIds: []
-    });
+  it("keeps account identity out of the weekly toolbar", () => {
+    const wrapper = mountToolbar("2026-06-17");
 
-    expect(wrapper.get(".toolbar-user").text()).toBe("admin · 系统管理员");
-  });
-
-  it("uses display name when it differs from the role label", () => {
-    const wrapper = mountToolbar("2026-06-17", {
-      id: "user-scheduler",
-      username: "scheduler",
-      displayName: "排班负责人",
-      role: "scheduler",
-      staffId: null,
-      managedStaffIds: []
-    });
-
-    expect(wrapper.get(".toolbar-user").text()).toBe("排班负责人 · 排班管理员");
+    expect(wrapper.find(".toolbar-user").exists()).toBe(false);
+    expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-06-15 至 2026-06-21");
   });
 });
