@@ -286,11 +286,10 @@ function createSchedulerUser(managedStaffIds: string[]): AuthUser {
 
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
-  props: ["selectedDate", "adminMode", "currentUser"],
+  props: ["selectedDate", "adminMode", "canManageConfig"],
   emits: ["update:selectedDate", "logout", "openManagement", "openPasswordChange", "printMonth", "printWeek"],
   template: `
     <section>
-      <span data-testid="current-user">{{ currentUser?.displayName }}</span>
       <button data-testid="open-management" type="button" @click="$emit('openManagement')">配置</button>
       <button data-testid="open-password-change" type="button" @click="$emit('openPasswordChange')">修改密码</button>
       <button data-testid="logout-button" type="button" @click="$emit('logout')">
@@ -603,7 +602,7 @@ function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null =
 
 async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
   await flushPromises();
-  expect(wrapper.get('[data-testid="current-user"]').text()).toContain("系统管理员");
+  expect(wrapper.get(".header-user").text()).toContain("系统管理员");
 }
 
 async function openBonusTab(wrapper: ReturnType<typeof mountApp>) {
@@ -775,20 +774,28 @@ describe("App", () => {
     expect(infoPanel.text()).toContain("休息 不计出勤");
   });
 
-  it("shows the current user and supports logging out", async () => {
+  it("shows the current user in the header and supports logging out", async () => {
     apiMocks.logout.mockResolvedValue(undefined);
     const wrapper = mountApp();
 
     await flushPromises();
-    expect(wrapper.get('[data-testid="current-user"]').text()).toContain("系统管理员");
-    expect(wrapper.get(".admin-mode-banner").text()).toContain("当前账号可查看全科排班");
-    expect(wrapper.get(".admin-mode-banner").text()).toContain("并可维护人员、班次、节假日和账号");
+    expect(wrapper.get(".header-user").text()).toBe("admin · 系统管理员");
+    expect(wrapper.find(".week-chip").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="current-user"]').exists()).toBe(false);
 
     await wrapper.get('[data-testid="logout-button"]').trigger("click");
     await flushPromises();
 
     expect(apiMocks.logout).toHaveBeenCalled();
     expect(wrapper.find(".app-shell").exists()).toBe(false);
+  });
+
+  it("uses display name for scheduler header identity when it differs from the role label", async () => {
+    const wrapper = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+
+    expect(wrapper.get(".header-user").text()).toBe("排班员 · 排班管理员");
   });
 
   it("loads users and audit logs when opening system management", async () => {

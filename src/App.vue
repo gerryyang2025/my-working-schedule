@@ -266,6 +266,24 @@ const editableStaffIds = computed(() => {
   return [];
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
+const currentUserRoleLabel = computed(() => {
+  if (currentUser.value?.role === "admin") {
+    return "系统管理员";
+  }
+  if (currentUser.value?.role === "scheduler") {
+    return "排班管理员";
+  }
+  return "只读查看";
+});
+const currentUserIdentityLabel = computed(() => {
+  if (!currentUser.value) {
+    return "";
+  }
+
+  const displayName = currentUser.value.displayName.trim();
+  const fallbackName = displayName && displayName !== currentUserRoleLabel.value ? displayName : currentUser.value.username;
+  return `${fallbackName} · ${currentUserRoleLabel.value}`;
+});
 const currentWeekEditableEntryCount = computed(() => {
   if (!data.value) {
     return 0;
@@ -1028,7 +1046,7 @@ onMounted(async () => {
         <p class="eyebrow">国际医学部</p>
         <h1>护理排班管理系统</h1>
       </div>
-      <div class="week-chip">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</div>
+      <div class="header-user">{{ currentUserIdentityLabel }}</div>
     </header>
 
     <section class="app-info-panel" aria-label="系统使用说明与核算规则">
@@ -1053,7 +1071,6 @@ onMounted(async () => {
       v-model:selected-date="selectedDate"
       :admin-mode="canEditSchedule"
       :can-manage-config="canManageConfig"
-      :current-user="currentUser"
       @open-management="openManagementDrawer"
       @open-password-change="passwordDialogOpen = true"
       @print-month="printWithMode('month')"
