@@ -53,7 +53,7 @@ import { validateScheduleQueryRange } from "@/lib/schedule-query";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
-type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus";
+type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "help";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -102,7 +102,8 @@ const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
   { key: "query", label: "查询" },
   { key: "weekly", label: "周统计" },
-  { key: "bonus", label: "月结与奖金" }
+  { key: "bonus", label: "月结与奖金" },
+  { key: "help", label: "使用说明" }
 ];
 
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
@@ -1049,24 +1050,6 @@ onMounted(async () => {
       <div class="header-user">{{ currentUserIdentityLabel }}</div>
     </header>
 
-    <section class="app-info-panel" aria-label="系统使用说明与核算规则">
-      <div class="app-info-block">
-        <h2>快速上手</h2>
-        <p>
-          所有登录账号可查看全科排班；排班员只能编辑账号可管理人员范围内的格子，其他格子为只读。绑定人员只用于标识账号本人，
-          不会自动授予排班权限，编辑范围由账号可管理人员决定。
-        </p>
-      </div>
-      <div class="app-info-block">
-        <h2>核算规则</h2>
-        <p>
-          按班次而不是自然日计出勤；满勤默认 5 个班次，影响满勤的节假日会扣减；加班 = max(0, 出勤班次 -
-          满勤标准)；总系数按班次系数累加，护士长绩效系数单独核算。
-        </p>
-        <p v-if="shiftCoefficientDescriptions">班次系数：{{ shiftCoefficientDescriptions }}</p>
-      </div>
-    </section>
-
     <AppToolbar
       v-model:selected-date="selectedDate"
       :admin-mode="canEditSchedule"
@@ -1085,10 +1068,6 @@ onMounted(async () => {
       :error="passwordChangeError"
       @change-password="handleChangePassword"
     />
-
-    <section v-if="currentUser.role === 'admin' || currentUser.role === 'scheduler'" class="admin-mode-banner" role="status">
-      当前账号可查看全科排班{{ canManageConfig ? "，并可维护人员、班次、节假日和账号" : "；可编辑范围由账号可管理人员决定" }}。
-    </section>
 
     <el-dialog
       v-model="printPreviewOpen"
@@ -1358,6 +1337,43 @@ onMounted(async () => {
               @confirm-settlement="handleConfirmSettlement"
               @cancel-settlement="handleCancelSettlement"
             />
+          </section>
+          <section
+            v-show="activeWorkbenchTab === 'help'"
+            class="workbench-tab-panel help-page"
+            data-testid="workbench-panel-help"
+          >
+            <section class="help-section">
+              <h2>快速上手</h2>
+              <ul class="help-list">
+                <li>通过日期选择或上一周、本周、下一周定位自然周。</li>
+                <li>在“排班”页选择画笔班次，再点击表格格子快速填班。</li>
+                <li>点击格子可进入单元格编辑，处理一人一天多个班次或备注。</li>
+                <li>搜索人员只影响当前页面展示，不改变排班数据。</li>
+                <li>复制上一周、批量休息、批量办公、批量清空只作用于当前可编辑范围。</li>
+              </ul>
+            </section>
+
+            <section class="help-section">
+              <h2>人员权限</h2>
+              <ul class="help-list">
+                <li>系统管理员：可查看全科排班，可维护人员、班次、节假日、账号、排班和月结。</li>
+                <li>排班管理员：可查看全科排班，只能维护账号可管理人员范围内的排班和月结。</li>
+                <li>只读查看：可查看排班、查询、周统计和月结结果，不能保存修改。</li>
+                <li>绑定人员只用于标识账号本人，不会自动授予排班权限；编辑范围由账号可管理人员决定。</li>
+              </ul>
+            </section>
+
+            <section class="help-section">
+              <h2>核算规则</h2>
+              <ul class="help-list">
+                <li>按班次而不是自然日计出勤。</li>
+                <li>满勤默认 5 个班次，影响满勤的节假日会扣减满勤标准。</li>
+                <li>加班 = max(0, 出勤班次 - 满勤标准)。</li>
+                <li>总系数按班次系数累加，护士长绩效系数单独核算。</li>
+              </ul>
+              <p v-if="shiftCoefficientDescriptions" class="help-rule-list">班次系数：{{ shiftCoefficientDescriptions }}</p>
+            </section>
           </section>
         </section>
 

@@ -753,25 +753,36 @@ describe("App", () => {
     delete document.body.dataset.printMode;
   });
 
-  it("renders concise usage and calculation guidance below the title", async () => {
+  it("moves usage, permission, and calculation guidance into the help tab", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
 
-    const infoPanel = wrapper.get(".app-info-panel");
-    expect(infoPanel.text()).toContain("快速上手");
-    expect(infoPanel.text()).toContain("所有登录账号可查看全科排班");
-    expect(infoPanel.text()).toContain("排班员只能编辑账号可管理人员范围内的格子");
-    expect(infoPanel.text()).toContain("绑定人员只用于标识账号本人");
-    expect(infoPanel.text()).toContain("不会自动授予排班权限");
-    expect(infoPanel.text()).toContain("编辑范围由账号可管理人员决定");
-    expect(infoPanel.text()).toContain("核算规则");
-    expect(infoPanel.text()).toContain("按班次而不是自然日计出勤");
-    expect(infoPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
-    expect(infoPanel.text()).toContain("护士长绩效系数单独核算");
-    expect(infoPanel.text()).toContain("班次系数");
-    expect(infoPanel.text()).toContain("A1组长 1.50");
-    expect(infoPanel.text()).toContain("休息 不计出勤");
+    expect(wrapper.find(".app-info-panel").exists()).toBe(false);
+    expect(wrapper.find(".admin-mode-banner").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="workbench-panel-help"]').exists()).toBe(true);
+    expectPanelHidden(wrapper, "workbench-panel-help");
+
+    await wrapper.get('[data-testid="workbench-tab-help"]').trigger("click");
+    await nextTick();
+
+    expectPanelVisible(wrapper, "workbench-panel-help");
+    const helpPanel = wrapper.get('[data-testid="workbench-panel-help"]');
+    expect(helpPanel.text()).toContain("快速上手");
+    expect(helpPanel.text()).toContain("通过日期选择或上一周、本周、下一周定位自然周");
+    expect(helpPanel.text()).toContain("选择画笔班次");
+    expect(helpPanel.text()).toContain("人员权限");
+    expect(helpPanel.text()).toContain("系统管理员：可查看全科排班，可维护人员、班次、节假日、账号、排班和月结");
+    expect(helpPanel.text()).toContain("排班管理员：可查看全科排班，只能维护账号可管理人员范围内的排班和月结");
+    expect(helpPanel.text()).toContain("只读查看：可查看排班、查询、周统计和月结结果，不能保存修改");
+    expect(helpPanel.text()).toContain("绑定人员只用于标识账号本人");
+    expect(helpPanel.text()).toContain("核算规则");
+    expect(helpPanel.text()).toContain("按班次而不是自然日计出勤");
+    expect(helpPanel.text()).toContain("加班 = max(0, 出勤班次 - 满勤标准)");
+    expect(helpPanel.text()).toContain("护士长绩效系数单独核算");
+    expect(helpPanel.text()).toContain("班次系数");
+    expect(helpPanel.text()).toContain("A1组长 1.50");
+    expect(helpPanel.text()).toContain("休息 不计出勤");
   });
 
   it("shows the current user in the header and supports logging out", async () => {
@@ -986,7 +997,7 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="schedule-editable-staff-ids"]').text()).toBe("staff-nurse-001");
-    expect(wrapper.get(".admin-mode-banner").text()).toContain("可编辑范围由账号可管理人员决定");
+    expect(wrapper.find(".admin-mode-banner").exists()).toBe(false);
   });
 
   it("lets a scheduler with no managed staff view the full schedule without editable cells", async () => {
@@ -1066,7 +1077,8 @@ describe("App", () => {
       "排班",
       "查询",
       "周统计",
-      "月结与奖金"
+      "月结与奖金",
+      "使用说明"
     ]);
 
     await openQueryTab(wrapper);
