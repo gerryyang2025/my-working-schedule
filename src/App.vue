@@ -401,6 +401,10 @@ function cancelConfigRequests(): void {
   auditLogRequestId.value += 1;
   configMutationRequestId.value += 1;
   auditLoading.value = false;
+  staffSaving.value = false;
+  shiftSaving.value = false;
+  holidaySaving.value = false;
+  userSaving.value = false;
 }
 
 function isAbortError(caughtError: unknown): boolean {
@@ -589,6 +593,7 @@ async function handleLogin(payload: { username: string; password: string }): Pro
 async function handleLogout(): Promise<void> {
   cancelPrintPdfRequest();
   cancelConfigRequests();
+  activeWorkbenchTab.value = "schedule";
   await logout();
   currentUser.value = null;
   data.value = null;
@@ -654,6 +659,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     passwordDialogOpen.value = false;
     cancelPrintPdfRequest();
     cancelConfigRequests();
+    activeWorkbenchTab.value = "schedule";
     await logout();
     currentUser.value = null;
     data.value = null;
@@ -1110,7 +1116,9 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
     }
   } finally {
-    staffSaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      staffSaving.value = false;
+    }
   }
 }
 
@@ -1136,7 +1144,9 @@ async function handleDeleteStaff(staffId: string): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员删除失败");
     }
   } finally {
-    staffSaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      staffSaving.value = false;
+    }
   }
 }
 
@@ -1162,7 +1172,9 @@ async function handleSaveShift(shift: Shift): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
     }
   } finally {
-    shiftSaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      shiftSaving.value = false;
+    }
   }
 }
 
@@ -1188,7 +1200,9 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
     }
   } finally {
-    holidaySaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      holidaySaving.value = false;
+    }
   }
 }
 
@@ -1214,7 +1228,9 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日删除失败");
     }
   } finally {
-    holidaySaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      holidaySaving.value = false;
+    }
   }
 }
 
@@ -1243,7 +1259,9 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号保存失败");
     }
   } finally {
-    userSaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      userSaving.value = false;
+    }
   }
 }
 
@@ -1272,7 +1290,9 @@ async function handleDeleteUser(userId: string): Promise<void> {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号删除失败");
     }
   } finally {
-    userSaving.value = false;
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      userSaving.value = false;
+    }
   }
 }
 

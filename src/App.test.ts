@@ -364,8 +364,20 @@ const WeeklySummaryStub = defineComponent({
   template: '<section data-testid="weekly-summary">{{ summary.weekStart }}-{{ summary.weekEnd }}</section>'
 });
 
-const EmptyStub = defineComponent({
-  template: "<section />"
+const LoginPageStub = defineComponent({
+  name: "LoginPage",
+  emits: ["login"],
+  template: `
+    <section data-testid="login-page">
+      <button
+        data-testid="login-submit"
+        type="button"
+        @click="$emit('login', { username: 'admin', password: 'admin-password' })"
+      >
+        login
+      </button>
+    </section>
+  `
 });
 
 const CellEditorDialogStub = defineComponent({
@@ -382,7 +394,17 @@ const CellEditorDialogStub = defineComponent({
 
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
-  props: ["modelValue", "mode", "users", "auditLogs", "adminMode"],
+  props: [
+    "modelValue",
+    "mode",
+    "users",
+    "auditLogs",
+    "adminMode",
+    "staffSaving",
+    "shiftSaving",
+    "holidaySaving",
+    "userSaving"
+  ],
   emits: [
     "saveStaff",
     "deleteStaff",
@@ -402,6 +424,10 @@ const ManagementDrawerStub = defineComponent({
       <span v-if="!adminMode" data-testid="management-permission">无配置权限</span>
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
       <span data-testid="drawer-audit">{{ auditLogs.map((entry) => entry.summary).join(",") }}</span>
+      <span data-testid="drawer-staff-saving">{{ staffSaving ? "saving" : "idle" }}</span>
+      <span data-testid="drawer-shift-saving">{{ shiftSaving ? "saving" : "idle" }}</span>
+      <span data-testid="drawer-holiday-saving">{{ holidaySaving ? "saving" : "idle" }}</span>
+      <span data-testid="drawer-user-saving">{{ userSaving ? "saving" : "idle" }}</span>
       <button
         data-testid="drawer-save-staff"
         type="button"
@@ -620,7 +646,7 @@ function mountApp(
         ElButton: ElButtonStub,
         ElDialog: ElDialogStub,
         ElInput: ElInputStub,
-        LoginPage: EmptyStub,
+        LoginPage: LoginPageStub,
         ManagementDrawer: ManagementDrawerStub,
         PasswordChangeDialog: PasswordChangeDialogStub,
         PrintViews: PrintViewsStub,
@@ -852,6 +878,40 @@ describe("App", () => {
 
     expect(apiMocks.logout).toHaveBeenCalled();
     expect(wrapper.find(".app-shell").exists()).toBe(false);
+  });
+
+  it("returns to the schedule panel after logout from config and login again", async () => {
+    apiMocks.logout.mockResolvedValueOnce(undefined);
+    apiMocks.login.mockResolvedValueOnce(testAuthUser);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    const listUsersCallCountBeforeLogout = apiMocks.listUsers.mock.calls.length;
+    const listAuditLogsCallCountBeforeLogout = apiMocks.listAuditLogs.mock.calls.length;
+
+    expectPanelVisible(wrapper, "workbench-panel-config");
+    expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("admin");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("保存账号：scheduler");
+
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="logout-button"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(".app-shell").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="login-page"]').exists()).toBe(true);
+
+    await wrapper.get('[data-testid="login-submit"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.login).toHaveBeenCalledWith("admin", "admin-password");
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expectPanelHidden(wrapper, "workbench-panel-config");
+    expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(false);
+    expect(apiMocks.listUsers).toHaveBeenCalledTimes(listUsersCallCountBeforeLogout);
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeLogout);
   });
 
   it("shows only the scheduler account in the header identity", async () => {
@@ -1221,6 +1281,74 @@ describe("App", () => {
 
     expectPanelVisible(wrapper, "workbench-panel-schedule");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-nurse-001");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-save");
+  });
+
+  it("clears stale staff save loading on config exit without clearing a newer save", async () => {
+    const staleSaveRequest = createDeferred<PublicAppData>();
+    const currentSaveRequest = createDeferred<PublicAppData>();
+    const staleSaveData = structuredClone(testData);
+    const currentSaveData = structuredClone(testData);
+    staleSaveData.staff = [
+      {
+        id: "staff-stale-save",
+        jobId: "888888",
+        name: "保存后过期人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 88
+      }
+    ];
+    currentSaveData.staff = [
+      {
+        id: "staff-current-save",
+        jobId: "777777",
+        name: "当前保存人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 77
+      }
+    ];
+    apiMocks.saveStaff.mockReturnValueOnce(staleSaveRequest.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("saving");
+
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("idle");
+
+    apiMocks.saveStaff.mockReturnValueOnce(currentSaveRequest.promise);
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("saving");
+
+    staleSaveRequest.resolve(staleSaveData);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("saving");
+
+    currentSaveRequest.resolve(currentSaveData);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("idle");
+
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-current-save");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-save");
   });
 
