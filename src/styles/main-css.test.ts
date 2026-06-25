@@ -237,6 +237,7 @@ describe("main.css layout rules", () => {
     expect(rowSearchRules).toContain("display: flex");
     expect(rowSearchRules).toContain("flex: 0 1 auto");
     expect(rowSearchRules).toContain("margin: 0");
+    expect(rowSearchRules).toContain("margin-left: 16px");
     expect(rowSearchRules).toContain("padding: 0");
     expect(rowSearchRules).toContain("border: 0");
     expect(rowSearchRules).toContain("background: transparent");
@@ -276,6 +277,7 @@ describe("main.css layout rules", () => {
     expect(mobileRowSearch).toContain("display: grid");
     expect(mobileRowSearch).toContain("grid-template-columns: 1fr");
     expect(mobileRowSearch).toContain("width: 100%");
+    expect(mobileRowSearch).toContain("margin-left: 0");
     expect(mobileRowSearchInput).toContain("width: 100%");
     expect(mobileRowSearchInput).toContain("flex: 1 1 auto");
     expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");

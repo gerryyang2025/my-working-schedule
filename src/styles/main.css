@@ -404,6 +404,7 @@ body {
   display: flex;
   flex: 0 1 auto;
   margin: 0;
+  margin-left: 16px;
   border: 0;
   padding: 0;
   background: transparent;
@@ -1289,6 +1290,7 @@ body {
     display: grid;
     grid-template-columns: 1fr;
     width: 100%;
+    margin-left: 0;
   }
 
   .schedule-operation-row .schedule-search-input {
