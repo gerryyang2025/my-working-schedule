@@ -123,6 +123,18 @@ describe("main.css layout rules", () => {
     expect(headerRules).toContain("display: flex");
   });
 
+  it("hides drawer and inline management tables on mobile", () => {
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const managementTableRules = ruleBlockIn(
+      mobileCss,
+      ".management-drawer .el-table,\n  .management-inline-panel .el-table"
+    );
+
+    expect(mobileCss).toContain(".management-drawer .el-table");
+    expect(mobileCss).toContain(".management-inline-panel .el-table");
+    expect(managementTableRules).toContain("display: none");
+  });
+
   it("lets compact header actions wrap naturally on mobile", () => {
     const mobileCss = mediaBlock("(max-width: 768px)");
     const mobileHeaderActions = ruleBlockIn(mobileCss, ".app-header-actions");
