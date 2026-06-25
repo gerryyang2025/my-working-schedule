@@ -121,6 +121,11 @@ const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "help", label: "使用说明" }
 ];
 
+interface ConfigMutationContext {
+  requestId: number;
+  userId: string | null;
+}
+
 const selectedWeek = computed(() => getWeekRange(selectedDate.value));
 const selectedMonth = computed(() => selectedDate.value.slice(0, 7));
 const bonusStartMonth = ref(selectedMonth.value);
@@ -389,6 +394,13 @@ async function refreshData(): Promise<void> {
   data.value = await loadData();
 }
 
+function resetConfigMutationSavingState(): void {
+  staffSaving.value = false;
+  shiftSaving.value = false;
+  holidaySaving.value = false;
+  userSaving.value = false;
+}
+
 function cancelConfigRequests(): void {
   configLoadAbortController.value?.abort();
   managementDataAbortController.value?.abort();
@@ -401,10 +413,7 @@ function cancelConfigRequests(): void {
   auditLogRequestId.value += 1;
   configMutationRequestId.value += 1;
   auditLoading.value = false;
-  staffSaving.value = false;
-  shiftSaving.value = false;
-  holidaySaving.value = false;
-  userSaving.value = false;
+  resetConfigMutationSavingState();
 }
 
 function isAbortError(caughtError: unknown): boolean {
@@ -450,6 +459,19 @@ function canApplyConfigMutation(requestId: number, userId: string | null): boole
     canManageConfig.value &&
     (currentUser.value?.id ?? null) === userId
   );
+}
+
+function beginConfigMutation(): ConfigMutationContext | null {
+  if (!canManageConfig.value || activeWorkbenchTab.value !== "config") {
+    return null;
+  }
+
+  const requestId = (configMutationRequestId.value += 1);
+  resetConfigMutationSavingState();
+  return {
+    requestId,
+    userId: currentUser.value?.id ?? null
+  };
 }
 
 async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<void> {
@@ -1095,12 +1117,16 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 }
 
 async function handleSaveStaff(staff: StaffMember): Promise<void> {
-  if (!canManageConfig.value || staffSaving.value) {
+  if (staffSaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   staffSaving.value = true;
   try {
     const savedData = await saveStaff(staff);
@@ -1123,12 +1149,16 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
 }
 
 async function handleDeleteStaff(staffId: string): Promise<void> {
-  if (!canManageConfig.value || staffSaving.value) {
+  if (staffSaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   staffSaving.value = true;
   try {
     const savedData = await deleteStaff(staffId);
@@ -1151,12 +1181,16 @@ async function handleDeleteStaff(staffId: string): Promise<void> {
 }
 
 async function handleSaveShift(shift: Shift): Promise<void> {
-  if (!canManageConfig.value || shiftSaving.value) {
+  if (shiftSaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   shiftSaving.value = true;
   try {
     const savedData = await saveShift(shift);
@@ -1179,12 +1213,16 @@ async function handleSaveShift(shift: Shift): Promise<void> {
 }
 
 async function handleSaveHoliday(holiday: Holiday): Promise<void> {
-  if (!canManageConfig.value || holidaySaving.value) {
+  if (holidaySaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   holidaySaving.value = true;
   try {
     const savedData = await saveHoliday(holiday);
@@ -1207,12 +1245,16 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
 }
 
 async function handleDeleteHoliday(holidayId: string): Promise<void> {
-  if (!canManageConfig.value || holidaySaving.value) {
+  if (holidaySaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   holidaySaving.value = true;
   try {
     const savedData = await deleteHoliday(holidayId);
@@ -1235,12 +1277,16 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
 }
 
 async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
-  if (!canManageConfig.value || userSaving.value) {
+  if (userSaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   userSaving.value = true;
   try {
     await saveUser(user);
@@ -1266,12 +1312,16 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
 }
 
 async function handleDeleteUser(userId: string): Promise<void> {
-  if (!canManageConfig.value || userSaving.value) {
+  if (userSaving.value) {
     return;
   }
 
-  const requestId = configMutationRequestId.value;
-  const requestUserId = currentUser.value?.id ?? null;
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
   userSaving.value = true;
   try {
     await deleteUser(userId);

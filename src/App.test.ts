@@ -1352,6 +1352,69 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-save");
   });
 
+  it("ignores an older staff save after a newer config mutation starts", async () => {
+    const olderStaffSaveRequest = createDeferred<PublicAppData>();
+    const newerShiftSaveRequest = createDeferred<PublicAppData>();
+    const olderStaffData = structuredClone(testData);
+    const newerShiftData = structuredClone(testData);
+    olderStaffData.staff = [
+      {
+        id: "staff-older-overlap",
+        jobId: "666666",
+        name: "较早保存人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 66
+      }
+    ];
+    newerShiftData.staff = [
+      {
+        id: "staff-newer-overlap",
+        jobId: "555555",
+        name: "较新保存人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 55
+      }
+    ];
+    apiMocks.saveStaff.mockReturnValueOnce(olderStaffSaveRequest.promise);
+    apiMocks.saveShift.mockReturnValueOnce(newerShiftSaveRequest.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("saving");
+
+    await wrapper.get('[data-testid="drawer-save-shift"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("idle");
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
+
+    const listAuditLogsCallCountBeforeOlderResolve = apiMocks.listAuditLogs.mock.calls.length;
+    olderStaffSaveRequest.resolve(olderStaffData);
+    await flushPromises();
+
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeOlderResolve);
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-nurse-001");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-older-overlap");
+
+    newerShiftSaveRequest.resolve(newerShiftData);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("idle");
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeOlderResolve + 1);
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-newer-overlap");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-older-overlap");
+  });
+
   it("does not refresh management users or show success after an in-flight config user save resolves post-logout", async () => {
     const saveUserRequest = createDeferred<{ user: ManagedAuthUser }>();
     const logoutRequest = createDeferred<void>();
