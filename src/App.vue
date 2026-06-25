@@ -345,9 +345,7 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
     nextTab !== previousTab &&
     (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
   ) {
-    printPdfRequestId.value += 1;
-    pdfGenerating.value = false;
-    revokePdfDownloadUrl();
+    cancelPrintPdfRequest();
   }
 });
 
@@ -446,6 +444,7 @@ async function handleLogin(payload: { username: string; password: string }): Pro
 }
 
 async function handleLogout(): Promise<void> {
+  cancelPrintPdfRequest();
   await logout();
   currentUser.value = null;
   data.value = null;
@@ -721,7 +720,7 @@ function invokeSystemPrint(mode: PrintMode): void {
 }
 
 function revokePdfDownloadUrl(): void {
-  if (pdfDownloadUrl.value) {
+  if (pdfDownloadUrl.value && typeof URL.revokeObjectURL === "function") {
     URL.revokeObjectURL(pdfDownloadUrl.value);
   }
 
@@ -737,7 +736,7 @@ function openPrintPreview(mode: PrintMode): void {
 
 function closePrintPreview(): void {
   printPreviewMode.value = null;
-  revokePdfDownloadUrl();
+  cancelPrintPdfRequest();
 }
 
 function printWithMode(mode: PrintMode): void {
@@ -790,6 +789,7 @@ function handlePrintPanelPrint(): void {
     return;
   }
 
+  cancelPrintPdfRequest();
   invokeSystemPrint(mode);
 }
 
@@ -814,6 +814,12 @@ function preparePdfDownload(file: File, message: string): void {
   pdfDownloadName.value = file.name;
   pdfDownloadUrl.value = URL.createObjectURL(file);
   printPdfStatus.value = message;
+}
+
+function cancelPrintPdfRequest(): void {
+  printPdfRequestId.value += 1;
+  pdfGenerating.value = false;
+  revokePdfDownloadUrl();
 }
 
 function isCurrentPrintPdfRequest(requestId: number, mode: PrintMode): boolean {
@@ -1141,6 +1147,7 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  cancelPrintPdfRequest();
   document.removeEventListener("click", handleDocumentClick);
 });
 </script>
@@ -1227,6 +1234,7 @@ onBeforeUnmount(() => {
         <el-button
           v-if="!isMobileViewport() && isSystemPrintSupported"
           data-testid="print-preview-system-button"
+          :disabled="pdfGenerating"
           @click="handlePreviewPrint"
         >
           调用系统打印
@@ -1478,6 +1486,7 @@ onBeforeUnmount(() => {
                   v-if="!isMobileViewport() && isSystemPrintSupported"
                   data-testid="print-panel-system-button"
                   type="button"
+                  :disabled="pdfGenerating"
                   @click="handlePrintPanelPrint"
                 >
                   调用系统打印
@@ -1523,6 +1532,7 @@ onBeforeUnmount(() => {
                   v-if="!isMobileViewport() && isSystemPrintSupported"
                   data-testid="print-panel-system-button"
                   type="button"
+                  :disabled="pdfGenerating"
                   @click="handlePrintPanelPrint"
                 >
                   调用系统打印

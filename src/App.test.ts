@@ -2259,6 +2259,87 @@ describe("App", () => {
     }
   });
 
+  it("ignores a stale PDF result after logging out from a print panel", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    const deferredWeekPdf = createDeferred<File>();
+    apiMocks.logout.mockResolvedValue(undefined);
+    pdfMocks.createPrintPdfFile.mockReturnValueOnce(deferredWeekPdf.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+
+      await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="logout-button"]').trigger("click");
+      await flushPromises();
+
+      deferredWeekPdf.resolve(pdfFile);
+      await flushPromises();
+
+      expect(apiMocks.logout).toHaveBeenCalled();
+      expect(wrapper.find(".app-shell").exists()).toBe(false);
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(createObjectUrlSpy).not.toHaveBeenCalled();
+      expect(elementPlusMocks.ElMessage.warning).not.toHaveBeenCalled();
+      expect(elementPlusMocks.ElMessage.error).not.toHaveBeenCalled();
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
+    }
+  });
+
+  it("cancels a pending PDF request before invoking system print", async () => {
+    const restoreDesktopViewport = mockMobileViewport(false);
+    const { printSpy, restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    const deferredWeekPdf = createDeferred<File>();
+    pdfMocks.createPrintPdfFile.mockReturnValueOnce(deferredWeekPdf.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      await nextTick();
+
+      const systemPrintButton = panel.get('[data-testid="print-panel-system-button"]');
+      expect(systemPrintButton.attributes("disabled")).toBeDefined();
+      systemPrintButton.element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      await nextTick();
+
+      deferredWeekPdf.resolve(pdfFile);
+      await flushPromises();
+
+      expect(printSpy).toHaveBeenCalledTimes(1);
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(createObjectUrlSpy).not.toHaveBeenCalled();
+      expect(panel.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+      expect(panel.find(".print-pdf-status").exists()).toBe(false);
+    } finally {
+      restoreDesktopViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
+    }
+  });
+
   it("falls back to a PDF download link when file sharing is not supported", async () => {
     const restoreMobileViewport = mockMobileViewport(true);
     const { restore: restorePrint } = mockSystemPrint();
