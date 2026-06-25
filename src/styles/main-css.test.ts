@@ -51,17 +51,45 @@ function mediaBlock(query: string): string {
 }
 
 describe("main.css layout rules", () => {
-  it("styles the header account identity without using the old week chip", () => {
-    const headerUserRules = ruleBlocks(".header-user")[0] || "";
+  it("styles compact header actions and account dropdown", () => {
+    const appTitleRules = ruleBlocks(".app-title")[0] || "";
+    const headerActionsRules = ruleBlocks(".app-header-actions")[0] || "";
+    const userMenuRules = ruleBlocks(".header-user-menu")[0] || "";
+    const userMenuButtonRules = ruleBlocks(".app-header-actions .header-user-menu-button")[0] || "";
+    const userDropdownRules = ruleBlocks(".header-user-dropdown")[0] || "";
 
-    expect(headerUserRules).toContain("border: 1px solid #dbe3ef");
-    expect(headerUserRules).toContain("background: #ffffff");
-    expect(headerUserRules).toContain("font-weight: 700");
-    expect(headerUserRules).toContain("white-space: nowrap");
+    expect(appTitleRules).not.toBe("");
+    expect(headerActionsRules).toContain("display: flex");
+    expect(headerActionsRules).toContain("justify-content: flex-end");
+    expect(headerActionsRules).toContain("flex-wrap: wrap");
+    expect(headerActionsRules).toContain("gap: 8px");
+    expect(headerActionsRules).toContain("align-items: center");
+    expect(userMenuRules).toContain("position: relative");
+    expect(userMenuButtonRules).toContain("border:");
+    expect(userMenuButtonRules).toContain("background:");
+    expect(userMenuButtonRules).toContain("font-weight:");
+    expect(userMenuButtonRules).toContain("white-space: nowrap");
+    expect(userDropdownRules).toContain("position: absolute");
+    expect(userDropdownRules).toContain("right: 0");
+    expect(userDropdownRules).toContain("top: calc(100% + 6px)");
+    expect(userDropdownRules).toContain("z-index:");
+    expect(userDropdownRules).toContain("background:");
+    expect(userDropdownRules).toContain("border:");
+    expect(userDropdownRules).toContain("box-shadow:");
     expect(ruleBlocks(".week-chip")).toHaveLength(0);
+    expect(ruleBlocks(".toolbar")).toHaveLength(0);
+    expect(ruleBlocks(".toolbar-group")).toHaveLength(0);
+    expect(ruleBlocks(".toolbar-actions")).toHaveLength(0);
+    expect(ruleBlocks(".toolbar-week-range")).toHaveLength(0);
     expect(ruleBlocks(".toolbar-user")).toHaveLength(0);
+    expect(ruleBlocks(".header-user")).toHaveLength(0);
     expectSelectorAbsent(".week-chip");
+    expectSelectorAbsent(".toolbar");
+    expectSelectorAbsent(".toolbar-group");
+    expectSelectorAbsent(".toolbar-actions");
+    expectSelectorAbsent(".toolbar-week-range");
     expectSelectorAbsent(".toolbar-user");
+    expectSelectorAbsent(".header-user");
     expectSelectorAbsent(".app-info-panel");
     expectSelectorAbsent(".admin-mode-banner");
   });
@@ -87,13 +115,15 @@ describe("main.css layout rules", () => {
     expect(helpRuleListRules).toContain("color: #475569");
   });
 
-  it("lets the header account identity wrap naturally on mobile", () => {
+  it("lets compact header actions wrap naturally on mobile", () => {
     const mobileCss = mediaBlock("(max-width: 768px)");
-    const mobileHeaderUser = ruleBlockIn(mobileCss, ".header-user");
+    const mobileHeaderActions = ruleBlockIn(mobileCss, ".app-header-actions");
+    const mobileHeaderUserMenu = ruleBlockIn(mobileCss, ".header-user-menu");
 
-    expect(mobileHeaderUser).toContain("width: 100%");
-    expect(mobileHeaderUser).toContain("text-align: center");
-    expect(mobileHeaderUser).toContain("white-space: normal");
+    expect(mobileHeaderActions).toContain("width: 100%");
+    expect(mobileHeaderActions).toContain("justify-content: flex-start");
+    expect(mobileHeaderUserMenu).toContain("min-width: 0");
+    expect(mobileHeaderUserMenu).toContain("max-width: 100%");
   });
 
   it("lays out the shift palette as grouped wrapping rows", () => {
@@ -144,17 +174,96 @@ describe("main.css layout rules", () => {
     expect(emptyRules).toContain("text-align: center");
   });
 
+  it("lays out compact schedule operation row controls", () => {
+    const operationRowRules = ruleBlocks(".schedule-operation-row")[0] ?? "";
+    const weekControlsRules = ruleBlocks(".schedule-week-controls")[0] ?? "";
+    const weekFieldsRules = ruleBlocks(".schedule-week-fields")[0] ?? "";
+    const weekNumberRules = ruleBlocks(".schedule-week-number")[0] ?? "";
+    const weekRangeRules = ruleBlocks(".schedule-week-range")[0] ?? "";
+    const rowSearchRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search");
+    const rowSearchInputRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search-input");
+    const rowActionsRules = ruleBlockIn(css, ".schedule-operation-row .schedule-actions");
+
+    expect(operationRowRules).toContain("display: flex");
+    expect(operationRowRules).toContain("flex-wrap: wrap");
+    expect(operationRowRules).toContain("align-items: center");
+    expect(operationRowRules).toContain("gap: 8px");
+    expect(operationRowRules).toContain("position: relative");
+    expect(operationRowRules).toContain("padding: 8px");
+    expect(operationRowRules).toContain("border: 1px solid #dbeafe");
+    expect(operationRowRules).toContain("background: #f8fbff");
+    expect(operationRowRules).toContain("margin: 0 0 8px");
+    expect(weekControlsRules).toContain("display: flex");
+    expect(weekControlsRules).toContain("flex-wrap: wrap");
+    expect(weekControlsRules).toContain("align-items: center");
+    expect(weekControlsRules).toContain("gap: 8px");
+    expect(weekControlsRules).toContain("flex: 0 1 auto");
+    expect(weekFieldsRules).toContain("display: flex");
+    expect(weekFieldsRules).toContain("flex-wrap: wrap");
+    expect(weekFieldsRules).toContain("align-items: center");
+    expect(weekFieldsRules).toContain("gap: 8px");
+    expect(weekNumberRules).toContain("background: #ecfdf5");
+    expect(weekNumberRules).toContain("color: #15803d");
+    expect(weekNumberRules).toContain("font-weight: 900");
+    expect(weekNumberRules).toContain("white-space: nowrap");
+    expect(weekRangeRules).toContain("white-space: nowrap");
+    expect(weekRangeRules).toContain("color: #475569");
+    expect(weekRangeRules).toContain("font-size: 13px");
+    expect(rowSearchRules).toContain("display: flex");
+    expect(rowSearchRules).toContain("flex: 0 1 auto");
+    expect(rowSearchRules).toContain("margin: 0");
+    expect(rowSearchRules).toContain("padding: 0");
+    expect(rowSearchRules).toContain("border: 0");
+    expect(rowSearchRules).toContain("background: transparent");
+    expect(rowSearchInputRules).toContain("flex: 0 0 280px");
+    expect(rowSearchInputRules).toContain("width: 280px");
+    expect(rowSearchInputRules).toContain("max-width: 100%");
+    expect(rowActionsRules).toContain("margin-left: auto");
+    expect(rowActionsRules).toContain("margin-bottom: 0");
+    expect(rowActionsRules).toContain("justify-content: flex-end");
+  });
+
   it("stacks the schedule staff search controls on mobile", () => {
     const mobileCss = mediaBlock("(max-width: 768px)");
     const mobileSearch = ruleBlockIn(mobileCss, ".schedule-search");
     const mobileInput = ruleBlockIn(mobileCss, ".schedule-search-input");
     const mobileClear = ruleBlockIn(mobileCss, ".schedule-search-clear");
+    const mobileOperationRow = ruleBlockIn(mobileCss, ".schedule-operation-row");
+    const mobileWeekControls = ruleBlockIn(mobileCss, ".schedule-week-controls");
+    const mobileWeekFields = ruleBlockIn(mobileCss, ".schedule-week-fields");
+    const mobileWeekRange = ruleBlockIn(mobileCss, ".schedule-week-range");
+    const mobileRowSearch = ruleBlockIn(mobileCss, ".schedule-operation-row .schedule-search");
+    const mobileRowSearchInput = ruleBlockIn(mobileCss, ".schedule-operation-row .schedule-search-input");
+    const mobileActions = ruleBlockIn(mobileCss, ".schedule-actions");
 
     expect(mobileSearch).toContain("display: grid");
     expect(mobileSearch).toContain("grid-template-columns: 1fr");
     expect(mobileInput).toContain("width: 100%");
     expect(mobileInput).toContain("min-width: 0");
     expect(mobileClear).toContain("width: 100%");
+    expect(mobileOperationRow).toContain("align-items: stretch");
+    expect(mobileOperationRow).toContain("flex-direction: column");
+    expect(mobileWeekControls).toContain("width: 100%");
+    expect(mobileWeekFields).toContain("flex-wrap: wrap");
+    expect(mobileWeekRange).toContain("white-space: normal");
+    expect(mobileRowSearch).toContain("display: grid");
+    expect(mobileRowSearch).toContain("grid-template-columns: 1fr");
+    expect(mobileRowSearch).toContain("width: 100%");
+    expect(mobileRowSearchInput).toContain("width: 100%");
+    expect(mobileRowSearchInput).toContain("flex: 1 1 auto");
+    expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+  });
+
+  it("hides compact app controls for print", () => {
+    const printMedia = mediaBlock("print");
+    const hiddenControls = ruleBlockIn(
+      printMedia,
+      ".app-header,\n  .app-header-actions,\n  .state-message,\n  .schedule-operation-row,\n  .workbench,\n  .el-overlay,\n  .el-drawer"
+    );
+
+    expect(hiddenControls).toContain("display: none !important");
+    expect(printMedia).not.toContain(".header-user");
+    expect(printMedia).not.toContain(".toolbar");
   });
 
   it("styles the schedule query controls and week blocks", () => {

@@ -83,10 +83,11 @@ describe("AppToolbar", () => {
     expect(dateSelectors).toHaveLength(1);
     expect(dateSelectors[0].attributes("data-placeholder")).toBe("选择日期");
     expect(wrapper.find('input[data-placeholder="选择周"]').exists()).toBe(false);
-    expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-06-22 至 2026-06-28");
+    expect(wrapper.find(".schedule-week-fields").exists()).toBe(true);
+    expect(wrapper.get(".schedule-week-range").text()).toBe("2026-06-22 至 2026-06-28");
   });
 
-  it("does not render standalone year or month controls in the weekly toolbar", () => {
+  it("does not render standalone year or month controls in the weekly controls", () => {
     const wrapper = mountToolbar();
 
     expect(wrapper.find('[data-testid="year-input"]').exists()).toBe(false);
@@ -112,18 +113,17 @@ describe("AppToolbar", () => {
     expect(wrapper.emitted("update:selectedDate")).toEqual([["2026-06-08"], ["2026-06-22"]]);
   });
 
-  it("keeps top-level account and app actions out of the weekly toolbar", () => {
+  it("keeps top-level account and app actions out of the weekly controls", () => {
     const wrapper = mountToolbar("2026-06-17");
 
-    expect(wrapper.find(".toolbar-user").exists()).toBe(false);
-    expect(wrapper.find(".toolbar-actions").exists()).toBe(false);
+    expect(wrapper.find(".schedule-week-fields").exists()).toBe(true);
     expect(wrapper.text()).not.toContain("修改密码");
     expect(wrapper.text()).not.toContain("配置");
     expect(wrapper.text()).not.toContain("打印周表");
     expect(wrapper.text()).not.toContain("打印月表");
     expect(wrapper.text()).not.toContain("全屏");
     expect(wrapper.text()).not.toContain("退出登录");
-    expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-06-15 至 2026-06-21");
+    expect(wrapper.get(".schedule-week-range").text()).toBe("2026-06-15 至 2026-06-21");
     expect(wrapper.emitted("logout")).toBeUndefined();
     expect(wrapper.emitted("openPasswordChange")).toBeUndefined();
     expect(wrapper.emitted("openManagement")).toBeUndefined();

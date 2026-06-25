@@ -34,6 +34,10 @@ body {
   letter-spacing: 0;
 }
 
+.app-title {
+  min-width: 0;
+}
+
 .eyebrow {
   margin: 0;
   color: #2563eb;
@@ -41,14 +45,81 @@ body {
   font-weight: 600;
 }
 
-.header-user {
+.app-header-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.app-header-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  border: 1px solid #bfdbfe;
+  padding: 0 10px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  font: inherit;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.app-header-actions button:disabled {
+  border-color: #e2e8f0;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.app-header-actions svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+}
+
+.header-user-menu {
+  position: relative;
+  max-width: 100%;
+}
+
+.app-header-actions .header-user-menu-button {
   border: 1px solid #dbe3ef;
-  padding: 6px 10px;
   background: #ffffff;
   color: #334155;
-  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
+}
+
+.header-user-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 20;
+  display: grid;
+  min-width: 118px;
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  padding: 4px;
+  box-shadow: 0 12px 28px rgb(15 23 42 / 14%);
+}
+
+.header-user-dropdown button {
+  justify-content: flex-start;
+  width: 100%;
+  border: 0;
+  background: transparent;
+  color: #334155;
+}
+
+.header-user-dropdown button:hover,
+.header-user-dropdown button:focus-visible {
+  background: #eff6ff;
+  color: #1d4ed8;
 }
 
 .state-message {
@@ -100,22 +171,33 @@ body {
   font-weight: 600;
 }
 
-.toolbar {
+.schedule-week-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 10px;
-  border: 1px solid #dbe3ef;
-  background: #ffffff;
-  margin-bottom: 12px;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.toolbar-group,
-.toolbar-actions {
+.schedule-week-fields {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
+}
+
+.schedule-week-number {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border: 1px solid #bbf7d0;
+  padding: 0 8px;
+  background: #ecfdf5;
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 900;
+  white-space: nowrap;
 }
 
 .week-nav {
@@ -128,7 +210,7 @@ body {
   width: 64px;
 }
 
-.toolbar-week-range {
+.schedule-week-range {
   white-space: nowrap;
   color: #475569;
   font-size: 13px;
@@ -227,7 +309,7 @@ body {
   flex-wrap: wrap;
   gap: 8px;
   justify-content: flex-end;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 
 .schedule-actions button {
@@ -252,6 +334,18 @@ body {
   background: #f8fafc;
   color: #94a3b8;
   cursor: not-allowed;
+}
+
+.schedule-operation-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  margin: 0 0 8px;
+  border: 1px solid #dbeafe;
+  padding: 8px;
+  background: #f8fbff;
 }
 
 .schedule-search {
@@ -301,6 +395,27 @@ body {
   padding: 0 12px;
   font-weight: 800;
   cursor: pointer;
+}
+
+.schedule-operation-row .schedule-search {
+  display: flex;
+  flex: 0 1 auto;
+  margin: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.schedule-operation-row .schedule-search-input {
+  flex: 0 0 280px;
+  width: 280px;
+  max-width: 100%;
+}
+
+.schedule-operation-row .schedule-actions {
+  margin-left: auto;
+  margin-bottom: 0;
+  justify-content: flex-end;
 }
 
 .schedule-search-empty {
@@ -987,30 +1102,35 @@ body {
     font-size: 20px;
   }
 
-  .header-user {
+  .app-header-actions {
     width: 100%;
-    text-align: center;
-    white-space: normal;
+    justify-content: flex-start;
+  }
+
+  .header-user-menu {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .app-header-actions .header-user-menu-button {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .help-page {
     padding: 12px;
   }
 
-  .toolbar {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .toolbar-group,
-  .toolbar-actions {
+  .schedule-week-controls,
+  .schedule-week-fields {
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
   }
 
-  .toolbar-group > .el-date-editor.el-input,
-  .toolbar-group > .el-date-editor.el-input__wrapper {
+  .schedule-week-fields > .el-date-editor.el-input,
+  .schedule-week-fields > .el-date-editor.el-input__wrapper {
     flex: 1 1 164px;
     min-width: 164px;
   }
@@ -1019,18 +1139,10 @@ body {
     flex: 0 0 auto;
   }
 
-  .toolbar-week-range {
+  .schedule-week-range {
     flex-basis: 100%;
-    text-align: center;
-  }
-
-  .toolbar-actions {
-    overflow-x: auto;
-    padding-bottom: 2px;
-  }
-
-  .toolbar-actions .el-button {
-    flex: 0 0 auto;
+    text-align: left;
+    white-space: normal;
   }
 
   .workbench {
@@ -1053,7 +1165,6 @@ body {
   .schedule-actions {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin-bottom: 8px;
   }
 
   .schedule-actions button {
@@ -1078,6 +1189,30 @@ body {
 
   .schedule-search-clear {
     width: 100%;
+  }
+
+  .schedule-operation-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .schedule-operation-row .schedule-week-controls {
+    width: 100%;
+  }
+
+  .schedule-operation-row .schedule-search {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .schedule-operation-row .schedule-search-input {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .schedule-operation-row .schedule-actions {
+    margin-left: 0;
   }
 
   .schedule-query-controls {
@@ -1370,9 +1505,9 @@ body {
   }
 
   .app-header,
-  .header-user,
+  .app-header-actions,
   .state-message,
-  .toolbar,
+  .schedule-operation-row,
   .workbench,
   .el-overlay,
   .el-drawer {

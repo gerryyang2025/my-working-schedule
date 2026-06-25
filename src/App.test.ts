@@ -291,7 +291,7 @@ const AppToolbarStub = defineComponent({
   template: `
     <section data-testid="schedule-week-controls">
       <span class="schedule-week-number">第26周</span>
-      <span class="toolbar-week-range">2026-06-22 - 2026-06-28</span>
+      <span class="schedule-week-range">2026-06-22 - 2026-06-28</span>
       <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
         jump
       </button>
