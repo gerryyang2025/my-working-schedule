@@ -90,6 +90,7 @@ const printPreviewContentRef = ref<HTMLElement | null>(null);
 const printWeekPanelContentRef = ref<HTMLElement | null>(null);
 const printMonthPanelContentRef = ref<HTMLElement | null>(null);
 const pdfGenerating = ref(false);
+const printPdfRequestId = ref(0);
 const pdfDownloadUrl = ref("");
 const pdfDownloadName = ref("");
 const printPdfStatus = ref("");
@@ -344,6 +345,7 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
     nextTab !== previousTab &&
     (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
   ) {
+    printPdfRequestId.value += 1;
     revokePdfDownloadUrl();
   }
 });
@@ -815,6 +817,7 @@ function preparePdfDownload(file: File, message: string): void {
 
 async function handlePreviewPdfShare(): Promise<void> {
   const mode = getCurrentPrintMode();
+  const title = activePrintTitle.value;
   if (!mode || pdfGenerating.value) {
     return;
   }
@@ -826,17 +829,22 @@ async function handlePreviewPdfShare(): Promise<void> {
   }
 
   pdfGenerating.value = true;
+  const requestId = (printPdfRequestId.value += 1);
   revokePdfDownloadUrl();
 
   try {
     const filename = getPrintPdfFilename(mode);
     const pdfFile = await createPrintPdfFile({ element: activePrintView, filename });
 
+    if (requestId !== printPdfRequestId.value || getCurrentPrintMode() !== mode) {
+      return;
+    }
+
     if (canSharePdfFile(pdfFile)) {
       try {
         await navigator.share({
           files: [pdfFile],
-          title: activePrintTitle.value
+          title
         });
         ElMessage.success("PDF 已发送到系统分享");
       } catch (shareError) {

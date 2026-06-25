@@ -1679,11 +1679,12 @@ describe("App", () => {
       await openPrintWeekTab(wrapper);
       await nextTick();
 
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
       expect(printSpy).not.toHaveBeenCalled();
       expectPanelVisible(wrapper, "workbench-panel-print-week");
-      expect(wrapper.get('[data-testid="workbench-panel-print-week"]').text()).toContain("周表打印预览");
-      expect(wrapper.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
-      expect(wrapper.get(".print-preview-active").text()).toContain("周表预览");
+      expect(panel.text()).toContain("周表打印预览");
+      expect(panel.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
+      expect(panel.get(".print-preview-active").text()).toContain("周表预览");
       expect(wrapper.find(".print-preview-dialog").exists()).toBe(false);
     } finally {
       restoreMobileViewport();
@@ -1702,9 +1703,10 @@ describe("App", () => {
       await openPrintMonthTab(wrapper);
       await nextTick();
 
+      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
       expect(printSpy).not.toHaveBeenCalled();
-      expect(wrapper.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
-      expect(wrapper.find('[data-testid="print-panel-system-button"]').exists()).toBe(false);
+      expect(panel.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
+      expect(panel.find('[data-testid="print-panel-system-button"]').exists()).toBe(false);
     } finally {
       restoreMobileViewport();
       restorePrint();
@@ -1741,9 +1743,10 @@ describe("App", () => {
       await openPrintMonthTab(wrapper);
       await nextTick();
 
+      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
       expect(printSpy).not.toHaveBeenCalled();
-      expect(wrapper.get(".print-preview-active").text()).toContain("月度汇总");
-      expect(wrapper.get(".print-preview-active").text()).toContain("李护士:1:1.50");
+      expect(panel.get(".print-preview-active").text()).toContain("月度汇总");
+      expect(panel.get(".print-preview-active").text()).toContain("李护士:1:1.50");
     } finally {
       restoreMobileViewport();
       restorePrint();
@@ -2110,7 +2113,8 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
@@ -2123,6 +2127,53 @@ describe("App", () => {
         title: "周表打印预览"
       });
       expect(wrapper.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+    }
+  });
+
+  it("ignores a stale week PDF result after switching to the month print panel", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const weekPdfFile = new File(["week pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    const monthPdfFile = new File(["month pdf"], "month-schedule.pdf", { type: "application/pdf" });
+    const deferredWeekPdf = createDeferred<File>();
+    pdfMocks.createPrintPdfFile.mockReturnValueOnce(deferredWeekPdf.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+
+      await openPrintMonthTab(wrapper);
+      await nextTick();
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      deferredWeekPdf.resolve(weekPdfFile);
+      await flushPromises();
+
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(monthPanel.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+      expect(monthPanel.find(".print-pdf-status").exists()).toBe(false);
+
+      pdfMocks.createPrintPdfFile.mockResolvedValueOnce(monthPdfFile);
+      await monthPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      await flushPromises();
+
+      expect(pdfMocks.createPrintPdfFile).toHaveBeenLastCalledWith({
+        element: expect.any(HTMLElement),
+        filename: "month-schedule.pdf"
+      });
+      expect(shareSpy).toHaveBeenCalledWith({
+        files: [monthPdfFile],
+        title: "月表打印预览"
+      });
     } finally {
       restoreMobileViewport();
       restorePrint();
@@ -2144,7 +2195,8 @@ describe("App", () => {
       await flushPromises();
       await openPrintMonthTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
@@ -2154,7 +2206,7 @@ describe("App", () => {
       expect(shareSpy).not.toHaveBeenCalled();
       expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
 
-      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
+      const downloadLink = panel.get('[data-testid="print-pdf-download-link"]');
       expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
       expect(downloadLink.attributes("download")).toBe("month-schedule.pdf");
       expect(downloadLink.text()).toContain("下载 PDF");
@@ -2181,7 +2233,8 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(shareSpy).toHaveBeenCalledWith({
@@ -2190,10 +2243,10 @@ describe("App", () => {
       });
       expect(createObjectUrlSpy).toHaveBeenCalledWith(pdfFile);
 
-      const downloadLink = wrapper.get('[data-testid="print-pdf-download-link"]');
+      const downloadLink = panel.get('[data-testid="print-pdf-download-link"]');
       expect(downloadLink.attributes("href")).toBe("blob:print-pdf");
       expect(downloadLink.attributes("download")).toBe("week-schedule.pdf");
-      expect(wrapper.get(".print-pdf-status").text()).toContain("下载 PDF");
+      expect(panel.get(".print-pdf-status").text()).toContain("下载 PDF");
     } finally {
       restoreMobileViewport();
       restorePrint();
