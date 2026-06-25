@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
-import type { AuthUser, PublicAppData } from "@/api/client";
+import type { AuditLogEntry, AuthUser, ManagedAuthUser, PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
   bulkUpdateWeekSchedule: vi.fn(),
@@ -383,7 +383,16 @@ const CellEditorDialogStub = defineComponent({
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
   props: ["modelValue", "mode", "users", "auditLogs", "adminMode"],
-  emits: ["saveStaff", "deleteStaff", "saveUser", "deleteUser", "refreshAuditLogs"],
+  emits: [
+    "saveStaff",
+    "deleteStaff",
+    "saveShift",
+    "saveHoliday",
+    "deleteHoliday",
+    "saveUser",
+    "deleteUser",
+    "refreshAuditLogs"
+  ],
   template: `
     <section
       v-if="modelValue"
@@ -406,6 +415,27 @@ const ManagementDrawerStub = defineComponent({
         @click="$emit('deleteStaff', 'staff-nurse-001')"
       >
         delete staff
+      </button>
+      <button
+        data-testid="drawer-save-shift"
+        type="button"
+        @click="$emit('saveShift', { id: 'shift-a1', name: 'A1组长', shortName: 'A1', color: '#2563EB', countsAttendance: true, coefficient: 1.5, enabled: true, sortOrder: 1 })"
+      >
+        save shift
+      </button>
+      <button
+        data-testid="drawer-save-holiday"
+        type="button"
+        @click="$emit('saveHoliday', { id: 'holiday-dragon', date: '2026-06-19', name: '端午节', affectsRequiredAttendance: true })"
+      >
+        save holiday
+      </button>
+      <button
+        data-testid="drawer-delete-holiday"
+        type="button"
+        @click="$emit('deleteHoliday', 'holiday-dragon')"
+      >
+        delete holiday
       </button>
       <button
         data-testid="drawer-save-user"
@@ -965,6 +995,225 @@ describe("App", () => {
       keyword: "scheduler",
       limit: 50
     });
+  });
+
+  it("blocks non-admin config mutation events from calling privileged APIs", async () => {
+    apiMocks.saveStaff.mockResolvedValue(structuredClone(testData));
+    apiMocks.deleteStaff.mockResolvedValue(structuredClone(testData));
+    apiMocks.saveShift.mockResolvedValue(structuredClone(testData));
+    apiMocks.saveHoliday.mockResolvedValue(structuredClone(testData));
+    apiMocks.deleteHoliday.mockResolvedValue(structuredClone(testData));
+    apiMocks.saveUser.mockResolvedValue({
+      user: {
+        id: "user-scheduler",
+        username: "scheduler",
+        displayName: "排班管理员",
+        role: "scheduler",
+        staffId: null,
+        managedStaffIds: [],
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    });
+    apiMocks.deleteUser.mockResolvedValue({ ok: true });
+    const wrapper = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    for (const testId of [
+      "drawer-save-staff",
+      "drawer-delete-staff",
+      "drawer-save-shift",
+      "drawer-save-holiday",
+      "drawer-delete-holiday",
+      "drawer-save-user",
+      "drawer-delete-user"
+    ]) {
+      await wrapper.get(`[data-testid="${testId}"]`).trigger("click");
+    }
+    await flushPromises();
+
+    expect(apiMocks.saveStaff).not.toHaveBeenCalled();
+    expect(apiMocks.deleteStaff).not.toHaveBeenCalled();
+    expect(apiMocks.saveShift).not.toHaveBeenCalled();
+    expect(apiMocks.saveHoliday).not.toHaveBeenCalled();
+    expect(apiMocks.deleteHoliday).not.toHaveBeenCalled();
+    expect(apiMocks.saveUser).not.toHaveBeenCalled();
+    expect(apiMocks.deleteUser).not.toHaveBeenCalled();
+    expect(apiMocks.listUsers).not.toHaveBeenCalled();
+    expect(apiMocks.listAuditLogs).not.toHaveBeenCalled();
+  });
+
+  it("allows admins to save and delete shift and holiday configuration", async () => {
+    apiMocks.saveShift.mockResolvedValue(structuredClone(testData));
+    apiMocks.saveHoliday.mockResolvedValue(structuredClone(testData));
+    apiMocks.deleteHoliday.mockResolvedValue(structuredClone(testData));
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-shift"]').trigger("click");
+    await wrapper.get('[data-testid="drawer-save-holiday"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-delete-holiday"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveShift).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "shift-a1",
+        name: "A1组长",
+        shortName: "A1"
+      })
+    );
+    expect(apiMocks.saveHoliday).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: "holiday-dragon",
+        date: "2026-06-19",
+        name: "端午节"
+      })
+    );
+    expect(apiMocks.deleteHoliday).toHaveBeenCalledWith("holiday-dragon");
+  });
+
+  it("ignores stale config data after leaving the config tab", async () => {
+    const staleConfigLoad = createDeferred<PublicAppData>();
+    const staleConfigData = structuredClone(testData);
+    staleConfigData.staff = [
+      {
+        id: "staff-stale-config",
+        jobId: "999999",
+        name: "过期人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 99
+      }
+    ];
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.loadData.mockReturnValueOnce(staleConfigLoad.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+
+    staleConfigLoad.resolve(staleConfigData);
+    await flushPromises();
+
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-nurse-001");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-config");
+  });
+
+  it("ignores stale management users and audit logs after leaving the config tab", async () => {
+    const staleUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
+    const staleAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const nextUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
+    const nextAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const staleUsers: ManagedAuthUser[] = [
+      {
+        id: "user-stale",
+        username: "stale-user",
+        displayName: "过期账号",
+        role: "admin",
+        staffId: null,
+        managedStaffIds: [],
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    ];
+    const staleAuditLogs: AuditLogEntry[] = [
+      {
+        id: "audit-stale",
+        occurredAt: "2026-06-19T00:00:00.000Z",
+        userId: "user-stale",
+        username: "stale-user",
+        action: "user.save",
+        targetType: "user",
+        targetId: "user-stale",
+        summary: "过期审计日志",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.listUsers.mockReturnValueOnce(staleUsersRequest.promise);
+    apiMocks.listAuditLogs.mockReturnValueOnce(staleAuditRequest.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+
+    staleUsersRequest.resolve({ rows: staleUsers });
+    staleAuditRequest.resolve({ rows: staleAuditLogs });
+    await flushPromises();
+
+    apiMocks.listUsers.mockReturnValueOnce(nextUsersRequest.promise);
+    apiMocks.listAuditLogs.mockReturnValueOnce(nextAuditRequest.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-users"]').text()).not.toContain("stale-user");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("过期审计日志");
+  });
+
+  it("keeps the latest audit refresh results when older requests resolve later", async () => {
+    const olderAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const newerAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const olderAuditLogs: AuditLogEntry[] = [
+      {
+        id: "audit-older",
+        occurredAt: "2026-06-19T00:00:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "user.save",
+        targetType: "user",
+        targetId: "user-older",
+        summary: "较早审计日志",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const newerAuditLogs: AuditLogEntry[] = [
+      {
+        id: "audit-newer",
+        occurredAt: "2026-06-19T00:01:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "user.save",
+        targetType: "user",
+        targetId: "user-newer",
+        summary: "最新审计日志",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    apiMocks.listAuditLogs.mockReturnValueOnce(olderAuditRequest.promise);
+    apiMocks.listAuditLogs.mockReturnValueOnce(newerAuditRequest.promise);
+
+    await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
+    await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
+    newerAuditRequest.resolve({ rows: newerAuditLogs });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("最新审计日志");
+
+    olderAuditRequest.resolve({ rows: olderAuditLogs });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("最新审计日志");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("较早审计日志");
   });
 
   it("saves users from the management drawer and refreshes the user list", async () => {

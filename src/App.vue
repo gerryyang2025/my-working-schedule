@@ -82,6 +82,9 @@ const shiftSaving = ref(false);
 const holidaySaving = ref(false);
 const userSaving = ref(false);
 const auditLoading = ref(false);
+const configLoadRequestId = ref(0);
+const managementDataRequestId = ref(0);
+const auditLogRequestId = ref(0);
 const settlementSaving = ref(false);
 const settlementCanceling = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
@@ -349,9 +352,14 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
   }
 });
 
-watch(activeWorkbenchTab, (nextTab) => {
+watch(activeWorkbenchTab, (nextTab, previousTab) => {
   if (nextTab === "config") {
     void loadConfigPanelData();
+    return;
+  }
+
+  if (previousTab === "config") {
+    cancelConfigRequests();
   }
 });
 
@@ -381,14 +389,63 @@ async function refreshUsers(): Promise<void> {
   users.value = (await listUsers()).rows;
 }
 
+function cancelConfigRequests(): void {
+  configLoadRequestId.value += 1;
+  managementDataRequestId.value += 1;
+  auditLogRequestId.value += 1;
+  auditLoading.value = false;
+}
+
+function isCurrentConfigContext(requestId: number, userId: string | null): boolean {
+  return (
+    configLoadRequestId.value === requestId &&
+    activeWorkbenchTab.value === "config" &&
+    (currentUser.value?.id ?? null) === userId
+  );
+}
+
+function canApplyManagementDataRequest(requestId: number, auditRequestId: number, userId: string | null): boolean {
+  return (
+    managementDataRequestId.value === requestId &&
+    auditLogRequestId.value === auditRequestId &&
+    activeWorkbenchTab.value === "config" &&
+    canManageConfig.value &&
+    (currentUser.value?.id ?? null) === userId
+  );
+}
+
+function canApplyAuditLogRequest(requestId: number, userId: string | null): boolean {
+  return (
+    auditLogRequestId.value === requestId &&
+    activeWorkbenchTab.value === "config" &&
+    canManageConfig.value &&
+    (currentUser.value?.id ?? null) === userId
+  );
+}
+
 async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<void> {
+  if (activeWorkbenchTab.value !== "config" || !canManageConfig.value) {
+    return;
+  }
+
+  const requestId = (auditLogRequestId.value += 1);
+  const userId = currentUser.value?.id ?? null;
   auditLoading.value = true;
   try {
-    auditLogs.value = (await listAuditLogs(query)).rows;
+    const response = await listAuditLogs(query);
+    if (!canApplyAuditLogRequest(requestId, userId)) {
+      return;
+    }
+
+    auditLogs.value = response.rows;
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "审计日志加载失败");
+    if (canApplyAuditLogRequest(requestId, userId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "审计日志加载失败");
+    }
   } finally {
-    auditLoading.value = false;
+    if (canApplyAuditLogRequest(requestId, userId)) {
+      auditLoading.value = false;
+    }
   }
 }
 
@@ -417,24 +474,50 @@ async function refreshManagementData(): Promise<void> {
     return;
   }
 
+  const requestId = (managementDataRequestId.value += 1);
+  const auditRequestId = (auditLogRequestId.value += 1);
+  const userId = currentUser.value?.id ?? null;
   auditLoading.value = true;
   try {
     const [usersResponse, auditResponse] = await Promise.all([listUsers(), listAuditLogs({ limit: 100 })]);
+    if (!canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+      return;
+    }
+
     users.value = usersResponse.rows;
     auditLogs.value = auditResponse.rows;
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
+    if (canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
+    }
   } finally {
-    auditLoading.value = false;
+    if (canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+      auditLoading.value = false;
+    }
   }
 }
 
 async function loadConfigPanelData(): Promise<void> {
+  const requestId = (configLoadRequestId.value += 1);
+  const userId = currentUser.value?.id ?? null;
   try {
-    await refreshData();
+    const loadedData = await loadData();
+    if (!isCurrentConfigContext(requestId, userId)) {
+      return;
+    }
+
+    data.value = loadedData;
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
+    if (isCurrentConfigContext(requestId, userId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
+    }
+    return;
   }
+
+  if (!isCurrentConfigContext(requestId, userId)) {
+    return;
+  }
+
   await refreshManagementData();
 }
 
@@ -458,6 +541,7 @@ async function handleLogin(payload: { username: string; password: string }): Pro
 
 async function handleLogout(): Promise<void> {
   cancelPrintPdfRequest();
+  cancelConfigRequests();
   await logout();
   currentUser.value = null;
   data.value = null;
@@ -522,6 +606,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     await changePassword(payload);
     passwordDialogOpen.value = false;
     cancelPrintPdfRequest();
+    cancelConfigRequests();
     await logout();
     currentUser.value = null;
     data.value = null;
@@ -957,7 +1042,7 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 }
 
 async function handleSaveStaff(staff: StaffMember): Promise<void> {
-  if (staffSaving.value) {
+  if (!canManageConfig.value || staffSaving.value) {
     return;
   }
 
@@ -974,7 +1059,7 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
 }
 
 async function handleDeleteStaff(staffId: string): Promise<void> {
-  if (staffSaving.value) {
+  if (!canManageConfig.value || staffSaving.value) {
     return;
   }
 
@@ -991,7 +1076,7 @@ async function handleDeleteStaff(staffId: string): Promise<void> {
 }
 
 async function handleSaveShift(shift: Shift): Promise<void> {
-  if (shiftSaving.value) {
+  if (!canManageConfig.value || shiftSaving.value) {
     return;
   }
 
@@ -1008,7 +1093,7 @@ async function handleSaveShift(shift: Shift): Promise<void> {
 }
 
 async function handleSaveHoliday(holiday: Holiday): Promise<void> {
-  if (holidaySaving.value) {
+  if (!canManageConfig.value || holidaySaving.value) {
     return;
   }
 
@@ -1025,7 +1110,7 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
 }
 
 async function handleDeleteHoliday(holidayId: string): Promise<void> {
-  if (holidaySaving.value) {
+  if (!canManageConfig.value || holidaySaving.value) {
     return;
   }
 
@@ -1042,7 +1127,7 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
 }
 
 async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
-  if (userSaving.value) {
+  if (!canManageConfig.value || userSaving.value) {
     return;
   }
 
@@ -1060,7 +1145,7 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
 }
 
 async function handleDeleteUser(userId: string): Promise<void> {
-  if (userSaving.value) {
+  if (!canManageConfig.value || userSaving.value) {
     return;
   }
 
