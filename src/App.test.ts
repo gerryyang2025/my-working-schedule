@@ -2300,6 +2300,51 @@ describe("App", () => {
     }
   });
 
+  it("ignores a stale PDF result after password change logout from a print panel", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    const deferredWeekPdf = createDeferred<File>();
+    apiMocks.changePassword.mockResolvedValue({ ok: true });
+    apiMocks.logout.mockResolvedValue(undefined);
+    pdfMocks.createPrintPdfFile.mockReturnValueOnce(deferredWeekPdf.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+
+      await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+      await nextTick();
+      await wrapper.get('[data-testid="open-password-change"]').trigger("click");
+      await flushPromises();
+      await wrapper.get('[data-testid="submit-password-change"]').trigger("click");
+      await flushPromises();
+
+      deferredWeekPdf.resolve(pdfFile);
+      await flushPromises();
+
+      expect(apiMocks.changePassword).toHaveBeenCalled();
+      expect(apiMocks.logout).toHaveBeenCalled();
+      expect(wrapper.find(".app-shell").exists()).toBe(false);
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(createObjectUrlSpy).not.toHaveBeenCalled();
+      expect(wrapper.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+      expect(wrapper.find(".print-pdf-status").exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
+    }
+  });
+
   it("cancels a pending PDF request before invoking system print", async () => {
     const restoreDesktopViewport = mockMobileViewport(false);
     const { printSpy, restore: restorePrint } = mockSystemPrint();

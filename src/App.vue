@@ -508,6 +508,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
   try {
     await changePassword(payload);
     passwordDialogOpen.value = false;
+    cancelPrintPdfRequest();
     await logout();
     currentUser.value = null;
     data.value = null;
