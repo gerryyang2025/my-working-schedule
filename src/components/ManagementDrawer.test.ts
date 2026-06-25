@@ -75,9 +75,10 @@ const ElButtonStub = defineComponent({
 
 const ElPopconfirmStub = defineComponent({
   name: "ElPopconfirm",
+  props: ["title", "width"],
   emits: ["confirm"],
   template:
-    '<span><slot name="reference" /><button data-testid="confirm-popconfirm" type="button" @click="$emit(\'confirm\')">confirm</button></span>'
+    '<span data-testid="popconfirm" :data-width="width" :data-title="title"><slot name="reference" /><button data-testid="confirm-popconfirm" type="button" @click="$emit(\'confirm\')">confirm</button></span>'
 });
 
 const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
@@ -302,6 +303,7 @@ describe("ManagementDrawer", () => {
       .findAll(".management-mobile-user")
       .find((item) => item.text().includes("系统管理员"))!
       .trigger("click");
+    expect(getConfirmButtonFor(wrapper, '[data-testid="delete-user-button"]')!.element.parentElement?.getAttribute("data-width")).toBe("360");
     await wrapper.get('[data-testid="delete-user-button"]').trigger("click");
 
     expect(wrapper.emitted("deleteUser")).toBeUndefined();

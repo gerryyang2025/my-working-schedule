@@ -606,6 +606,7 @@ watch(
             </el-button>
             <el-popconfirm
               title="确认删除该账号？仅建议删除误建或测试账号。删除后会清理登录会话、人员绑定和可管理人员关系，审计日志将保留。"
+              width="360"
               @confirm="emit('deleteUser', userDraft.id)"
             >
               <template #reference>
