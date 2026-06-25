@@ -27,10 +27,6 @@ body {
   margin-bottom: 12px;
 }
 
-.app-header.user-menu-open {
-  margin-bottom: 88px;
-}
-
 .app-header h1 {
   margin: 2px 0 0;
   font-size: 22px;
@@ -92,10 +88,13 @@ body {
 }
 
 .app-header-actions .header-user-menu-button {
+  max-width: min(220px, 50vw);
+  overflow: hidden;
   border: 1px solid #dbe3ef;
   background: #ffffff;
   color: #334155;
   font-weight: 700;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -103,7 +102,7 @@ body {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
-  z-index: 20;
+  z-index: 50;
   display: grid;
   min-width: 118px;
   border: 1px solid #dbe3ef;

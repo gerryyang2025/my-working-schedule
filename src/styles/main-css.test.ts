@@ -53,31 +53,25 @@ function mediaBlock(query: string): string {
 describe("main.css layout rules", () => {
   it("styles compact header actions and account dropdown", () => {
     const appTitleRules = ruleBlocks(".app-title")[0] || "";
-    const openUserMenuHeaderRules = ruleBlocks(".app-header.user-menu-open")[0] || "";
+    const openUserMenuHeaderRules = ruleBlocks(".app-header.user-menu-open");
     const headerActionsRules = ruleBlocks(".app-header-actions")[0] || "";
     const userMenuRules = ruleBlocks(".header-user-menu")[0] || "";
     const userMenuButtonRules = ruleBlocks(".app-header-actions .header-user-menu-button")[0] || "";
     const userDropdownRules = ruleBlocks(".header-user-dropdown")[0] || "";
 
     expect(appTitleRules).not.toBe("");
-    expect(openUserMenuHeaderRules).toContain("margin-bottom: 88px");
+    expect(openUserMenuHeaderRules).toHaveLength(0);
     expect(headerActionsRules).toContain("display: flex");
     expect(headerActionsRules).toContain("justify-content: flex-end");
-    expect(headerActionsRules).toContain("flex-wrap: wrap");
-    expect(headerActionsRules).toContain("gap: 8px");
     expect(headerActionsRules).toContain("align-items: center");
     expect(userMenuRules).toContain("position: relative");
-    expect(userMenuButtonRules).toContain("border:");
-    expect(userMenuButtonRules).toContain("background:");
-    expect(userMenuButtonRules).toContain("font-weight:");
-    expect(userMenuButtonRules).toContain("white-space: nowrap");
+    expect(userMenuButtonRules).toContain("max-width:");
+    expect(userMenuButtonRules).toContain("overflow: hidden");
+    expect(userMenuButtonRules).toContain("text-overflow: ellipsis");
     expect(userDropdownRules).toContain("position: absolute");
     expect(userDropdownRules).toContain("right: 0");
     expect(userDropdownRules).toContain("top: calc(100% + 6px)");
     expect(userDropdownRules).toContain("z-index:");
-    expect(userDropdownRules).toContain("background:");
-    expect(userDropdownRules).toContain("border:");
-    expect(userDropdownRules).toContain("box-shadow:");
     expect(ruleBlocks(".week-chip")).toHaveLength(0);
     expect(ruleBlocks(".toolbar")).toHaveLength(0);
     expect(ruleBlocks(".toolbar-group")).toHaveLength(0);

@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { CalendarDays, Printer, Settings } from "lucide-vue-next";
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
@@ -54,7 +53,7 @@ import { validateScheduleQueryRange } from "@/lib/schedule-query";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
-type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "help";
+type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "printWeek" | "printMonth" | "config" | "help";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -107,6 +106,9 @@ const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "query", label: "查询" },
   { key: "weekly", label: "周统计" },
   { key: "bonus", label: "月结与奖金" },
+  { key: "printWeek", label: "打印周表" },
+  { key: "printMonth", label: "打印月表" },
+  { key: "config", label: "配置" },
   { key: "help", label: "使用说明" }
 ];
 
@@ -271,7 +273,7 @@ const editableStaffIds = computed(() => {
   return [];
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
-const currentUserAccountLabel = computed(() => currentUser.value?.username ?? "");
+const currentUserAccountLabel = computed(() => (currentUser.value ? `当前用户：${currentUser.value.username}` : "当前用户："));
 const currentWeekEditableEntryCount = computed(() => {
   if (!data.value) {
     return 0;
@@ -721,6 +723,40 @@ function printWithMode(mode: PrintMode): void {
   invokeSystemPrint(mode);
 }
 
+function legacyWorkbenchActionTestId(tab: WorkbenchTab): string | null {
+  if (tab === "printWeek") {
+    return "print-week";
+  }
+
+  if (tab === "printMonth") {
+    return "print-month";
+  }
+
+  if (tab === "config") {
+    return "open-management";
+  }
+
+  return null;
+}
+
+function selectWorkbenchTab(tab: WorkbenchTab): void {
+  activeWorkbenchTab.value = tab;
+
+  if (tab === "printWeek") {
+    printWithMode("week");
+    return;
+  }
+
+  if (tab === "printMonth") {
+    printWithMode("month");
+    return;
+  }
+
+  if (tab === "config") {
+    void openManagementDrawer();
+  }
+}
+
 function handlePreviewPrint(): void {
   if (!printPreviewMode.value) {
     return;
@@ -1059,29 +1095,12 @@ onBeforeUnmount(() => {
   <section v-if="authChecking" class="state-message">正在检查登录状态...</section>
   <LoginPage v-else-if="!currentUser" :loading="loginSubmitting" :error="loginError" @login="handleLogin" />
   <main v-else class="app-shell">
-    <header class="app-header" :class="{ 'user-menu-open': userMenuOpen }">
+    <header class="app-header">
       <div class="app-title">
         <p class="eyebrow">国际医学部</p>
         <h1>护理排班管理系统</h1>
       </div>
       <div class="app-header-actions">
-        <button
-          data-testid="open-management"
-          type="button"
-          :disabled="!canManageConfig"
-          @click="openManagementDrawer"
-        >
-          <Settings aria-hidden="true" />
-          配置
-        </button>
-        <button data-testid="print-week" type="button" @click="printWithMode('week')">
-          <Printer aria-hidden="true" />
-          打印周表
-        </button>
-        <button data-testid="print-month" type="button" @click="printWithMode('month')">
-          <CalendarDays aria-hidden="true" />
-          打印月表
-        </button>
         <div ref="userMenuRef" class="header-user-menu" @keydown="handleUserMenuKeydown">
           <button
             ref="userMenuButtonRef"
@@ -1199,9 +1218,12 @@ onBeforeUnmount(() => {
             :data-testid="`workbench-tab-${tab.key}`"
             type="button"
             :class="{ active: activeWorkbenchTab === tab.key }"
-            @click="activeWorkbenchTab = tab.key"
+            @click="selectWorkbenchTab(tab.key)"
           >
-            {{ tab.label }}
+            <span v-if="legacyWorkbenchActionTestId(tab.key)" :data-testid="legacyWorkbenchActionTestId(tab.key)">
+              {{ tab.label }}
+            </span>
+            <template v-else>{{ tab.label }}</template>
           </button>
         </nav>
 

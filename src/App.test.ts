@@ -795,7 +795,7 @@ describe("App", () => {
 
     await flushPromises();
     const userButton = wrapper.get('[data-testid="header-user-menu-button"]');
-    expect(userButton.text()).toBe("admin");
+    expect(userButton.text()).toBe("当前用户：admin");
     expect(userButton.text()).not.toContain("系统管理员");
     expect(wrapper.find(".week-chip").exists()).toBe(false);
     expect(wrapper.find('[data-testid="current-user"]').exists()).toBe(false);
@@ -815,21 +815,21 @@ describe("App", () => {
     await flushPromises();
 
     const userButtonText = wrapper.get('[data-testid="header-user-menu-button"]').text();
-    expect(userButtonText).toBe("scheduler");
+    expect(userButtonText).toBe("当前用户：scheduler");
     expect(userButtonText).not.toContain("排班员");
     expect(userButtonText).not.toContain("排班管理员");
   });
 
-  it("shows header actions with the user menu and removes fullscreen and role labels", async () => {
+  it("shows only the current user trigger in the header actions", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
 
     const headerActions = wrapper.get(".app-header-actions");
-    expect(headerActions.get('[data-testid="open-management"]').text()).toContain("配置");
-    expect(headerActions.get('[data-testid="print-week"]').text()).toContain("打印周表");
-    expect(headerActions.get('[data-testid="print-month"]').text()).toContain("打印月表");
-    expect(headerActions.get('[data-testid="header-user-menu-button"]').text()).toBe("admin");
+    expect(headerActions.find('[data-testid="open-management"]').exists()).toBe(false);
+    expect(headerActions.find('[data-testid="print-week"]').exists()).toBe(false);
+    expect(headerActions.find('[data-testid="print-month"]').exists()).toBe(false);
+    expect(headerActions.get('[data-testid="header-user-menu-button"]').text()).toBe("当前用户：admin");
     expect(headerActions.text()).not.toContain("全屏");
     expect(wrapper.find('[data-testid="fullscreen-button"]').exists()).toBe(false);
     expect(wrapper.get(".app-header").text()).not.toContain("系统管理员");
@@ -846,7 +846,7 @@ describe("App", () => {
     await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
     await nextTick();
 
-    expect(wrapper.get(".app-header").classes()).toContain("user-menu-open");
+    expect(wrapper.get(".app-header").classes()).not.toContain("user-menu-open");
     const dropdown = wrapper.get(".header-user-dropdown");
     expect(dropdown.attributes("role")).toBe("menu");
     expect(dropdown.get('[data-testid="open-password-change"]').text()).toContain("修改密码");
@@ -1180,6 +1180,9 @@ describe("App", () => {
       "查询",
       "周统计",
       "月结与奖金",
+      "打印周表",
+      "打印月表",
+      "配置",
       "使用说明"
     ]);
 
