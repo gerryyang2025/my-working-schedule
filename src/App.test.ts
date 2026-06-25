@@ -685,12 +685,18 @@ async function openQueryTab(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="workbench-tab-query"]').trigger("click");
 }
 
+async function openPrintTab(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('[data-testid="workbench-tab-print"]').trigger("click");
+}
+
 async function openPrintWeekTab(wrapper: ReturnType<typeof mountApp>) {
-  await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
+  await openPrintTab(wrapper);
+  await wrapper.get('[data-testid="print-mode-week"]').trigger("click");
 }
 
 async function openPrintMonthTab(wrapper: ReturnType<typeof mountApp>) {
-  await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
+  await openPrintTab(wrapper);
+  await wrapper.get('[data-testid="print-mode-month"]').trigger("click");
 }
 
 function createDeferred<T>(): { promise: Promise<T>; reject: (reason?: unknown) => void; resolve: (value: T) => void } {
@@ -2067,8 +2073,7 @@ describe("App", () => {
       "查询",
       "周统计",
       "月结与奖金",
-      "打印周表",
-      "打印月表",
+      "打印",
       "配置",
       "使用说明"
     ]);
@@ -2080,6 +2085,31 @@ describe("App", () => {
     expectPanelHidden(wrapper, "workbench-panel-weekly");
     expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 2 / 2 人；日期 7 天；共 1 周");
     expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(true);
+  });
+
+  it("groups week and month print previews under a single print tab", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="workbench-tab-printWeek"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="workbench-tab-printMonth"]').exists()).toBe(false);
+
+    await openPrintTab(wrapper);
+    await nextTick();
+
+    const panel = wrapper.get('[data-testid="workbench-panel-print"]');
+    expectPanelVisible(wrapper, "workbench-panel-print");
+    expect(panel.get('[data-testid="print-mode-week"]').classes()).toContain("active");
+    expect(panel.text()).toContain("周表打印预览");
+    expect(panel.get(".print-preview-active").text()).toContain("周表预览");
+
+    await panel.get('[data-testid="print-mode-month"]').trigger("click");
+    await nextTick();
+
+    expect(panel.get('[data-testid="print-mode-month"]').classes()).toContain("active");
+    expect(panel.text()).toContain("月表打印预览");
+    expect(panel.get(".print-preview-active").text()).toContain("月表预览");
   });
 
   it("splits a custom query range by natural week", async () => {
@@ -2560,9 +2590,9 @@ describe("App", () => {
       await openPrintWeekTab(wrapper);
       await nextTick();
 
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       expect(printSpy).not.toHaveBeenCalled();
-      expectPanelVisible(wrapper, "workbench-panel-print-week");
+      expectPanelVisible(wrapper, "workbench-panel-print");
       expect(panel.text()).toContain("周表打印预览");
       expect(panel.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
       expect(panel.get(".print-preview-active").text()).toContain("周表预览");
@@ -2584,7 +2614,7 @@ describe("App", () => {
       await openPrintMonthTab(wrapper);
       await nextTick();
 
-      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       expect(printSpy).not.toHaveBeenCalled();
       expect(panel.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
       expect(panel.find('[data-testid="print-panel-system-button"]').exists()).toBe(false);
@@ -2624,7 +2654,7 @@ describe("App", () => {
       await openPrintMonthTab(wrapper);
       await nextTick();
 
-      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       expect(printSpy).not.toHaveBeenCalled();
       expect(panel.get(".print-preview-active").text()).toContain("月度汇总");
       expect(panel.get(".print-preview-active").text()).toContain("李护士:1:1.50");
@@ -2994,7 +3024,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
@@ -3030,12 +3060,12 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
 
       await openPrintMonthTab(wrapper);
       await nextTick();
-      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       deferredWeekPdf.resolve(weekPdfFile);
       await flushPromises();
 
@@ -3075,12 +3105,12 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
 
       await openPrintMonthTab(wrapper);
       await nextTick();
-      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       deferredWeekPdf.reject(new Error("week pdf failed"));
       await flushPromises();
 
@@ -3111,7 +3141,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
@@ -3122,7 +3152,7 @@ describe("App", () => {
 
       await openPrintMonthTab(wrapper);
       await nextTick();
-      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print"]');
       deferredShare.reject(new DOMException("share canceled", "AbortError"));
       await flushPromises();
 
@@ -3154,7 +3184,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
 
       await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
@@ -3196,7 +3226,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
 
       await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
@@ -3239,7 +3269,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await nextTick();
 
@@ -3277,7 +3307,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintMonthTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
@@ -3315,7 +3345,7 @@ describe("App", () => {
       await flushPromises();
       await openPrintWeekTab(wrapper);
       await nextTick();
-      const panel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      const panel = wrapper.get('[data-testid="workbench-panel-print"]');
       await panel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 

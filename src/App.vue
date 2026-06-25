@@ -53,7 +53,7 @@ import { validateScheduleQueryRange } from "@/lib/schedule-query";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
-type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "printWeek" | "printMonth" | "config" | "help";
+type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "print" | "config" | "help";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -102,6 +102,7 @@ const pdfDownloadUrl = ref("");
 const pdfDownloadName = ref("");
 const printPdfStatus = ref("");
 const activeWorkbenchTab = ref<WorkbenchTab>("schedule");
+const activePrintPanelMode = ref<PrintMode>("week");
 const passwordDialogOpen = ref(false);
 const passwordChanging = ref(false);
 const passwordChangeError = ref("");
@@ -116,8 +117,7 @@ const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "query", label: "查询" },
   { key: "weekly", label: "周统计" },
   { key: "bonus", label: "月结与奖金" },
-  { key: "printWeek", label: "打印周表" },
-  { key: "printMonth", label: "打印月表" },
+  { key: "print", label: "打印" },
   { key: "config", label: "配置" },
   { key: "help", label: "使用说明" }
 ];
@@ -329,12 +329,8 @@ const printPreviewOpen = computed({
   }
 });
 const activePrintMode = computed<PrintMode | null>(() => {
-  if (activeWorkbenchTab.value === "printWeek") {
-    return "week";
-  }
-
-  if (activeWorkbenchTab.value === "printMonth") {
-    return "month";
+  if (activeWorkbenchTab.value === "print") {
+    return activePrintPanelMode.value;
   }
 
   return printPreviewMode.value;
@@ -354,12 +350,13 @@ const printPreviewTitle = computed(() => activePrintTitle.value);
 const isSystemPrintSupported = computed(() => typeof window !== "undefined" && typeof window.print === "function");
 
 watch(activeWorkbenchTab, (nextTab, previousTab) => {
-  if (
-    nextTab !== previousTab &&
-    (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
-  ) {
+  if (nextTab !== previousTab && (nextTab === "print" || previousTab === "print")) {
     cancelPrintPdfRequest();
   }
+});
+
+watch(activePrintPanelMode, () => {
+  cancelPrintPdfRequest();
 });
 
 watch(activeWorkbenchTab, (nextTab, previousTab) => {
@@ -943,12 +940,7 @@ function printWithMode(mode: PrintMode): void {
 }
 
 function selectWorkbenchTab(tab: WorkbenchTab): void {
-  if (tab === "printWeek") {
-    activeWorkbenchTab.value = tab;
-    return;
-  }
-
-  if (tab === "printMonth") {
+  if (tab === "print") {
     activeWorkbenchTab.value = tab;
     return;
   }
@@ -1745,16 +1737,34 @@ onBeforeUnmount(() => {
             />
           </section>
           <section
-            v-show="activeWorkbenchTab === 'printWeek'"
+            v-show="activeWorkbenchTab === 'print'"
             class="workbench-tab-panel print-panel"
-            data-testid="workbench-panel-print-week"
+            data-testid="workbench-panel-print"
           >
             <header class="print-panel-header">
               <div>
-                <h2>周表打印预览</h2>
+                <h2>{{ activePrintTitle }}</h2>
                 <p class="print-preview-tip">
                   预览内容确认无误后可生成 PDF；手机端优先使用系统分享，不支持时可下载 PDF 后打印。
                 </p>
+                <div class="print-mode-switch" aria-label="打印类型">
+                  <button
+                    data-testid="print-mode-week"
+                    type="button"
+                    :class="{ active: activePrintPanelMode === 'week' }"
+                    @click="activePrintPanelMode = 'week'"
+                  >
+                    周表
+                  </button>
+                  <button
+                    data-testid="print-mode-month"
+                    type="button"
+                    :class="{ active: activePrintPanelMode === 'month' }"
+                    @click="activePrintPanelMode = 'month'"
+                  >
+                    月表
+                  </button>
+                </div>
               </div>
               <div class="print-panel-actions">
                 <button data-testid="print-panel-pdf-button" type="button" :disabled="pdfGenerating" @click="handlePreviewPdfShare">
@@ -1773,9 +1783,14 @@ onBeforeUnmount(() => {
             <p v-if="!isSystemPrintSupported" class="print-preview-warning">
               当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
             </p>
-            <section ref="printWeekPanelContentRef" class="print-preview-content" aria-label="周表打印预览内容">
+            <section
+              v-show="activePrintPanelMode === 'week'"
+              ref="printWeekPanelContentRef"
+              class="print-preview-content"
+              aria-label="周表打印预览内容"
+            >
               <PrintViews
-                v-if="activeWorkbenchTab === 'printWeek' && data && weeklySummary"
+                v-if="activeWorkbenchTab === 'print' && activePrintPanelMode === 'week' && data && weeklySummary"
                 :data="data"
                 :days="printMonthDays"
                 :monthly-summary="monthlySummary"
@@ -1784,43 +1799,14 @@ onBeforeUnmount(() => {
                 preview-mode="week"
               />
             </section>
-            <p v-if="printPdfStatus" class="print-pdf-status">{{ printPdfStatus }}</p>
-            <p v-if="pdfDownloadUrl" class="print-pdf-download">
-              <a data-testid="print-pdf-download-link" :href="pdfDownloadUrl" :download="pdfDownloadName">下载 PDF</a>
-            </p>
-          </section>
-          <section
-            v-show="activeWorkbenchTab === 'printMonth'"
-            class="workbench-tab-panel print-panel"
-            data-testid="workbench-panel-print-month"
-          >
-            <header class="print-panel-header">
-              <div>
-                <h2>月表打印预览</h2>
-                <p class="print-preview-tip">
-                  预览内容确认无误后可生成 PDF；手机端优先使用系统分享，不支持时可下载 PDF 后打印。
-                </p>
-              </div>
-              <div class="print-panel-actions">
-                <button data-testid="print-panel-pdf-button" type="button" :disabled="pdfGenerating" @click="handlePreviewPdfShare">
-                  {{ pdfGenerating ? "生成中..." : "生成/分享 PDF" }}
-                </button>
-                <button
-                  v-if="!isMobileViewport() && isSystemPrintSupported"
-                  data-testid="print-panel-system-button"
-                  type="button"
-                  @click="handlePrintPanelPrint"
-                >
-                  调用系统打印
-                </button>
-              </div>
-            </header>
-            <p v-if="!isSystemPrintSupported" class="print-preview-warning">
-              当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
-            </p>
-            <section ref="printMonthPanelContentRef" class="print-preview-content" aria-label="月表打印预览内容">
+            <section
+              v-show="activePrintPanelMode === 'month'"
+              ref="printMonthPanelContentRef"
+              class="print-preview-content"
+              aria-label="月表打印预览内容"
+            >
               <PrintViews
-                v-if="activeWorkbenchTab === 'printMonth' && data && weeklySummary"
+                v-if="activeWorkbenchTab === 'print' && activePrintPanelMode === 'month' && data && weeklySummary"
                 :data="data"
                 :days="printMonthDays"
                 :monthly-summary="monthlySummary"

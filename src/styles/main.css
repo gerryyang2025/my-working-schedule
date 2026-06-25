@@ -871,6 +871,35 @@ body {
   line-height: 1.25;
 }
 
+.print-mode-switch {
+  display: inline-flex;
+  gap: 0;
+  margin-top: 10px;
+  overflow: hidden;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px;
+  background: #eff6ff;
+}
+
+.print-mode-switch button {
+  min-width: 72px;
+  border: 0;
+  border-right: 1px solid #bfdbfe;
+  padding: 7px 14px;
+  background: transparent;
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.print-mode-switch button:last-child {
+  border-right: 0;
+}
+
+.print-mode-switch button.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+
 .print-panel-actions {
   display: flex;
   flex-wrap: wrap;
