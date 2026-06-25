@@ -723,25 +723,7 @@ function printWithMode(mode: PrintMode): void {
   invokeSystemPrint(mode);
 }
 
-function legacyWorkbenchActionTestId(tab: WorkbenchTab): string | null {
-  if (tab === "printWeek") {
-    return "print-week";
-  }
-
-  if (tab === "printMonth") {
-    return "print-month";
-  }
-
-  if (tab === "config") {
-    return "open-management";
-  }
-
-  return null;
-}
-
 function selectWorkbenchTab(tab: WorkbenchTab): void {
-  activeWorkbenchTab.value = tab;
-
   if (tab === "printWeek") {
     printWithMode("week");
     return;
@@ -754,7 +736,10 @@ function selectWorkbenchTab(tab: WorkbenchTab): void {
 
   if (tab === "config") {
     void openManagementDrawer();
+    return;
   }
+
+  activeWorkbenchTab.value = tab;
 }
 
 function handlePreviewPrint(): void {
@@ -1220,10 +1205,7 @@ onBeforeUnmount(() => {
             :class="{ active: activeWorkbenchTab === tab.key }"
             @click="selectWorkbenchTab(tab.key)"
           >
-            <span v-if="legacyWorkbenchActionTestId(tab.key)" :data-testid="legacyWorkbenchActionTestId(tab.key)">
-              {{ tab.label }}
-            </span>
-            <template v-else>{{ tab.label }}</template>
+            {{ tab.label }}
           </button>
         </nav>
 

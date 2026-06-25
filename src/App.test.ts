@@ -892,7 +892,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
 
     expect(apiMocks.listUsers).toHaveBeenCalled();
@@ -918,7 +918,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-save-user"]').trigger("click");
     await flushPromises();
@@ -951,7 +951,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-save-managed-user"]').trigger("click");
     await flushPromises();
@@ -972,7 +972,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     const listUsersCallCountBeforeDelete = apiMocks.listUsers.mock.calls.length;
     const listAuditLogsCallCountBeforeDelete = apiMocks.listAuditLogs.mock.calls.length;
@@ -990,7 +990,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
     await flushPromises();
@@ -1013,7 +1013,7 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    await wrapper.get('[data-testid="open-management"]').trigger("click");
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-delete-staff"]').trigger("click");
     await flushPromises();
@@ -1644,6 +1644,22 @@ describe("App", () => {
     expect((wrapper.get('[data-testid="bonus-draft-input"]').element as HTMLInputElement).value).toBe("1234");
   });
 
+  it("opens action tabs without switching away from the current workbench panel", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="management-drawer"]').exists()).toBe(true);
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expectPanelHidden(wrapper, "workbench-panel-help");
+    expect(wrapper.get('[data-testid="workbench-tab-schedule"]').classes()).toContain("active");
+    expect(wrapper.get('[data-testid="workbench-tab-config"]').classes()).not.toContain("active");
+  });
+
   it("opens a visible week print preview on mobile instead of silently invoking system print", async () => {
     const restoreMobileViewport = mockMobileViewport(true);
     const { printSpy, restore: restorePrint } = mockSystemPrint();
@@ -1652,7 +1668,7 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
@@ -1674,7 +1690,7 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
@@ -1713,7 +1729,7 @@ describe("App", () => {
       const wrapper = mountApp(data);
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
@@ -2083,7 +2099,7 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
       await nextTick();
       await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
       await flushPromises();
@@ -2117,7 +2133,7 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-month"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
       await nextTick();
       await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
       await flushPromises();
@@ -2154,7 +2170,7 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="print-week"]').trigger("click");
+      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
       await nextTick();
       await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
       await flushPromises();
