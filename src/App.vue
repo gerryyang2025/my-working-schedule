@@ -1235,7 +1235,6 @@ onBeforeUnmount(() => {
         <el-button
           v-if="!isMobileViewport() && isSystemPrintSupported"
           data-testid="print-preview-system-button"
-          :disabled="pdfGenerating"
           @click="handlePreviewPrint"
         >
           调用系统打印
@@ -1487,7 +1486,6 @@ onBeforeUnmount(() => {
                   v-if="!isMobileViewport() && isSystemPrintSupported"
                   data-testid="print-panel-system-button"
                   type="button"
-                  :disabled="pdfGenerating"
                   @click="handlePrintPanelPrint"
                 >
                   调用系统打印
@@ -1533,7 +1531,6 @@ onBeforeUnmount(() => {
                   v-if="!isMobileViewport() && isSystemPrintSupported"
                   data-testid="print-panel-system-button"
                   type="button"
-                  :disabled="pdfGenerating"
                   @click="handlePrintPanelPrint"
                 >
                   调用系统打印

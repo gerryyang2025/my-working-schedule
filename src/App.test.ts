@@ -2365,9 +2365,8 @@ describe("App", () => {
       await nextTick();
 
       const systemPrintButton = panel.get('[data-testid="print-panel-system-button"]');
-      expect(systemPrintButton.attributes("disabled")).toBeDefined();
-      systemPrintButton.element.dispatchEvent(new MouseEvent("click", { bubbles: true }));
-      await nextTick();
+      expect(systemPrintButton.attributes("disabled")).toBeUndefined();
+      await systemPrintButton.trigger("click");
 
       deferredWeekPdf.resolve(pdfFile);
       await flushPromises();
