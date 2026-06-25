@@ -346,6 +346,7 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
     (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
   ) {
     printPdfRequestId.value += 1;
+    pdfGenerating.value = false;
     revokePdfDownloadUrl();
   }
 });
@@ -815,6 +816,10 @@ function preparePdfDownload(file: File, message: string): void {
   printPdfStatus.value = message;
 }
 
+function isCurrentPrintPdfRequest(requestId: number, mode: PrintMode): boolean {
+  return printPdfRequestId.value === requestId && getCurrentPrintMode() === mode;
+}
+
 async function handlePreviewPdfShare(): Promise<void> {
   const mode = getCurrentPrintMode();
   const title = activePrintTitle.value;
@@ -836,7 +841,7 @@ async function handlePreviewPdfShare(): Promise<void> {
     const filename = getPrintPdfFilename(mode);
     const pdfFile = await createPrintPdfFile({ element: activePrintView, filename });
 
-    if (requestId !== printPdfRequestId.value || getCurrentPrintMode() !== mode) {
+    if (!isCurrentPrintPdfRequest(requestId, mode)) {
       return;
     }
 
@@ -846,8 +851,14 @@ async function handlePreviewPdfShare(): Promise<void> {
           files: [pdfFile],
           title
         });
+        if (!isCurrentPrintPdfRequest(requestId, mode)) {
+          return;
+        }
         ElMessage.success("PDF 已发送到系统分享");
       } catch (shareError) {
+        if (!isCurrentPrintPdfRequest(requestId, mode)) {
+          return;
+        }
         preparePdfDownload(pdfFile, "系统分享未完成，请点击下方链接下载 PDF。");
         ElMessage.warning(shareError instanceof Error ? shareError.message : "系统分享未完成");
       }
@@ -856,9 +867,14 @@ async function handlePreviewPdfShare(): Promise<void> {
 
     preparePdfDownload(pdfFile, "当前浏览器不支持直接分享 PDF，请点击下方链接下载。");
   } catch (caughtError) {
+    if (!isCurrentPrintPdfRequest(requestId, mode)) {
+      return;
+    }
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "PDF 生成失败");
   } finally {
-    pdfGenerating.value = false;
+    if (isCurrentPrintPdfRequest(requestId, mode)) {
+      pdfGenerating.value = false;
+    }
   }
 }
 

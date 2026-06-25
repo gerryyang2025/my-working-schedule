@@ -621,13 +621,15 @@ async function openPrintMonthTab(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
 }
 
-function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
+function createDeferred<T>(): { promise: Promise<T>; reject: (reason?: unknown) => void; resolve: (value: T) => void } {
+  let reject!: (reason?: unknown) => void;
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise) => {
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    reject = rejectPromise;
     resolve = resolvePromise;
   });
 
-  return { promise, resolve };
+  return { promise, reject, resolve };
 }
 
 function mockMobileViewport(matches = true): () => void {
@@ -2178,6 +2180,82 @@ describe("App", () => {
       restoreMobileViewport();
       restorePrint();
       restoreNavigatorShare();
+    }
+  });
+
+  it("ignores a stale PDF generation error after switching print panels", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const deferredWeekPdf = createDeferred<File>();
+    pdfMocks.createPrintPdfFile.mockReturnValueOnce(deferredWeekPdf.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+
+      await openPrintMonthTab(wrapper);
+      await nextTick();
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      deferredWeekPdf.reject(new Error("week pdf failed"));
+      await flushPromises();
+
+      expect(elementPlusMocks.ElMessage.error).not.toHaveBeenCalled();
+      expect(shareSpy).not.toHaveBeenCalled();
+      expect(monthPanel.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+      expect(monthPanel.find(".print-pdf-status").exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+    }
+  });
+
+  it("ignores a stale PDF share rejection after switching print panels", async () => {
+    const restoreMobileViewport = mockMobileViewport(true);
+    const { restore: restorePrint } = mockSystemPrint();
+    const { restore: restoreNavigatorShare, shareSpy } = mockNavigatorFileShare(true);
+    const { createObjectUrlSpy, restore: restorePdfDownloadUrl } = mockPdfDownloadUrl();
+    const pdfFile = new File(["pdf"], "week-schedule.pdf", { type: "application/pdf" });
+    const deferredShare = createDeferred<void>();
+    pdfMocks.createPrintPdfFile.mockResolvedValue(pdfFile);
+    shareSpy.mockReturnValue(deferredShare.promise);
+
+    try {
+      const wrapper = mountApp();
+
+      await flushPromises();
+      await openPrintWeekTab(wrapper);
+      await nextTick();
+      const weekPanel = wrapper.get('[data-testid="workbench-panel-print-week"]');
+      await weekPanel.get('[data-testid="print-panel-pdf-button"]').trigger("click");
+      await flushPromises();
+
+      expect(shareSpy).toHaveBeenCalledWith({
+        files: [pdfFile],
+        title: "周表打印预览"
+      });
+
+      await openPrintMonthTab(wrapper);
+      await nextTick();
+      const monthPanel = wrapper.get('[data-testid="workbench-panel-print-month"]');
+      deferredShare.reject(new DOMException("share canceled", "AbortError"));
+      await flushPromises();
+
+      expect(createObjectUrlSpy).not.toHaveBeenCalled();
+      expect(elementPlusMocks.ElMessage.warning).not.toHaveBeenCalled();
+      expect(monthPanel.find('[data-testid="print-pdf-download-link"]').exists()).toBe(false);
+      expect(monthPanel.find(".print-pdf-status").exists()).toBe(false);
+    } finally {
+      restoreMobileViewport();
+      restorePrint();
+      restoreNavigatorShare();
+      restorePdfDownloadUrl();
     }
   });
 
