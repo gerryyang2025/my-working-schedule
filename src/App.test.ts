@@ -840,11 +840,13 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
+    expect(wrapper.get(".app-header").classes()).not.toContain("user-menu-open");
     expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
 
     await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
     await nextTick();
 
+    expect(wrapper.get(".app-header").classes()).toContain("user-menu-open");
     const dropdown = wrapper.get(".header-user-dropdown");
     expect(dropdown.attributes("role")).toBe("menu");
     expect(dropdown.get('[data-testid="open-password-change"]').text()).toContain("修改密码");
@@ -864,6 +866,7 @@ describe("App", () => {
     await nextTick();
 
     expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
+    expect(wrapper.get(".app-header").classes()).not.toContain("user-menu-open");
     expect(userButton.attributes("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(userButton.element);
   });
@@ -881,6 +884,7 @@ describe("App", () => {
     await nextTick();
 
     expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
+    expect(wrapper.get(".app-header").classes()).not.toContain("user-menu-open");
     expect(userButton.attributes("aria-expanded")).toBe("false");
   });
 

@@ -53,12 +53,14 @@ function mediaBlock(query: string): string {
 describe("main.css layout rules", () => {
   it("styles compact header actions and account dropdown", () => {
     const appTitleRules = ruleBlocks(".app-title")[0] || "";
+    const openUserMenuHeaderRules = ruleBlocks(".app-header.user-menu-open")[0] || "";
     const headerActionsRules = ruleBlocks(".app-header-actions")[0] || "";
     const userMenuRules = ruleBlocks(".header-user-menu")[0] || "";
     const userMenuButtonRules = ruleBlocks(".app-header-actions .header-user-menu-button")[0] || "";
     const userDropdownRules = ruleBlocks(".header-user-dropdown")[0] || "";
 
     expect(appTitleRules).not.toBe("");
+    expect(openUserMenuHeaderRules).toContain("margin-bottom: 88px");
     expect(headerActionsRules).toContain("display: flex");
     expect(headerActionsRules).toContain("justify-content: flex-end");
     expect(headerActionsRules).toContain("flex-wrap: wrap");

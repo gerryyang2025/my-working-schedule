@@ -27,6 +27,10 @@ body {
   margin-bottom: 12px;
 }
 
+.app-header.user-menu-open {
+  margin-bottom: 88px;
+}
+
 .app-header h1 {
   margin: 2px 0 0;
   font-size: 22px;

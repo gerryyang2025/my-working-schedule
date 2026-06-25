@@ -1059,7 +1059,7 @@ onBeforeUnmount(() => {
   <section v-if="authChecking" class="state-message">正在检查登录状态...</section>
   <LoginPage v-else-if="!currentUser" :loading="loginSubmitting" :error="loginError" @login="handleLogin" />
   <main v-else class="app-shell">
-    <header class="app-header">
+    <header class="app-header" :class="{ 'user-menu-open': userMenuOpen }">
       <div class="app-title">
         <p class="eyebrow">国际医学部</p>
         <h1>护理排班管理系统</h1>
