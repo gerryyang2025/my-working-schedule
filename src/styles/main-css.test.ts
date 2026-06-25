@@ -270,7 +270,9 @@ describe("main.css layout rules", () => {
     expect(mobileOperationRow).toContain("flex-direction: column");
     expect(mobileWeekControls).toContain("width: 100%");
     expect(mobileWeekFields).toContain("flex-wrap: wrap");
-    expect(mobileWeekRange).toContain("white-space: normal");
+    expect(mobileWeekRange).toContain("flex: 0 1 auto");
+    expect(mobileWeekRange).toContain("white-space: nowrap");
+    expect(mobileWeekRange).not.toContain("flex-basis: 100%");
     expect(mobileRowSearch).toContain("display: grid");
     expect(mobileRowSearch).toContain("grid-template-columns: 1fr");
     expect(mobileRowSearch).toContain("width: 100%");

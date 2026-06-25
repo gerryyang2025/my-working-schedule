@@ -1225,9 +1225,9 @@ body {
   }
 
   .schedule-week-range {
-    flex-basis: 100%;
+    flex: 0 1 auto;
     text-align: left;
-    white-space: normal;
+    white-space: nowrap;
   }
 
   .workbench {

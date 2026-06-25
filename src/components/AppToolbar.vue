@@ -33,6 +33,7 @@ function moveToCurrentWeek(): void {
   <section class="schedule-week-controls" data-testid="schedule-week-controls">
     <div class="schedule-week-fields">
       <span class="schedule-week-number">{{ scheduleWeekLabel }}</span>
+      <span class="schedule-week-range">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</span>
       <el-date-picker
         :model-value="selectedDate"
         type="date"
@@ -50,7 +51,6 @@ function moveToCurrentWeek(): void {
           <el-button :icon="ChevronRight" aria-label="下一周" @click="moveWeek(1)" />
         </el-tooltip>
       </div>
-      <span class="schedule-week-range">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</span>
     </div>
   </section>
 </template>

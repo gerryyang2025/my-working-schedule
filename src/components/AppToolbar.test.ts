@@ -85,6 +85,11 @@ describe("AppToolbar", () => {
     expect(wrapper.find('input[data-placeholder="选择周"]').exists()).toBe(false);
     expect(wrapper.find(".schedule-week-fields").exists()).toBe(true);
     expect(wrapper.get(".schedule-week-range").text()).toBe("2026-06-22 至 2026-06-28");
+    expect(
+      Array.from(wrapper.get(".schedule-week-fields").element.children)
+        .slice(0, 2)
+        .map((element) => element.className)
+    ).toEqual(["schedule-week-number", "schedule-week-range"]);
   });
 
   it("does not render standalone year or month controls in the weekly controls", () => {
