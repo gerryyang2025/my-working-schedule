@@ -383,6 +383,20 @@ describe("main.css layout rules", () => {
 });
 
 describe("main.css print month layout rules", () => {
+  it("styles in-page print panels with readable controls", () => {
+    const panelRules = ruleBlocks(".print-panel")[0] || "";
+    const headerRules = ruleBlocks(".print-panel-header")[0] || "";
+    const actionRules = ruleBlocks(".print-panel-actions")[0] || "";
+
+    expect(panelRules).toContain("display: grid");
+    expect(panelRules).toContain("border: 1px solid #dbe3ef");
+    expect(panelRules).toContain("background: #ffffff");
+    expect(headerRules).toContain("display: flex");
+    expect(headerRules).toContain("justify-content: space-between");
+    expect(actionRules).toContain("display: flex");
+    expect(actionRules).toContain("flex-wrap: wrap");
+  });
+
   it("keeps the month detail table on a scrollable print canvas instead of squeezing it on mobile", () => {
     const monthTable = ruleBlocks(".print-preview-content .print-month .print-month-detail-table")[0] ?? "";
     const monthCells =

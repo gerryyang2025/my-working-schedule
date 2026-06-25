@@ -822,6 +822,57 @@ body {
   display: none;
 }
 
+.print-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  padding: 16px;
+  background: #ffffff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.print-panel-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.print-panel-header h2 {
+  margin: 0 0 6px;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1.25;
+}
+
+.print-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.print-panel-actions button {
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.print-panel-actions button:first-child {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.print-panel-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .print-preview-dialog {
   width: min(960px, calc(100vw - 24px)) !important;
   max-width: calc(100vw - 24px);
@@ -1452,6 +1503,14 @@ body {
 
   .management-actions .el-button {
     flex: 1 1 120px;
+  }
+
+  .print-panel-header {
+    flex-direction: column;
+  }
+
+  .print-panel-actions {
+    justify-content: flex-start;
   }
 
   .print-preview-dialog {

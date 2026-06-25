@@ -87,6 +87,8 @@ const settlementSaving = ref(false);
 const settlementCanceling = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
 const printPreviewContentRef = ref<HTMLElement | null>(null);
+const printWeekPanelContentRef = ref<HTMLElement | null>(null);
+const printMonthPanelContentRef = ref<HTMLElement | null>(null);
 const pdfGenerating = ref(false);
 const pdfDownloadUrl = ref("");
 const pdfDownloadName = ref("");
@@ -312,18 +314,39 @@ const printPreviewOpen = computed({
     }
   }
 });
-const printPreviewTitle = computed(() => {
-  if (printPreviewMode.value === "week") {
+const activePrintMode = computed<PrintMode | null>(() => {
+  if (activeWorkbenchTab.value === "printWeek") {
+    return "week";
+  }
+
+  if (activeWorkbenchTab.value === "printMonth") {
+    return "month";
+  }
+
+  return printPreviewMode.value;
+});
+const activePrintTitle = computed(() => {
+  if (activePrintMode.value === "week") {
     return "周表打印预览";
   }
 
-  if (printPreviewMode.value === "month") {
+  if (activePrintMode.value === "month") {
     return "月表打印预览";
   }
 
   return "打印预览";
 });
+const printPreviewTitle = computed(() => activePrintTitle.value);
 const isSystemPrintSupported = computed(() => typeof window !== "undefined" && typeof window.print === "function");
+
+watch(activeWorkbenchTab, (nextTab, previousTab) => {
+  if (
+    nextTab !== previousTab &&
+    (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
+  ) {
+    revokePdfDownloadUrl();
+  }
+});
 
 watch(selectedMonth, (nextMonth, previousMonth) => {
   if (nextMonth === previousMonth) {
@@ -725,12 +748,12 @@ function printWithMode(mode: PrintMode): void {
 
 function selectWorkbenchTab(tab: WorkbenchTab): void {
   if (tab === "printWeek") {
-    printWithMode("week");
+    activeWorkbenchTab.value = tab;
     return;
   }
 
   if (tab === "printMonth") {
-    printWithMode("month");
+    activeWorkbenchTab.value = tab;
     return;
   }
 
@@ -742,12 +765,33 @@ function selectWorkbenchTab(tab: WorkbenchTab): void {
   activeWorkbenchTab.value = tab;
 }
 
-function handlePreviewPrint(): void {
-  if (!printPreviewMode.value) {
+function getActivePrintElement(): HTMLElement | null {
+  if (activePrintMode.value === "week") {
+    return printWeekPanelContentRef.value?.querySelector(".print-preview-active") ?? null;
+  }
+
+  if (activePrintMode.value === "month") {
+    return printMonthPanelContentRef.value?.querySelector(".print-preview-active") ?? null;
+  }
+
+  return printPreviewContentRef.value?.querySelector(".print-preview-active") ?? null;
+}
+
+function getCurrentPrintMode(): PrintMode | null {
+  return activePrintMode.value;
+}
+
+function handlePrintPanelPrint(): void {
+  const mode = getCurrentPrintMode();
+  if (!mode) {
     return;
   }
 
-  invokeSystemPrint(printPreviewMode.value);
+  invokeSystemPrint(mode);
+}
+
+function handlePreviewPrint(): void {
+  handlePrintPanelPrint();
 }
 
 function getPrintPdfFilename(mode: PrintMode): string {
@@ -770,11 +814,12 @@ function preparePdfDownload(file: File, message: string): void {
 }
 
 async function handlePreviewPdfShare(): Promise<void> {
-  if (!printPreviewMode.value || pdfGenerating.value) {
+  const mode = getCurrentPrintMode();
+  if (!mode || pdfGenerating.value) {
     return;
   }
 
-  const activePrintView = printPreviewContentRef.value?.querySelector(".print-preview-active");
+  const activePrintView = getActivePrintElement();
   if (!(activePrintView instanceof HTMLElement)) {
     ElMessage.error("打印内容不可用");
     return;
@@ -784,14 +829,14 @@ async function handlePreviewPdfShare(): Promise<void> {
   revokePdfDownloadUrl();
 
   try {
-    const filename = getPrintPdfFilename(printPreviewMode.value);
+    const filename = getPrintPdfFilename(mode);
     const pdfFile = await createPrintPdfFile({ element: activePrintView, filename });
 
     if (canSharePdfFile(pdfFile)) {
       try {
         await navigator.share({
           files: [pdfFile],
-          title: printPreviewTitle.value
+          title: activePrintTitle.value
         });
         ElMessage.success("PDF 已发送到系统分享");
       } catch (shareError) {
@@ -1388,6 +1433,96 @@ onBeforeUnmount(() => {
               @confirm-settlement="handleConfirmSettlement"
               @cancel-settlement="handleCancelSettlement"
             />
+          </section>
+          <section
+            v-show="activeWorkbenchTab === 'printWeek'"
+            class="workbench-tab-panel print-panel"
+            data-testid="workbench-panel-print-week"
+          >
+            <header class="print-panel-header">
+              <div>
+                <h2>周表打印预览</h2>
+                <p class="print-preview-tip">
+                  预览内容确认无误后可生成 PDF；手机端优先使用系统分享，不支持时可下载 PDF 后打印。
+                </p>
+              </div>
+              <div class="print-panel-actions">
+                <button data-testid="print-panel-pdf-button" type="button" :disabled="pdfGenerating" @click="handlePreviewPdfShare">
+                  {{ pdfGenerating ? "生成中..." : "生成/分享 PDF" }}
+                </button>
+                <button
+                  v-if="!isMobileViewport() && isSystemPrintSupported"
+                  data-testid="print-panel-system-button"
+                  type="button"
+                  @click="handlePrintPanelPrint"
+                >
+                  调用系统打印
+                </button>
+              </div>
+            </header>
+            <p v-if="!isSystemPrintSupported" class="print-preview-warning">
+              当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
+            </p>
+            <section ref="printWeekPanelContentRef" class="print-preview-content" aria-label="周表打印预览内容">
+              <PrintViews
+                v-if="activeWorkbenchTab === 'printWeek' && data && weeklySummary"
+                :data="data"
+                :days="printMonthDays"
+                :monthly-summary="monthlySummary"
+                :monthly-settlement="currentMonthlySettlement"
+                :summary="weeklySummary"
+                preview-mode="week"
+              />
+            </section>
+            <p v-if="printPdfStatus" class="print-pdf-status">{{ printPdfStatus }}</p>
+            <p v-if="pdfDownloadUrl" class="print-pdf-download">
+              <a data-testid="print-pdf-download-link" :href="pdfDownloadUrl" :download="pdfDownloadName">下载 PDF</a>
+            </p>
+          </section>
+          <section
+            v-show="activeWorkbenchTab === 'printMonth'"
+            class="workbench-tab-panel print-panel"
+            data-testid="workbench-panel-print-month"
+          >
+            <header class="print-panel-header">
+              <div>
+                <h2>月表打印预览</h2>
+                <p class="print-preview-tip">
+                  预览内容确认无误后可生成 PDF；手机端优先使用系统分享，不支持时可下载 PDF 后打印。
+                </p>
+              </div>
+              <div class="print-panel-actions">
+                <button data-testid="print-panel-pdf-button" type="button" :disabled="pdfGenerating" @click="handlePreviewPdfShare">
+                  {{ pdfGenerating ? "生成中..." : "生成/分享 PDF" }}
+                </button>
+                <button
+                  v-if="!isMobileViewport() && isSystemPrintSupported"
+                  data-testid="print-panel-system-button"
+                  type="button"
+                  @click="handlePrintPanelPrint"
+                >
+                  调用系统打印
+                </button>
+              </div>
+            </header>
+            <p v-if="!isSystemPrintSupported" class="print-preview-warning">
+              当前浏览器不支持直接调用系统打印，可先核对预览内容，再使用浏览器菜单中的打印或分享功能。
+            </p>
+            <section ref="printMonthPanelContentRef" class="print-preview-content" aria-label="月表打印预览内容">
+              <PrintViews
+                v-if="activeWorkbenchTab === 'printMonth' && data && weeklySummary"
+                :data="data"
+                :days="printMonthDays"
+                :monthly-summary="monthlySummary"
+                :monthly-settlement="currentMonthlySettlement"
+                :summary="weeklySummary"
+                preview-mode="month"
+              />
+            </section>
+            <p v-if="printPdfStatus" class="print-pdf-status">{{ printPdfStatus }}</p>
+            <p v-if="pdfDownloadUrl" class="print-pdf-download">
+              <a data-testid="print-pdf-download-link" :href="pdfDownloadUrl" :download="pdfDownloadName">下载 PDF</a>
+            </p>
           </section>
           <section
             v-show="activeWorkbenchTab === 'help'"

@@ -613,6 +613,14 @@ async function openQueryTab(wrapper: ReturnType<typeof mountApp>) {
   await wrapper.get('[data-testid="workbench-tab-query"]').trigger("click");
 }
 
+async function openPrintWeekTab(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
+}
+
+async function openPrintMonthTab(wrapper: ReturnType<typeof mountApp>) {
+  await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
+}
+
 function createDeferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((resolvePromise) => {
@@ -1668,14 +1676,15 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
+      await openPrintWeekTab(wrapper);
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
-      expect(wrapper.get(".print-preview-dialog").text()).toContain("周表打印预览");
-      expect(wrapper.get(".print-preview-tip").text()).toContain("生成 PDF");
-      expect(wrapper.get('[data-testid="print-preview-pdf-button"]').text()).toContain("生成/分享 PDF");
+      expectPanelVisible(wrapper, "workbench-panel-print-week");
+      expect(wrapper.get('[data-testid="workbench-panel-print-week"]').text()).toContain("周表打印预览");
+      expect(wrapper.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
       expect(wrapper.get(".print-preview-active").text()).toContain("周表预览");
+      expect(wrapper.find(".print-preview-dialog").exists()).toBe(false);
     } finally {
       restoreMobileViewport();
       restorePrint();
@@ -1690,12 +1699,12 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
+      await openPrintMonthTab(wrapper);
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
-      expect(wrapper.get('[data-testid="print-preview-pdf-button"]').text()).toContain("生成/分享 PDF");
-      expect(wrapper.find('[data-testid="print-preview-system-button"]').exists()).toBe(false);
+      expect(wrapper.get('[data-testid="print-panel-pdf-button"]').text()).toContain("生成/分享 PDF");
+      expect(wrapper.find('[data-testid="print-panel-system-button"]').exists()).toBe(false);
     } finally {
       restoreMobileViewport();
       restorePrint();
@@ -1729,7 +1738,7 @@ describe("App", () => {
       const wrapper = mountApp(data);
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
+      await openPrintMonthTab(wrapper);
       await nextTick();
 
       expect(printSpy).not.toHaveBeenCalled();
@@ -2099,9 +2108,9 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
+      await openPrintWeekTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
@@ -2133,9 +2142,9 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printMonth"]').trigger("click");
+      await openPrintMonthTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(pdfMocks.createPrintPdfFile).toHaveBeenCalledWith({
@@ -2170,9 +2179,9 @@ describe("App", () => {
       const wrapper = mountApp();
 
       await flushPromises();
-      await wrapper.get('[data-testid="workbench-tab-printWeek"]').trigger("click");
+      await openPrintWeekTab(wrapper);
       await nextTick();
-      await wrapper.get('[data-testid="print-preview-pdf-button"]').trigger("click");
+      await wrapper.get('[data-testid="print-panel-pdf-button"]').trigger("click");
       await flushPromises();
 
       expect(shareSpy).toHaveBeenCalledWith({
