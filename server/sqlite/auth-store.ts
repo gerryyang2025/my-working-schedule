@@ -114,16 +114,58 @@ function mapAuditLog(row: AuditLogRow): AuditLogEntry {
   };
 }
 
-function normalizeAuditQuery(query: number | AuditLogQuery | undefined): Required<AuditLogQuery> {
+interface NormalizedAuditQuery {
+  username: string;
+  action: string;
+  keyword: string;
+  page: number;
+  pageSize: number;
+}
+
+function normalizePositiveInteger(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function normalizeAuditQuery(query: number | AuditLogQuery | undefined): NormalizedAuditQuery {
   if (typeof query === "number") {
-    return { username: "", action: "", keyword: "", limit: query };
+    return { username: "", action: "", keyword: "", page: 1, pageSize: Math.min(Math.max(Math.floor(query), 1), 100) };
   }
 
+  const page = Math.max(normalizePositiveInteger(query?.page, 1), 1);
+  const requestedPageSize = normalizePositiveInteger(query?.pageSize ?? query?.limit, 20);
   return {
     username: query?.username?.trim() ?? "",
     action: query?.action?.trim() ?? "",
     keyword: query?.keyword?.trim() ?? "",
-    limit: query?.limit ?? 100
+    page,
+    pageSize: Math.min(Math.max(requestedPageSize, 1), 100)
+  };
+}
+
+function buildAuditFilters(query: NormalizedAuditQuery): { whereClause: string; params: Array<string | number> } {
+  const filters: string[] = [];
+  const params: Array<string | number> = [];
+
+  if (query.username) {
+    filters.push("username = ?");
+    params.push(query.username);
+  }
+  if (query.action) {
+    filters.push("action = ?");
+    params.push(query.action);
+  }
+  if (query.keyword) {
+    filters.push("(summary like ? or target_type like ? or target_id like ?)");
+    const keyword = `%${query.keyword}%`;
+    params.push(keyword, keyword, keyword);
+  }
+
+  return {
+    whereClause: filters.length > 0 ? `where ${filters.join(" and ")}` : "",
+    params
   };
 }
 
@@ -571,26 +613,8 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
       const db = openDatabase();
       try {
         const normalizedQuery = normalizeAuditQuery(query);
-        const safeLimit = Math.min(Math.max(Math.floor(normalizedQuery.limit), 1), 200);
-        const filters: string[] = [];
-        const params: Array<string | number> = [];
-
-        if (normalizedQuery.username) {
-          filters.push("username = ?");
-          params.push(normalizedQuery.username);
-        }
-        if (normalizedQuery.action) {
-          filters.push("action = ?");
-          params.push(normalizedQuery.action);
-        }
-        if (normalizedQuery.keyword) {
-          filters.push("(summary like ? or target_type like ? or target_id like ?)");
-          const keyword = `%${normalizedQuery.keyword}%`;
-          params.push(keyword, keyword, keyword);
-        }
-
-        params.push(safeLimit);
-        const whereClause = filters.length > 0 ? `where ${filters.join(" and ")}` : "";
+        const { whereClause, params } = buildAuditFilters(normalizedQuery);
+        params.push(normalizedQuery.pageSize, (normalizedQuery.page - 1) * normalizedQuery.pageSize);
         const rows = db
           .prepare(
             `
@@ -598,12 +622,32 @@ export function createSqliteAuthStore(sqlitePath: string): AuthStore {
               from audit_logs
               ${whereClause}
               order by occurred_at desc, id desc
-              limit ?
+              limit ? offset ?
             `
           )
           .all(...params) as AuditLogRow[];
 
         return rows.map(mapAuditLog);
+      } finally {
+        db.close();
+      }
+    },
+
+    async countAuditLogs(query) {
+      const db = openDatabase();
+      try {
+        const normalizedQuery = normalizeAuditQuery(query);
+        const { whereClause, params } = buildAuditFilters(normalizedQuery);
+        const row = db
+          .prepare(
+            `
+              select count(*) as count
+              from audit_logs
+              ${whereClause}
+            `
+          )
+          .get(...params) as { count: number };
+        return row.count;
       } finally {
         db.close();
       }

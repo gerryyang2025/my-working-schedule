@@ -783,6 +783,49 @@ describe.sequential("API routes", () => {
     ]);
   });
 
+  it("paginates audit logs and returns the matching total", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+
+    for (let index = 0; index < 25; index += 1) {
+      await request(app)
+        .put(`/api/users/user-audit-page-${index}`)
+        .set(headers)
+        .send({
+          username: `audit-page-${index}`,
+          displayName: `审计分页 ${index}`,
+          role: "viewer",
+          enabled: true,
+          password: "audit-password"
+        })
+        .expect(200);
+    }
+
+    const response = await request(app)
+      .get("/api/audit-logs")
+      .query({ action: "user.save", page: "2", pageSize: "10" })
+      .set(headers)
+      .expect(200);
+
+    expect(response.body).toEqual(
+      expect.objectContaining({
+        total: 25,
+        page: 2,
+        pageSize: 10
+      })
+    );
+    expect(response.body.rows).toHaveLength(10);
+    expect(response.body.rows[0]).toEqual(
+      expect.objectContaining({
+        action: "user.save",
+        targetId: "user-audit-page-14"
+      })
+    );
+    expect(response.body.rows).toEqual(
+      expect.not.arrayContaining([expect.objectContaining({ targetId: "user-audit-page-24" })])
+    );
+  });
+
   it("rejects admin mode with the wrong password", async () => {
     const response = await request(createTestApp()).post("/api/admin/session").send({ password: "wrong" }).expect(401);
     expect(response.body).toEqual({ ok: false, message: "管理密码不正确" });

@@ -61,6 +61,7 @@ const error = ref("");
 const currentUser = ref<AuthUser | null>(null);
 const users = ref<ManagedAuthUser[]>([]);
 const auditLogs = ref<AuditLogEntry[]>([]);
+const auditTotal = ref(0);
 const authChecking = ref(true);
 const loginSubmitting = ref(false);
 const loginError = ref("");
@@ -487,7 +488,7 @@ function beginConfigMutation(): ConfigMutationContext | null {
   };
 }
 
-async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<void> {
+async function refreshAuditLogs(query: AuditLogQuery = { page: 1, pageSize: 20 }): Promise<void> {
   if (activeWorkbenchTab.value !== "config" || !canManageConfig.value) {
     return;
   }
@@ -505,6 +506,7 @@ async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<
     }
 
     auditLogs.value = response.rows;
+    auditTotal.value = response.total;
   } catch (caughtError) {
     if (!isAbortError(caughtError) && canApplyAuditLogRequest(requestId, userId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "审计日志加载失败");
@@ -528,7 +530,7 @@ async function handleRefreshAuditLogs(query: AuditLogQuery): Promise<void> {
 }
 
 async function refreshLatestAuditLogs(): Promise<void> {
-  await refreshAuditLogs({ limit: 100 });
+  await refreshAuditLogs({ page: 1, pageSize: 20 });
 }
 
 async function refreshLatestAuditLogsIfManaging(): Promise<void> {
@@ -554,7 +556,7 @@ async function refreshManagementData(): Promise<void> {
   try {
     const [usersResponse, auditResponse] = await Promise.all([
       listUsers({ signal: controller.signal }),
-      listAuditLogs({ limit: 100 }, { signal: controller.signal })
+      listAuditLogs({ page: 1, pageSize: 20 }, { signal: controller.signal })
     ]);
 
     if (canApplyManagementUsersRequest(requestId, userId)) {
@@ -563,6 +565,7 @@ async function refreshManagementData(): Promise<void> {
 
     if (canApplyManagementAuditRequest(requestId, auditRequestId, userId)) {
       auditLogs.value = auditResponse.rows;
+      auditTotal.value = auditResponse.total;
     }
   } catch (caughtError) {
     if (!isAbortError(caughtError) && canApplyManagementUsersRequest(requestId, userId)) {
@@ -636,6 +639,7 @@ async function handleLogout(): Promise<void> {
   data.value = null;
   users.value = [];
   auditLogs.value = [];
+  auditTotal.value = 0;
   ElMessage.success("已退出登录");
 }
 
@@ -702,6 +706,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     data.value = null;
     users.value = [];
     auditLogs.value = [];
+    auditTotal.value = 0;
     ElMessage.success("密码已修改，请重新登录");
   } catch (caughtError) {
     passwordChangeError.value = caughtError instanceof Error ? caughtError.message : "密码修改失败";
@@ -1841,6 +1846,7 @@ onBeforeUnmount(() => {
               :data="data"
               :users="users"
               :audit-logs="auditLogs"
+              :audit-total="auditTotal"
               :admin-mode="canManageConfig"
               :staff-save-version="staffSaveVersion"
               :shift-save-version="shiftSaveVersion"

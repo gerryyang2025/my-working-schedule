@@ -39,6 +39,8 @@ export interface AuditLogQuery {
   action?: string;
   keyword?: string;
   limit?: number;
+  page?: number;
+  pageSize?: number;
 }
 
 export interface SaveAuthUserInput {
@@ -86,6 +88,7 @@ export interface AuthStore {
   revokeSession(token: string): Promise<void>;
   recordAudit(entry: AuditLogInput): Promise<void>;
   listAuditLogs(query?: number | AuditLogQuery): Promise<AuditLogEntry[]>;
+  countAuditLogs(query?: AuditLogQuery): Promise<number>;
 }
 
 interface StoredUser extends AuthUser {
@@ -119,16 +122,34 @@ function createUser(username: string, password: string, role: UserRole): StoredU
   };
 }
 
-function normalizeAuditQuery(query: number | AuditLogQuery | undefined): Required<AuditLogQuery> {
+interface NormalizedAuditQuery {
+  username: string;
+  action: string;
+  keyword: string;
+  page: number;
+  pageSize: number;
+}
+
+function normalizePositiveInteger(value: number | undefined, fallback: number): number {
+  if (value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.floor(value);
+}
+
+function normalizeAuditQuery(query: number | AuditLogQuery | undefined): NormalizedAuditQuery {
   if (typeof query === "number") {
-    return { username: "", action: "", keyword: "", limit: query };
+    return { username: "", action: "", keyword: "", page: 1, pageSize: Math.min(Math.max(Math.floor(query), 1), 100) };
   }
 
+  const page = Math.max(normalizePositiveInteger(query?.page, 1), 1);
+  const requestedPageSize = normalizePositiveInteger(query?.pageSize ?? query?.limit, 20);
   return {
     username: query?.username?.trim() ?? "",
     action: query?.action?.trim() ?? "",
     keyword: query?.keyword?.trim().toLowerCase() ?? "",
-    limit: query?.limit ?? 100
+    page,
+    pageSize: Math.min(Math.max(requestedPageSize, 1), 100)
   };
 }
 
@@ -230,6 +251,22 @@ export function createMemoryAuthStore(): AuthStore {
       throw new AuthStoreError(400, "至少需要保留一个启用的系统管理员");
     }
     return user;
+  }
+
+  function filterAuditLogs(query: NormalizedAuditQuery): AuditLogEntry[] {
+    return auditLogs.filter((entry) => {
+      if (query.username && entry.username !== query.username) {
+        return false;
+      }
+      if (query.action && entry.action !== query.action) {
+        return false;
+      }
+      if (query.keyword) {
+        const searchable = `${entry.summary} ${entry.targetType} ${entry.targetId}`.toLowerCase();
+        return searchable.includes(query.keyword);
+      }
+      return true;
+    });
   }
 
   return {
@@ -398,22 +435,12 @@ export function createMemoryAuthStore(): AuthStore {
 
     async listAuditLogs(query) {
       const normalizedQuery = normalizeAuditQuery(query);
-      const safeLimit = Math.min(Math.max(Math.floor(normalizedQuery.limit), 1), 200);
-      return auditLogs
-        .filter((entry) => {
-          if (normalizedQuery.username && entry.username !== normalizedQuery.username) {
-            return false;
-          }
-          if (normalizedQuery.action && entry.action !== normalizedQuery.action) {
-            return false;
-          }
-          if (normalizedQuery.keyword) {
-            const searchable = `${entry.summary} ${entry.targetType} ${entry.targetId}`.toLowerCase();
-            return searchable.includes(normalizedQuery.keyword);
-          }
-          return true;
-        })
-        .slice(0, safeLimit);
+      const startIndex = (normalizedQuery.page - 1) * normalizedQuery.pageSize;
+      return filterAuditLogs(normalizedQuery).slice(startIndex, startIndex + normalizedQuery.pageSize);
+    },
+
+    async countAuditLogs(query) {
+      return filterAuditLogs(normalizeAuditQuery(query)).length;
     }
   };
 }

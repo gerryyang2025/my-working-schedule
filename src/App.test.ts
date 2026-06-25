@@ -2,7 +2,7 @@ import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
-import type { AuditLogEntry, AuthUser, ManagedAuthUser, PublicAppData } from "@/api/client";
+import type { AuditLogEntry, AuditLogListResponse, AuthUser, ManagedAuthUser, PublicAppData } from "@/api/client";
 
 const apiMocks = vi.hoisted(() => ({
   bulkUpdateWeekSchedule: vi.fn(),
@@ -399,6 +399,7 @@ const ManagementDrawerStub = defineComponent({
     "mode",
     "users",
     "auditLogs",
+    "auditTotal",
     "adminMode",
     "staffSaving",
     "shiftSaving",
@@ -424,6 +425,7 @@ const ManagementDrawerStub = defineComponent({
       <span v-if="!adminMode" data-testid="management-permission">无配置权限</span>
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
       <span data-testid="drawer-audit">{{ auditLogs.map((entry) => entry.summary).join(",") }}</span>
+      <span data-testid="drawer-audit-total">{{ auditTotal }}</span>
       <span data-testid="drawer-staff-saving">{{ staffSaving ? "saving" : "idle" }}</span>
       <span data-testid="drawer-shift-saving">{{ shiftSaving ? "saving" : "idle" }}</span>
       <span data-testid="drawer-holiday-saving">{{ holidaySaving ? "saving" : "idle" }}</span>
@@ -487,7 +489,7 @@ const ManagementDrawerStub = defineComponent({
       <button
         data-testid="drawer-refresh-audit"
         type="button"
-        @click="$emit('refreshAuditLogs', { username: 'admin', action: 'user.save', keyword: 'scheduler', limit: 50 })"
+        @click="$emit('refreshAuditLogs', { username: 'admin', action: 'user.save', keyword: 'scheduler', page: 2, pageSize: 50 })"
       >
         refresh audit
       </button>
@@ -597,6 +599,15 @@ const ElButtonStub = defineComponent({
 
 const mountedWrappers: Array<{ unmount: () => void }> = [];
 
+function createAuditLogResponse(rows: AuditLogEntry[], total = rows.length): AuditLogListResponse {
+  return {
+    rows,
+    total,
+    page: 1,
+    pageSize: 20
+  };
+}
+
 function mountApp(
   appData: PublicAppData = testData,
   authUser: AuthUser | null = testAuthUser,
@@ -619,8 +630,8 @@ function mountApp(
       }
     ]
   });
-  apiMocks.listAuditLogs.mockResolvedValue({
-    rows: [
+  apiMocks.listAuditLogs.mockResolvedValue(
+    createAuditLogResponse([
       {
         id: "audit-1",
         occurredAt: "2026-06-19T00:00:00.000Z",
@@ -633,8 +644,8 @@ function mountApp(
         ip: "127.0.0.1",
         userAgent: "vitest"
       }
-    ]
-  });
+    ])
+  );
 
   const wrapper = mount(App, {
     attachTo: options.attachTo,
@@ -1003,7 +1014,7 @@ describe("App", () => {
     expect(apiMocks.loadData).toHaveBeenCalledTimes(2);
     expect(apiMocks.listUsers).toHaveBeenCalled();
     expect(apiMocks.listAuditLogs).toHaveBeenCalledWith(
-      { limit: 100 },
+      { page: 1, pageSize: 20 },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expectPanelVisible(wrapper, "workbench-panel-config");
@@ -1070,7 +1081,7 @@ describe("App", () => {
 
   it("aborts in-flight management data requests when leaving the config tab", async () => {
     const usersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
-    const auditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const auditRequest = createDeferred<AuditLogListResponse>();
     const wrapper = mountApp();
 
     await flushPromises();
@@ -1134,7 +1145,8 @@ describe("App", () => {
         username: "admin",
         action: "user.save",
         keyword: "scheduler",
-        limit: 50
+        page: 2,
+        pageSize: 50
       },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
@@ -1466,9 +1478,9 @@ describe("App", () => {
   });
 
   it("ignores an older mutation audit refresh after a newer config mutation starts", async () => {
-    const olderAuditRefresh = createDeferred<{ rows: AuditLogEntry[] }>();
+    const olderAuditRefresh = createDeferred<AuditLogListResponse>();
     const newerShiftSaveRequest = createDeferred<PublicAppData>();
-    const newerAuditRefresh = createDeferred<{ rows: AuditLogEntry[] }>();
+    const newerAuditRefresh = createDeferred<AuditLogListResponse>();
     const newerShiftData = structuredClone(testData);
     const olderAuditRows: AuditLogEntry[] = [
       {
@@ -1527,7 +1539,7 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
 
-    olderAuditRefresh.resolve({ rows: olderAuditRows });
+    olderAuditRefresh.resolve(createAuditLogResponse(olderAuditRows));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
@@ -1540,7 +1552,7 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
 
-    newerAuditRefresh.resolve({ rows: newerAuditRows });
+    newerAuditRefresh.resolve(createAuditLogResponse(newerAuditRows));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("idle");
@@ -1594,9 +1606,9 @@ describe("App", () => {
 
   it("ignores stale management users and audit logs after leaving the config tab", async () => {
     const staleUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
-    const staleAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const staleAuditRequest = createDeferred<AuditLogListResponse>();
     const nextUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
-    const nextAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const nextAuditRequest = createDeferred<AuditLogListResponse>();
     const staleUsers: ManagedAuthUser[] = [
       {
         id: "user-stale",
@@ -1634,7 +1646,7 @@ describe("App", () => {
     await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
 
     staleUsersRequest.resolve({ rows: staleUsers });
-    staleAuditRequest.resolve({ rows: staleAuditLogs });
+    staleAuditRequest.resolve(createAuditLogResponse(staleAuditLogs));
     await flushPromises();
 
     apiMocks.listUsers.mockReturnValueOnce(nextUsersRequest.promise);
@@ -1648,8 +1660,8 @@ describe("App", () => {
 
   it("keeps management users when a standalone audit refresh wins the audit race", async () => {
     const managementUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
-    const managementAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
-    const standaloneAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const managementAuditRequest = createDeferred<AuditLogListResponse>();
+    const standaloneAuditRequest = createDeferred<AuditLogListResponse>();
     const loadedUsers: ManagedAuthUser[] = [
       {
         id: "user-loaded",
@@ -1703,13 +1715,13 @@ describe("App", () => {
     await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
     await nextTick();
 
-    standaloneAuditRequest.resolve({ rows: newerStandaloneAudit });
+    standaloneAuditRequest.resolve(createAuditLogResponse(newerStandaloneAudit));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("newer audit");
 
     managementUsersRequest.resolve({ rows: loadedUsers });
-    managementAuditRequest.resolve({ rows: olderManagementAudit });
+    managementAuditRequest.resolve(createAuditLogResponse(olderManagementAudit));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("loaded-user");
@@ -1718,8 +1730,8 @@ describe("App", () => {
   });
 
   it("keeps the latest audit refresh results when older requests resolve later", async () => {
-    const olderAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
-    const newerAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const olderAuditRequest = createDeferred<AuditLogListResponse>();
+    const newerAuditRequest = createDeferred<AuditLogListResponse>();
     const olderAuditLogs: AuditLogEntry[] = [
       {
         id: "audit-older",
@@ -1758,12 +1770,12 @@ describe("App", () => {
 
     await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
     await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
-    newerAuditRequest.resolve({ rows: newerAuditLogs });
+    newerAuditRequest.resolve(createAuditLogResponse(newerAuditLogs));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("最新审计日志");
 
-    olderAuditRequest.resolve({ rows: olderAuditLogs });
+    olderAuditRequest.resolve(createAuditLogResponse(olderAuditLogs));
     await flushPromises();
 
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("最新审计日志");
@@ -1874,7 +1886,7 @@ describe("App", () => {
       sortOrder: 1
     });
     expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith(
-      { limit: 100 },
+      { page: 1, pageSize: 20 },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
@@ -1892,7 +1904,7 @@ describe("App", () => {
 
     expect(apiMocks.deleteStaff).toHaveBeenCalledWith("staff-nurse-001");
     expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith(
-      { limit: 100 },
+      { page: 1, pageSize: 20 },
       expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);

@@ -81,6 +81,14 @@ const ElPopconfirmStub = defineComponent({
     '<span data-testid="popconfirm" :data-width="width" :data-title="title"><slot name="reference" /><button data-testid="confirm-popconfirm" type="button" @click="$emit(\'confirm\')">confirm</button></span>'
 });
 
+const ElPaginationStub = defineComponent({
+  name: "ElPagination",
+  props: ["currentPage", "pageSize", "pageSizes", "total"],
+  emits: ["current-change", "size-change"],
+  template:
+    '<nav data-testid="audit-pagination" :data-page="currentPage" :data-page-size="pageSize" :data-total="total"><button data-testid="audit-page-2" type="button" @click="$emit(\'current-change\', 2)">page 2</button><button data-testid="audit-page-size-50" type="button" @click="$emit(\'size-change\', 50)">50</button></nav>'
+});
+
 const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
   staff: [
     {
@@ -202,6 +210,7 @@ function mountDrawer(options: { props?: Partial<DrawerProps> } = {}) {
       holidaySaving: false,
       users,
       auditLogs,
+      auditTotal: auditLogs.length,
       userSaving: false,
       auditLoading: false,
       ...options.props
@@ -217,6 +226,7 @@ function mountDrawer(options: { props?: Partial<DrawerProps> } = {}) {
         ElInput: InputStub,
         ElInputNumber: InputStub,
         ElOption: ElOptionStub,
+        ElPagination: ElPaginationStub,
         ElPopconfirm: ElPopconfirmStub,
         ElSelect: ElSelectStub,
         ElTable: ElTableStub,
@@ -268,10 +278,19 @@ describe("ManagementDrawer", () => {
     expect(wrapper.find('[data-testid="delete-staff-button"]').exists()).toBe(false);
 
     await wrapper.get(".management-mobile-staff").trigger("click");
+    expect(getConfirmButtonFor(wrapper, '[data-testid="delete-staff-button"]')!.element.parentElement?.getAttribute("data-width")).toBe("360");
     await wrapper.get('[data-testid="delete-staff-button"]').trigger("click");
     await getConfirmButtonFor(wrapper, '[data-testid="delete-staff-button"]')!.trigger("click");
 
     expect(wrapper.emitted("deleteStaff")).toEqual([["staff-head"]]);
+  });
+
+  it("uses readable popconfirm widths for holiday deletion", async () => {
+    const wrapper = mountDrawer();
+
+    await wrapper.get(".management-mobile-holiday").trigger("click");
+
+    expect(getConfirmButtonFor(wrapper, '[data-testid="delete-holiday-button"]')!.element.parentElement?.getAttribute("data-width")).toBe("360");
   });
 
   it("renders account management and emits account saves", async () => {
@@ -438,22 +457,35 @@ describe("ManagementDrawer", () => {
     expect(helpText()).toContain("护士长需要参与排班管理时，请选择排班管理员");
   });
 
-  it("renders audit logs and emits audit filter requests", async () => {
-    const wrapper = mountDrawer();
+  it("renders audit logs and emits paginated audit filter requests", async () => {
+    const wrapper = mountDrawer({ props: { auditTotal: 45 } });
 
     expect(wrapper.text()).toContain("审计");
     expect(wrapper.text()).toContain("保存账号：scheduler");
     expect(wrapper.text()).toContain("2026-06-20 10:55:24");
     expect(wrapper.text()).not.toContain("2026-06-20T02:55:24.346Z");
+    expect(wrapper.get('[data-testid="audit-pagination"]').attributes("data-total")).toBe("45");
+    expect(wrapper.get('[data-testid="audit-pagination"]').attributes("data-page")).toBe("1");
+    expect(wrapper.get('[data-testid="audit-pagination"]').attributes("data-page-size")).toBe("20");
 
     await wrapper.get('[data-testid="refresh-audit-logs"]').trigger("click");
 
     expect(wrapper.emitted("refreshAuditLogs")).toEqual([
       [
         expect.objectContaining({
-          limit: 100
+          page: 1,
+          pageSize: 20
         })
       ]
+    ]);
+
+    await wrapper.get('[data-testid="audit-page-2"]').trigger("click");
+    await wrapper.get('[data-testid="audit-page-size-50"]').trigger("click");
+
+    expect(wrapper.emitted("refreshAuditLogs")).toEqual([
+      [expect.objectContaining({ page: 1, pageSize: 20 })],
+      [expect.objectContaining({ page: 2, pageSize: 20 })],
+      [expect.objectContaining({ page: 1, pageSize: 50 })]
     ]);
   });
 
@@ -465,7 +497,7 @@ describe("ManagementDrawer", () => {
     await wrapper.get('input[placeholder="关键词"]').setValue("scheduler");
     await wrapper.get('[data-testid="refresh-latest-audit-logs"]').trigger("click");
 
-    expect(wrapper.emitted("refreshAuditLogs")).toEqual([[{ limit: 100 }]]);
+    expect(wrapper.emitted("refreshAuditLogs")).toEqual([[{ page: 1, pageSize: 20 }]]);
     expect((wrapper.get('input[placeholder="账号筛选"]').element as HTMLInputElement).value).toBe("");
     expect((wrapper.get('input[placeholder="操作类型"]').element as HTMLInputElement).value).toBe("");
     expect((wrapper.get('input[placeholder="关键词"]').element as HTMLInputElement).value).toBe("");

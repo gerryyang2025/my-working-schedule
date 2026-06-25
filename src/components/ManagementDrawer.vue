@@ -11,6 +11,7 @@ const props = withDefaults(
     data: Pick<PublicAppData, "staff" | "shifts" | "holidays">;
     users: ManagedAuthUser[];
     auditLogs: AuditLogEntry[];
+    auditTotal: number;
     adminMode: boolean;
     staffSaveVersion: number;
     shiftSaveVersion: number;
@@ -75,11 +76,13 @@ const userDraft = reactive<SaveAuthUserInput>({
   password: ""
 });
 
-const auditFilters = reactive<Required<AuditLogQuery>>({
+const auditPageSizes = [20, 50, 100];
+const auditFilters = reactive({
   username: "",
   action: "",
   keyword: "",
-  limit: 100
+  page: 1,
+  pageSize: 20
 });
 const activeManagementTab = ref("staff");
 
@@ -254,8 +257,28 @@ function emitSaveUser(): void {
   emit("saveUser", payload);
 }
 
+function createAuditQuery(): AuditLogQuery {
+  const query: AuditLogQuery = {
+    page: auditFilters.page,
+    pageSize: auditFilters.pageSize
+  };
+
+  if (auditFilters.username.trim()) {
+    query.username = auditFilters.username.trim();
+  }
+  if (auditFilters.action.trim()) {
+    query.action = auditFilters.action.trim();
+  }
+  if (auditFilters.keyword.trim()) {
+    query.keyword = auditFilters.keyword.trim();
+  }
+
+  return query;
+}
+
 function emitRefreshAuditLogs(): void {
-  emit("refreshAuditLogs", { ...auditFilters });
+  auditFilters.page = 1;
+  emit("refreshAuditLogs", createAuditQuery());
 }
 
 function emitRefreshLatestAuditLogs(): void {
@@ -263,9 +286,21 @@ function emitRefreshLatestAuditLogs(): void {
     username: "",
     action: "",
     keyword: "",
-    limit: 100
+    page: 1,
+    pageSize: 20
   });
-  emit("refreshAuditLogs", { limit: 100 });
+  emit("refreshAuditLogs", createAuditQuery());
+}
+
+function handleAuditPageChange(page: number): void {
+  auditFilters.page = page;
+  emit("refreshAuditLogs", createAuditQuery());
+}
+
+function handleAuditPageSizeChange(pageSize: number): void {
+  auditFilters.page = 1;
+  auditFilters.pageSize = pageSize;
+  emit("refreshAuditLogs", createAuditQuery());
 }
 
 function handleManagementTabChange(tabName: string | number): void {
@@ -379,6 +414,7 @@ watch(
             </el-button>
             <el-popconfirm
               title="确认删除该人员？仅未被排班、月结和账号引用的测试人员可删除。"
+              width="360"
               @confirm="emit('deleteStaff', staffDraft.id)"
             >
               <template #reference>
@@ -494,9 +530,13 @@ watch(
             >
               保存节假日
             </el-button>
-            <el-popconfirm title="确认删除该节假日？" @confirm="emit('deleteHoliday', holidayDraft.id)">
+            <el-popconfirm title="确认删除该节假日？" width="360" @confirm="emit('deleteHoliday', holidayDraft.id)">
               <template #reference>
-                <el-button type="danger" :disabled="holidaySaving || !adminMode || !isExistingHolidayDraft">
+                <el-button
+                  data-testid="delete-holiday-button"
+                  type="danger"
+                  :disabled="holidaySaving || !adminMode || !isExistingHolidayDraft"
+                >
                   删除节假日
                 </el-button>
               </template>
@@ -629,7 +669,6 @@ watch(
           <el-input v-model="auditFilters.username" placeholder="账号筛选" :disabled="auditLoading" />
           <el-input v-model="auditFilters.action" placeholder="操作类型" :disabled="auditLoading" />
           <el-input v-model="auditFilters.keyword" placeholder="关键词" :disabled="auditLoading" />
-          <el-input-number v-model="auditFilters.limit" :min="1" :max="200" :step="10" :disabled="auditLoading" />
           <div class="management-actions">
             <el-button
               data-testid="refresh-latest-audit-logs"
@@ -674,6 +713,18 @@ watch(
             </span>
           </article>
         </div>
+        <el-pagination
+          v-if="auditTotal > auditFilters.pageSize"
+          class="audit-pagination"
+          :current-page="auditFilters.page"
+          :page-size="auditFilters.pageSize"
+          :page-sizes="auditPageSizes"
+          :total="auditTotal"
+          layout="total, sizes, prev, pager, next"
+          :disabled="auditLoading"
+          @current-change="handleAuditPageChange"
+          @size-change="handleAuditPageSizeChange"
+        />
       </el-tab-pane>
     </el-tabs>
   </component>
@@ -692,5 +743,10 @@ watch(
   color: var(--el-text-color-secondary);
   font-size: 13px;
   line-height: 1.5;
+}
+
+.audit-pagination {
+  margin-top: 12px;
+  justify-content: flex-end;
 }
 </style>

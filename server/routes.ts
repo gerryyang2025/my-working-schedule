@@ -234,12 +234,27 @@ function getQueryParam(request: Request, name: string): string {
 
 function parseAuditQuery(request: Request): AuditLogQuery {
   const limitText = getQueryParam(request, "limit");
+  const pageText = getQueryParam(request, "page");
+  const pageSizeText = getQueryParam(request, "pageSize");
   const parsedLimit = limitText ? Number(limitText) : 100;
+  const parsedPage = pageText ? Number(pageText) : 1;
+  const parsedPageSize = pageSizeText ? Number(pageSizeText) : limitText ? parsedLimit : 20;
   return {
     username: getQueryParam(request, "username"),
     action: getQueryParam(request, "action"),
     keyword: getQueryParam(request, "keyword"),
-    limit: Number.isFinite(parsedLimit) ? parsedLimit : 100
+    limit: Number.isFinite(parsedLimit) ? parsedLimit : 100,
+    page: Number.isFinite(parsedPage) ? parsedPage : 1,
+    pageSize: Number.isFinite(parsedPageSize) ? parsedPageSize : 20
+  };
+}
+
+function normalizeAuditPagination(query: AuditLogQuery): { page: number; pageSize: number } {
+  const page = Math.max(Math.floor(query.page ?? 1), 1);
+  const requestedPageSize = Math.floor(query.pageSize ?? query.limit ?? 20);
+  return {
+    page,
+    pageSize: Math.min(Math.max(Number.isFinite(requestedPageSize) ? requestedPageSize : 20, 1), 100)
   };
 }
 
@@ -982,7 +997,14 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
 
   router.get("/audit-logs", requireAdmin, async (request, response, next) => {
     try {
-      response.json({ rows: await authStore.listAuditLogs(parseAuditQuery(request)) });
+      const query = parseAuditQuery(request);
+      const { page, pageSize } = normalizeAuditPagination(query);
+      const normalizedQuery = { ...query, page, pageSize };
+      const [rows, total] = await Promise.all([
+        authStore.listAuditLogs(normalizedQuery),
+        authStore.countAuditLogs(normalizedQuery)
+      ]);
+      response.json({ rows, total, page, pageSize });
     } catch (error) {
       handleRouteError(error, response, next);
     }

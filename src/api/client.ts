@@ -78,6 +78,15 @@ export interface AuditLogQuery {
   action?: string;
   keyword?: string;
   limit?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface AuditLogListResponse {
+  rows: AuditLogEntry[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 const AUTH_TOKEN_STORAGE_KEY = "schedule-auth-token";
@@ -251,7 +260,7 @@ export function changePassword(payload: PasswordChangeInput): Promise<{ ok: true
 export function listAuditLogs(
   query: AuditLogQuery = {},
   options: { signal?: AbortSignal } = {}
-): Promise<{ rows: AuditLogEntry[] }> {
+): Promise<AuditLogListResponse> {
   const params = new URLSearchParams();
   if (query.username) {
     params.set("username", query.username);
@@ -265,9 +274,15 @@ export function listAuditLogs(
   if (query.limit) {
     params.set("limit", String(query.limit));
   }
+  if (query.page) {
+    params.set("page", String(query.page));
+  }
+  if (query.pageSize) {
+    params.set("pageSize", String(query.pageSize));
+  }
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return requestJson<{ rows: AuditLogEntry[] }>(`/api/audit-logs${suffix}`, { signal: options.signal });
+  return requestJson<AuditLogListResponse>(`/api/audit-logs${suffix}`, { signal: options.signal });
 }
 
 export function saveStaff(staff: StaffMember): Promise<PublicAppData> {
