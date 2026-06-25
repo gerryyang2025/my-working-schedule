@@ -818,6 +818,30 @@ body {
   display: none;
 }
 
+.management-panel {
+  min-width: 0;
+}
+
+.management-inline-panel {
+  border: 1px solid #dbe3ef;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.management-inline-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.management-inline-header h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
 .print-view {
   display: none;
 }
@@ -1429,7 +1453,8 @@ body {
     overflow-x: auto;
   }
 
-  .management-drawer .el-table {
+  .management-drawer .el-table,
+  .management-inline-panel .el-table {
     display: none;
   }
 

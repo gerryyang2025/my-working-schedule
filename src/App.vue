@@ -65,7 +65,6 @@ const authChecking = ref(true);
 const loginSubmitting = ref(false);
 const loginError = ref("");
 const selectedDate = ref(today);
-const managementOpen = ref(false);
 const selectedShiftId = ref("");
 const scheduleStaffQuery = ref("");
 const scheduleQueryStartDate = ref(getWeekRange(today).start);
@@ -307,6 +306,7 @@ const canOperateCurrentSettlement = computed(() => {
   return rows ? rows.every((row) => managedStaffIdSet.value.has(row.staffId)) : false;
 });
 const canManageConfig = computed(() => currentUser.value?.role === "admin");
+const configPanelOpen = computed(() => activeWorkbenchTab.value === "config");
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
   set: (isOpen: boolean) => {
@@ -346,6 +346,12 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
     (nextTab === "printWeek" || nextTab === "printMonth" || previousTab === "printWeek" || previousTab === "printMonth")
   ) {
     cancelPrintPdfRequest();
+  }
+});
+
+watch(activeWorkbenchTab, (nextTab) => {
+  if (nextTab === "config") {
+    void loadConfigPanelData();
   }
 });
 
@@ -391,7 +397,7 @@ async function refreshLatestAuditLogs(): Promise<void> {
 }
 
 async function refreshLatestAuditLogsIfManaging(): Promise<void> {
-  if (!managementOpen.value || !canManageConfig.value) {
+  if (activeWorkbenchTab.value !== "config" || !canManageConfig.value) {
     return;
   }
 
@@ -415,8 +421,7 @@ async function refreshManagementData(): Promise<void> {
   }
 }
 
-async function openManagementDrawer(): Promise<void> {
-  managementOpen.value = true;
+async function loadConfigPanelData(): Promise<void> {
   try {
     await refreshData();
   } catch (caughtError) {
@@ -761,7 +766,7 @@ function selectWorkbenchTab(tab: WorkbenchTab): void {
   }
 
   if (tab === "config") {
-    void openManagementDrawer();
+    activeWorkbenchTab.value = "config";
     return;
   }
 
@@ -1248,31 +1253,6 @@ onBeforeUnmount(() => {
     <section v-else-if="!data" class="state-message">正在加载排班数据...</section>
     <template v-else>
       <section class="workbench">
-        <ManagementDrawer
-          v-if="data"
-          v-model="managementOpen"
-          :data="data"
-          :users="users"
-          :audit-logs="auditLogs"
-          :admin-mode="canManageConfig"
-          :staff-save-version="staffSaveVersion"
-          :shift-save-version="shiftSaveVersion"
-          :holiday-save-version="holidaySaveVersion"
-          :staff-saving="staffSaving"
-          :shift-saving="shiftSaving"
-          :holiday-saving="holidaySaving"
-          :user-saving="userSaving"
-          :audit-loading="auditLoading"
-          @save-staff="handleSaveStaff"
-          @delete-staff="handleDeleteStaff"
-          @save-shift="handleSaveShift"
-          @save-holiday="handleSaveHoliday"
-          @delete-holiday="handleDeleteHoliday"
-          @save-user="handleSaveUser"
-          @delete-user="handleDeleteUser"
-          @refresh-audit-logs="refreshAuditLogs"
-        />
-
         <nav class="workbench-tabs" aria-label="工作台分区">
           <button
             v-for="tab in workbenchTabs"
@@ -1555,6 +1535,37 @@ onBeforeUnmount(() => {
             <p v-if="pdfDownloadUrl" class="print-pdf-download">
               <a data-testid="print-pdf-download-link" :href="pdfDownloadUrl" :download="pdfDownloadName">下载 PDF</a>
             </p>
+          </section>
+          <section
+            v-show="activeWorkbenchTab === 'config'"
+            class="workbench-tab-panel management-panel"
+            data-testid="workbench-panel-config"
+          >
+            <ManagementDrawer
+              v-if="data"
+              :model-value="configPanelOpen"
+              mode="inline"
+              :data="data"
+              :users="users"
+              :audit-logs="auditLogs"
+              :admin-mode="canManageConfig"
+              :staff-save-version="staffSaveVersion"
+              :shift-save-version="shiftSaveVersion"
+              :holiday-save-version="holidaySaveVersion"
+              :staff-saving="staffSaving"
+              :shift-saving="shiftSaving"
+              :holiday-saving="holidaySaving"
+              :user-saving="userSaving"
+              :audit-loading="auditLoading"
+              @save-staff="handleSaveStaff"
+              @delete-staff="handleDeleteStaff"
+              @save-shift="handleSaveShift"
+              @save-holiday="handleSaveHoliday"
+              @delete-holiday="handleDeleteHoliday"
+              @save-user="handleSaveUser"
+              @delete-user="handleDeleteUser"
+              @refresh-audit-logs="refreshAuditLogs"
+            />
           </section>
           <section
             v-show="activeWorkbenchTab === 'help'"

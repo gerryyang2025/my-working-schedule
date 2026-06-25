@@ -4,21 +4,25 @@ import type { AuditLogEntry, AuditLogQuery, ManagedAuthUser, PublicAppData, Save
 import { formatAuditOccurredAt } from "@/lib/format";
 import type { Holiday, Shift, StaffMember } from "@/types/domain";
 
-const props = defineProps<{
-  modelValue: boolean;
-  data: Pick<PublicAppData, "staff" | "shifts" | "holidays">;
-  users: ManagedAuthUser[];
-  auditLogs: AuditLogEntry[];
-  adminMode: boolean;
-  staffSaveVersion: number;
-  shiftSaveVersion: number;
-  holidaySaveVersion: number;
-  staffSaving: boolean;
-  shiftSaving: boolean;
-  holidaySaving: boolean;
-  userSaving: boolean;
-  auditLoading: boolean;
-}>();
+const props = withDefaults(
+  defineProps<{
+    modelValue: boolean;
+    mode?: "drawer" | "inline";
+    data: Pick<PublicAppData, "staff" | "shifts" | "holidays">;
+    users: ManagedAuthUser[];
+    auditLogs: AuditLogEntry[];
+    adminMode: boolean;
+    staffSaveVersion: number;
+    shiftSaveVersion: number;
+    holidaySaveVersion: number;
+    staffSaving: boolean;
+    shiftSaving: boolean;
+    holidaySaving: boolean;
+    userSaving: boolean;
+    auditLoading: boolean;
+  }>(),
+  { mode: "drawer" }
+);
 
 const emit = defineEmits<{
   "update:modelValue": [value: boolean];
@@ -304,13 +308,20 @@ watch(
 </script>
 
 <template>
-  <el-drawer
-    class="management-drawer"
-    :model-value="modelValue"
-    title="系统配置"
-    size="560px"
+  <component
+    :is="mode === 'drawer' ? 'el-drawer' : 'section'"
+    v-if="mode === 'drawer' || modelValue"
+    :class="mode === 'drawer' ? 'management-drawer' : 'management-inline-panel'"
+    :data-testid="mode === 'inline' ? 'management-inline-panel' : undefined"
+    :model-value="mode === 'drawer' ? modelValue : undefined"
+    :title="mode === 'drawer' ? '系统配置' : undefined"
+    :size="mode === 'drawer' ? '560px' : undefined"
     @update:model-value="emit('update:modelValue', $event)"
   >
+    <header v-if="mode === 'inline'" class="management-inline-header">
+      <h2>系统配置</h2>
+    </header>
+
     <el-alert v-if="!adminMode" title="进入编辑模式后才能保存配置" type="warning" :closable="false" />
 
     <el-tabs v-model="activeManagementTab" @tab-change="handleManagementTabChange">
@@ -664,7 +675,7 @@ watch(
         </div>
       </el-tab-pane>
     </el-tabs>
-  </el-drawer>
+  </component>
 </template>
 
 <style scoped>

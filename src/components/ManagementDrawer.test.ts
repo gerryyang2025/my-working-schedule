@@ -185,7 +185,9 @@ const auditLogs: AuditLogEntry[] = [
   }
 ];
 
-function mountDrawer() {
+type DrawerProps = InstanceType<typeof ManagementDrawer>["$props"];
+
+function mountDrawer(options: { props?: Partial<DrawerProps> } = {}) {
   return mount(ManagementDrawer, {
     props: {
       modelValue: true,
@@ -200,7 +202,8 @@ function mountDrawer() {
       users,
       auditLogs,
       userSaving: false,
-      auditLoading: false
+      auditLoading: false,
+      ...options.props
     },
     global: {
       stubs: {
@@ -242,6 +245,20 @@ describe("ManagementDrawer", () => {
     expect(wrapper.get(".management-mobile-shift").text()).toContain("系数 1.5");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("2026-06-19");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("端午节");
+  });
+
+  it("renders management content inline when mode is inline", () => {
+    const wrapper = mountDrawer({
+      props: {
+        mode: "inline",
+        modelValue: true
+      }
+    });
+
+    expect(wrapper.find(".management-drawer").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="management-inline-panel"]').text()).toContain("人员");
+    expect(wrapper.find(".management-mobile-list").exists()).toBe(true);
   });
 
   it("emits deleteStaff only for an existing staff draft", async () => {

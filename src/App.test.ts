@@ -382,10 +382,15 @@ const CellEditorDialogStub = defineComponent({
 
 const ManagementDrawerStub = defineComponent({
   name: "ManagementDrawer",
-  props: ["modelValue", "users", "auditLogs"],
+  props: ["modelValue", "mode", "users", "auditLogs", "adminMode"],
   emits: ["saveStaff", "deleteStaff", "saveUser", "deleteUser", "refreshAuditLogs"],
   template: `
-    <section v-if="modelValue" data-testid="management-drawer">
+    <section
+      v-if="modelValue"
+      :data-testid="mode === 'inline' ? 'management-inline-panel' : 'management-drawer'"
+    >
+      <span data-testid="management-mode">{{ mode }}</span>
+      <span v-if="!adminMode" data-testid="management-permission">无配置权限</span>
       <span data-testid="drawer-users">{{ users.map((user) => user.username).join(",") }}</span>
       <span data-testid="drawer-audit">{{ auditLogs.map((entry) => entry.summary).join(",") }}</span>
       <button
@@ -898,17 +903,35 @@ describe("App", () => {
     expect(userButton.attributes("aria-expanded")).toBe("false");
   });
 
-  it("loads users and audit logs when opening system management", async () => {
+  it("loads users and audit logs when opening the config tab", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
     await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
 
+    expect(apiMocks.loadData).toHaveBeenCalledTimes(2);
     expect(apiMocks.listUsers).toHaveBeenCalled();
     expect(apiMocks.listAuditLogs).toHaveBeenCalledWith({ limit: 100 });
+    expectPanelVisible(wrapper, "workbench-panel-config");
+    expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="management-mode"]').text()).toBe("inline");
     expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("admin");
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("保存账号：scheduler");
+  });
+
+  it("shows configuration permission state for non-admin users", async () => {
+    const wrapper = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.listUsers).not.toHaveBeenCalled();
+    expect(apiMocks.listAuditLogs).not.toHaveBeenCalled();
+    expectPanelVisible(wrapper, "workbench-panel-config");
+    expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="management-permission"]').text()).toContain("无配置权限");
   });
 
   it("saves users from the management drawer and refreshes the user list", async () => {
@@ -1654,7 +1677,7 @@ describe("App", () => {
     expect((wrapper.get('[data-testid="bonus-draft-input"]').element as HTMLInputElement).value).toBe("1234");
   });
 
-  it("opens action tabs without switching away from the current workbench panel", async () => {
+  it("opens the config tab as an inline workbench panel", async () => {
     const wrapper = mountApp();
 
     await flushPromises();
@@ -1663,11 +1686,13 @@ describe("App", () => {
     await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
 
-    expect(wrapper.find('[data-testid="management-drawer"]').exists()).toBe(true);
-    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expect(wrapper.find('[data-testid="management-drawer"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(true);
+    expectPanelVisible(wrapper, "workbench-panel-config");
+    expectPanelHidden(wrapper, "workbench-panel-schedule");
     expectPanelHidden(wrapper, "workbench-panel-help");
-    expect(wrapper.get('[data-testid="workbench-tab-schedule"]').classes()).toContain("active");
-    expect(wrapper.get('[data-testid="workbench-tab-config"]').classes()).not.toContain("active");
+    expect(wrapper.get('[data-testid="workbench-tab-schedule"]').classes()).not.toContain("active");
+    expect(wrapper.get('[data-testid="workbench-tab-config"]').classes()).toContain("active");
   });
 
   it("opens a visible week print preview on mobile instead of silently invoking system print", async () => {

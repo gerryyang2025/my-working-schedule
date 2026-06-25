@@ -111,6 +111,18 @@ describe("main.css layout rules", () => {
     expect(helpRuleListRules).toContain("color: #475569");
   });
 
+  it("styles inline management as a workbench panel", () => {
+    const panelRules = ruleBlocks(".management-panel")[0] || "";
+    const inlineRules = ruleBlocks(".management-inline-panel")[0] || "";
+    const headerRules = ruleBlocks(".management-inline-header")[0] || "";
+
+    expect(panelRules).toContain("min-width: 0");
+    expect(inlineRules).toContain("border: 1px solid #dbe3ef");
+    expect(inlineRules).toContain("background: #ffffff");
+    expect(inlineRules).toContain("padding:");
+    expect(headerRules).toContain("display: flex");
+  });
+
   it("lets compact header actions wrap naturally on mobile", () => {
     const mobileCss = mediaBlock("(max-width: 768px)");
     const mobileHeaderActions = ruleBlockIn(mobileCss, ".app-header-actions");
