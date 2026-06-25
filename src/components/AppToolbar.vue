@@ -1,22 +1,14 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { CalendarDays, ChevronLeft, ChevronRight, Expand, KeyRound, LogOut, Printer, Settings } from "lucide-vue-next";
-import { addWeeks, getWeekRange, toDateKey } from "@/lib/date";
+import { ChevronLeft, ChevronRight } from "lucide-vue-next";
+import { addWeeks, getScheduleWeekNumber, getWeekRange, toDateKey } from "@/lib/date";
 
 const props = defineProps<{
   selectedDate: string;
-  adminMode: boolean;
-  canManageConfig: boolean;
 }>();
 
 const emit = defineEmits<{
   "update:selectedDate": [value: string];
-  logout: [];
-  openPasswordChange: [];
-  openManagement: [];
-  printMonth: [];
-  printWeek: [];
-  fullscreen: [];
 }>();
 
 function handleSelectedDateUpdate(value: unknown): void {
@@ -26,6 +18,7 @@ function handleSelectedDateUpdate(value: unknown): void {
 }
 
 const selectedWeek = computed(() => getWeekRange(props.selectedDate));
+const scheduleWeekLabel = computed(() => `第${getScheduleWeekNumber(props.selectedDate)}周`);
 
 function moveWeek(offset: number): void {
   emit("update:selectedDate", addWeeks(props.selectedDate, offset));
@@ -37,8 +30,9 @@ function moveToCurrentWeek(): void {
 </script>
 
 <template>
-  <section class="toolbar">
+  <section class="schedule-week-controls" data-testid="schedule-week-controls">
     <div class="toolbar-group">
+      <span class="schedule-week-number">{{ scheduleWeekLabel }}</span>
       <el-date-picker
         :model-value="selectedDate"
         type="date"
@@ -57,15 +51,6 @@ function moveToCurrentWeek(): void {
         </el-tooltip>
       </div>
       <span class="toolbar-week-range">{{ selectedWeek.start }} 至 {{ selectedWeek.end }}</span>
-    </div>
-
-    <div class="toolbar-actions">
-      <el-button :icon="KeyRound" data-testid="open-password-change" @click="emit('openPasswordChange')">修改密码</el-button>
-      <el-button :icon="Settings" :disabled="!canManageConfig" @click="emit('openManagement')">配置</el-button>
-      <el-button :icon="CalendarDays" @click="emit('printWeek')">打印周表</el-button>
-      <el-button :icon="Printer" @click="emit('printMonth')">打印月表</el-button>
-      <el-button :icon="Expand" @click="emit('fullscreen')">全屏</el-button>
-      <el-button :icon="LogOut" @click="emit('logout')">退出登录</el-button>
     </div>
   </section>
 </template>

@@ -54,9 +54,7 @@ const ElTooltipStub = defineComponent({
 function mountToolbar(selectedDate = "2026-06-17") {
   return mount(AppToolbar, {
     props: {
-      selectedDate,
-      adminMode: true,
-      canManageConfig: true
+      selectedDate
     },
     global: {
       stubs: {
@@ -77,13 +75,15 @@ describe("AppToolbar", () => {
   });
 
   it("uses one date selector with an explicit Monday-to-Sunday range label", () => {
-    const wrapper = mountToolbar("2026-12-30");
+    const wrapper = mountToolbar("2026-06-22");
     const dateSelectors = wrapper.findAll('input[data-type="date"]');
 
+    expect(wrapper.find('[data-testid="schedule-week-controls"]').exists()).toBe(true);
+    expect(wrapper.get(".schedule-week-number").text()).toBe("第26周");
     expect(dateSelectors).toHaveLength(1);
     expect(dateSelectors[0].attributes("data-placeholder")).toBe("选择日期");
     expect(wrapper.find('input[data-placeholder="选择周"]').exists()).toBe(false);
-    expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-12-28 至 2027-01-03");
+    expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-06-22 至 2026-06-28");
   });
 
   it("does not render standalone year or month controls in the weekly toolbar", () => {
@@ -97,35 +97,38 @@ describe("AppToolbar", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 18));
     const wrapper = mountToolbar();
-    const buttons = wrapper.findAll("button");
 
-    await buttons[1].trigger("click");
+    await wrapper.get(".current-week-button").trigger("click");
 
     expect(wrapper.emitted("update:selectedDate")).toEqual([[getWeekRange(toDateKey(new Date())).start]]);
   });
 
   it("moves previous and next week from the current Monday-start week", async () => {
     const wrapper = mountToolbar("2026-06-17");
-    const buttons = wrapper.findAll("button");
 
-    await buttons[0].trigger("click");
-    await buttons[2].trigger("click");
+    await wrapper.get('button[aria-label="上一周"]').trigger("click");
+    await wrapper.get('button[aria-label="下一周"]').trigger("click");
 
     expect(wrapper.emitted("update:selectedDate")).toEqual([["2026-06-08"], ["2026-06-22"]]);
   });
 
-  it("emits a password-change action from the user toolbar", async () => {
-    const wrapper = mountToolbar("2026-06-17");
-
-    await wrapper.get('[data-testid="open-password-change"]').trigger("click");
-
-    expect(wrapper.emitted("openPasswordChange")).toEqual([[]]);
-  });
-
-  it("keeps account identity out of the weekly toolbar", () => {
+  it("keeps top-level account and app actions out of the weekly toolbar", () => {
     const wrapper = mountToolbar("2026-06-17");
 
     expect(wrapper.find(".toolbar-user").exists()).toBe(false);
+    expect(wrapper.find(".toolbar-actions").exists()).toBe(false);
+    expect(wrapper.text()).not.toContain("修改密码");
+    expect(wrapper.text()).not.toContain("配置");
+    expect(wrapper.text()).not.toContain("打印周表");
+    expect(wrapper.text()).not.toContain("打印月表");
+    expect(wrapper.text()).not.toContain("全屏");
+    expect(wrapper.text()).not.toContain("退出登录");
     expect(wrapper.get(".toolbar-week-range").text()).toBe("2026-06-15 至 2026-06-21");
+    expect(wrapper.emitted("logout")).toBeUndefined();
+    expect(wrapper.emitted("openPasswordChange")).toBeUndefined();
+    expect(wrapper.emitted("openManagement")).toBeUndefined();
+    expect(wrapper.emitted("printMonth")).toBeUndefined();
+    expect(wrapper.emitted("printWeek")).toBeUndefined();
+    expect(wrapper.emitted("fullscreen")).toBeUndefined();
   });
 });
