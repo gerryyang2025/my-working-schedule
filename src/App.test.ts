@@ -942,12 +942,92 @@ describe("App", () => {
 
     expect(apiMocks.loadData).toHaveBeenCalledTimes(2);
     expect(apiMocks.listUsers).toHaveBeenCalled();
-    expect(apiMocks.listAuditLogs).toHaveBeenCalledWith({ limit: 100 });
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledWith(
+      { limit: 100 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expectPanelVisible(wrapper, "workbench-panel-config");
     expect(wrapper.find('[data-testid="management-inline-panel"]').exists()).toBe(true);
     expect(wrapper.get('[data-testid="management-mode"]').text()).toBe("inline");
     expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("admin");
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("保存账号：scheduler");
+  });
+
+  it("passes abort signals to config read requests", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.loadData.mock.calls[1][0]).toEqual(
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(apiMocks.listUsers.mock.calls[0][0]).toEqual(
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+    expect(apiMocks.listAuditLogs.mock.calls[0][1]).toEqual(
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
+  });
+
+  it("aborts an in-flight config data request when leaving the config tab", async () => {
+    const configLoad = createDeferred<PublicAppData>();
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.loadData.mockReturnValueOnce(configLoad.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await nextTick();
+
+    const configLoadSignal = apiMocks.loadData.mock.calls[1][0]?.signal as AbortSignal;
+    expect(configLoadSignal.aborted).toBe(false);
+
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+
+    expect(configLoadSignal.aborted).toBe(true);
+  });
+
+  it("aborts an in-flight config data request on logout", async () => {
+    const configLoad = createDeferred<PublicAppData>();
+    apiMocks.logout.mockResolvedValue(undefined);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.loadData.mockReturnValueOnce(configLoad.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await nextTick();
+
+    const configLoadSignal = apiMocks.loadData.mock.calls[1][0]?.signal as AbortSignal;
+    expect(configLoadSignal.aborted).toBe(false);
+
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="logout-button"]').trigger("click");
+
+    expect(configLoadSignal.aborted).toBe(true);
+  });
+
+  it("aborts in-flight management data requests when leaving the config tab", async () => {
+    const usersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
+    const auditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.listUsers.mockReturnValueOnce(usersRequest.promise);
+    apiMocks.listAuditLogs.mockReturnValueOnce(auditRequest.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    const usersSignal = apiMocks.listUsers.mock.calls[0][0]?.signal as AbortSignal;
+    const auditSignal = apiMocks.listAuditLogs.mock.calls[0][1]?.signal as AbortSignal;
+    expect(usersSignal.aborted).toBe(false);
+    expect(auditSignal.aborted).toBe(false);
+
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+
+    expect(usersSignal.aborted).toBe(true);
+    expect(auditSignal.aborted).toBe(true);
   });
 
   it("shows configuration permission state for non-admin users", async () => {
@@ -989,12 +1069,15 @@ describe("App", () => {
     await flushPromises();
 
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeRefresh + 1);
-    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({
-      username: "admin",
-      action: "user.save",
-      keyword: "scheduler",
-      limit: 50
-    });
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith(
+      {
+        username: "admin",
+        action: "user.save",
+        keyword: "scheduler",
+        limit: 50
+      },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it("blocks non-admin config mutation events from calling privileged APIs", async () => {
@@ -1107,6 +1190,81 @@ describe("App", () => {
     expectPanelVisible(wrapper, "workbench-panel-schedule");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-nurse-001");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-config");
+  });
+
+  it("does not apply an in-flight staff save after leaving the config tab", async () => {
+    const saveStaffRequest = createDeferred<PublicAppData>();
+    const staleSaveData = structuredClone(testData);
+    staleSaveData.staff = [
+      {
+        id: "staff-stale-save",
+        jobId: "888888",
+        name: "保存后过期人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 88
+      }
+    ];
+    apiMocks.saveStaff.mockReturnValueOnce(saveStaffRequest.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="workbench-tab-schedule"]').trigger("click");
+
+    saveStaffRequest.resolve(staleSaveData);
+    await flushPromises();
+
+    expectPanelVisible(wrapper, "workbench-panel-schedule");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-nurse-001");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-save");
+  });
+
+  it("does not refresh management users or show success after an in-flight config user save resolves post-logout", async () => {
+    const saveUserRequest = createDeferred<{ user: ManagedAuthUser }>();
+    const logoutRequest = createDeferred<void>();
+    apiMocks.logout.mockReturnValueOnce(logoutRequest.promise);
+    apiMocks.saveUser.mockReturnValueOnce(saveUserRequest.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    const listUsersCallCountBeforeSave = apiMocks.listUsers.mock.calls.length;
+    const listAuditLogsCallCountBeforeSave = apiMocks.listAuditLogs.mock.calls.length;
+
+    await wrapper.get('[data-testid="drawer-save-user"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="logout-button"]').trigger("click");
+    await nextTick();
+
+    saveUserRequest.resolve({
+      user: {
+        id: "user-stale-save",
+        username: "stale-save",
+        displayName: "保存后过期账号",
+        role: "admin",
+        staffId: null,
+        managedStaffIds: [],
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    });
+    await flushPromises();
+
+    expect(apiMocks.listUsers).toHaveBeenCalledTimes(listUsersCallCountBeforeSave);
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeSave);
+    expect(elementPlusMocks.ElMessage.success).not.toHaveBeenCalledWith("账号已保存");
+
+    logoutRequest.resolve();
+    await flushPromises();
   });
 
   it("ignores stale management users and audit logs after leaving the config tab", async () => {
@@ -1319,7 +1477,10 @@ describe("App", () => {
       enabled: true,
       sortOrder: 1
     });
-    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ limit: 100 });
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith(
+      { limit: 100 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
   });
 
@@ -1334,7 +1495,10 @@ describe("App", () => {
     await flushPromises();
 
     expect(apiMocks.deleteStaff).toHaveBeenCalledWith("staff-nurse-001");
-    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ limit: 100 });
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith(
+      { limit: 100 },
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
     expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
   });
 

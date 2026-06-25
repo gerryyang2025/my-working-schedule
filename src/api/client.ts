@@ -161,8 +161,8 @@ export function setAdminMode(enabled: boolean): void {
   }
 }
 
-export function loadData(): Promise<PublicAppData> {
-  return requestJson<PublicAppData>("/api/data");
+export function loadData(options: { signal?: AbortSignal } = {}): Promise<PublicAppData> {
+  return requestJson<PublicAppData>("/api/data", { signal: options.signal });
 }
 
 function authHeaders(): HeadersInit {
@@ -224,8 +224,8 @@ export function getCachedCurrentUser(): AuthUser | null {
   return currentUser;
 }
 
-export function listUsers(): Promise<{ rows: ManagedAuthUser[] }> {
-  return requestJson<{ rows: ManagedAuthUser[] }>("/api/users");
+export function listUsers(options: { signal?: AbortSignal } = {}): Promise<{ rows: ManagedAuthUser[] }> {
+  return requestJson<{ rows: ManagedAuthUser[] }>("/api/users", { signal: options.signal });
 }
 
 export function saveUser(user: SaveAuthUserInput): Promise<{ user: ManagedAuthUser }> {
@@ -248,7 +248,10 @@ export function changePassword(payload: PasswordChangeInput): Promise<{ ok: true
   });
 }
 
-export function listAuditLogs(query: AuditLogQuery = {}): Promise<{ rows: AuditLogEntry[] }> {
+export function listAuditLogs(
+  query: AuditLogQuery = {},
+  options: { signal?: AbortSignal } = {}
+): Promise<{ rows: AuditLogEntry[] }> {
   const params = new URLSearchParams();
   if (query.username) {
     params.set("username", query.username);
@@ -264,7 +267,7 @@ export function listAuditLogs(query: AuditLogQuery = {}): Promise<{ rows: AuditL
   }
 
   const suffix = params.toString() ? `?${params.toString()}` : "";
-  return requestJson<{ rows: AuditLogEntry[] }>(`/api/audit-logs${suffix}`);
+  return requestJson<{ rows: AuditLogEntry[] }>(`/api/audit-logs${suffix}`, { signal: options.signal });
 }
 
 export function saveStaff(staff: StaffMember): Promise<PublicAppData> {

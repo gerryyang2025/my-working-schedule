@@ -85,6 +85,10 @@ const auditLoading = ref(false);
 const configLoadRequestId = ref(0);
 const managementDataRequestId = ref(0);
 const auditLogRequestId = ref(0);
+const configMutationRequestId = ref(0);
+const configLoadAbortController = ref<AbortController | null>(null);
+const managementDataAbortController = ref<AbortController | null>(null);
+const auditLogAbortController = ref<AbortController | null>(null);
 const settlementSaving = ref(false);
 const settlementCanceling = ref(false);
 const printPreviewMode = ref<PrintMode | null>(null);
@@ -385,15 +389,27 @@ async function refreshData(): Promise<void> {
   data.value = await loadData();
 }
 
-async function refreshUsers(): Promise<void> {
-  users.value = (await listUsers()).rows;
-}
-
 function cancelConfigRequests(): void {
+  configLoadAbortController.value?.abort();
+  managementDataAbortController.value?.abort();
+  auditLogAbortController.value?.abort();
+  configLoadAbortController.value = null;
+  managementDataAbortController.value = null;
+  auditLogAbortController.value = null;
   configLoadRequestId.value += 1;
   managementDataRequestId.value += 1;
   auditLogRequestId.value += 1;
+  configMutationRequestId.value += 1;
   auditLoading.value = false;
+}
+
+function isAbortError(caughtError: unknown): boolean {
+  return (
+    typeof caughtError === "object" &&
+    caughtError !== null &&
+    "name" in caughtError &&
+    (caughtError as { name?: unknown }).name === "AbortError"
+  );
 }
 
 function isCurrentConfigContext(requestId: number, userId: string | null): boolean {
@@ -423,6 +439,15 @@ function canApplyAuditLogRequest(requestId: number, userId: string | null): bool
   );
 }
 
+function canApplyConfigMutation(requestId: number, userId: string | null): boolean {
+  return (
+    configMutationRequestId.value === requestId &&
+    activeWorkbenchTab.value === "config" &&
+    canManageConfig.value &&
+    (currentUser.value?.id ?? null) === userId
+  );
+}
+
 async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<void> {
   if (activeWorkbenchTab.value !== "config" || !canManageConfig.value) {
     return;
@@ -430,19 +455,25 @@ async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<
 
   const requestId = (auditLogRequestId.value += 1);
   const userId = currentUser.value?.id ?? null;
+  auditLogAbortController.value?.abort();
+  const controller = new AbortController();
+  auditLogAbortController.value = controller;
   auditLoading.value = true;
   try {
-    const response = await listAuditLogs(query);
+    const response = await listAuditLogs(query, { signal: controller.signal });
     if (!canApplyAuditLogRequest(requestId, userId)) {
       return;
     }
 
     auditLogs.value = response.rows;
   } catch (caughtError) {
-    if (canApplyAuditLogRequest(requestId, userId)) {
+    if (!isAbortError(caughtError) && canApplyAuditLogRequest(requestId, userId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "审计日志加载失败");
     }
   } finally {
+    if (auditLogAbortController.value === controller) {
+      auditLogAbortController.value = null;
+    }
     if (canApplyAuditLogRequest(requestId, userId)) {
       auditLoading.value = false;
     }
@@ -477,9 +508,15 @@ async function refreshManagementData(): Promise<void> {
   const requestId = (managementDataRequestId.value += 1);
   const auditRequestId = (auditLogRequestId.value += 1);
   const userId = currentUser.value?.id ?? null;
+  managementDataAbortController.value?.abort();
+  const controller = new AbortController();
+  managementDataAbortController.value = controller;
   auditLoading.value = true;
   try {
-    const [usersResponse, auditResponse] = await Promise.all([listUsers(), listAuditLogs({ limit: 100 })]);
+    const [usersResponse, auditResponse] = await Promise.all([
+      listUsers({ signal: controller.signal }),
+      listAuditLogs({ limit: 100 }, { signal: controller.signal })
+    ]);
     if (!canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
       return;
     }
@@ -487,10 +524,13 @@ async function refreshManagementData(): Promise<void> {
     users.value = usersResponse.rows;
     auditLogs.value = auditResponse.rows;
   } catch (caughtError) {
-    if (canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+    if (!isAbortError(caughtError) && canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
     }
   } finally {
+    if (managementDataAbortController.value === controller) {
+      managementDataAbortController.value = null;
+    }
     if (canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
       auditLoading.value = false;
     }
@@ -500,18 +540,25 @@ async function refreshManagementData(): Promise<void> {
 async function loadConfigPanelData(): Promise<void> {
   const requestId = (configLoadRequestId.value += 1);
   const userId = currentUser.value?.id ?? null;
+  configLoadAbortController.value?.abort();
+  const controller = new AbortController();
+  configLoadAbortController.value = controller;
   try {
-    const loadedData = await loadData();
+    const loadedData = await loadData({ signal: controller.signal });
     if (!isCurrentConfigContext(requestId, userId)) {
       return;
     }
 
     data.value = loadedData;
   } catch (caughtError) {
-    if (isCurrentConfigContext(requestId, userId)) {
+    if (!isAbortError(caughtError) && isCurrentConfigContext(requestId, userId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
     }
     return;
+  } finally {
+    if (configLoadAbortController.value === controller) {
+      configLoadAbortController.value = null;
+    }
   }
 
   if (!isCurrentConfigContext(requestId, userId)) {
@@ -1046,13 +1093,22 @@ async function handleSaveStaff(staff: StaffMember): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   staffSaving.value = true;
   try {
-    data.value = await saveStaff(staff);
+    const savedData = await saveStaff(staff);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
     staffSaveVersion.value += 1;
     await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员保存失败");
+    }
   } finally {
     staffSaving.value = false;
   }
@@ -1063,13 +1119,22 @@ async function handleDeleteStaff(staffId: string): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   staffSaving.value = true;
   try {
-    data.value = await deleteStaff(staffId);
+    const savedData = await deleteStaff(staffId);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
     staffSaveVersion.value += 1;
     await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员删除失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员删除失败");
+    }
   } finally {
     staffSaving.value = false;
   }
@@ -1080,13 +1145,22 @@ async function handleSaveShift(shift: Shift): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   shiftSaving.value = true;
   try {
-    data.value = await saveShift(shift);
+    const savedData = await saveShift(shift);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
     shiftSaveVersion.value += 1;
     await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次保存失败");
+    }
   } finally {
     shiftSaving.value = false;
   }
@@ -1097,13 +1171,22 @@ async function handleSaveHoliday(holiday: Holiday): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   holidaySaving.value = true;
   try {
-    data.value = await saveHoliday(holiday);
+    const savedData = await saveHoliday(holiday);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
     holidaySaveVersion.value += 1;
     await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日保存失败");
+    }
   } finally {
     holidaySaving.value = false;
   }
@@ -1114,13 +1197,22 @@ async function handleDeleteHoliday(holidayId: string): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   holidaySaving.value = true;
   try {
-    data.value = await deleteHoliday(holidayId);
+    const savedData = await deleteHoliday(holidayId);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
     holidaySaveVersion.value += 1;
     await refreshLatestAuditLogsIfManaging();
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日删除失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "节假日删除失败");
+    }
   } finally {
     holidaySaving.value = false;
   }
@@ -1131,14 +1223,25 @@ async function handleSaveUser(user: SaveAuthUserInput): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   userSaving.value = true;
   try {
     await saveUser(user);
-    await refreshUsers();
-    await refreshLatestAuditLogs();
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    await refreshManagementData();
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
     ElMessage.success("账号已保存");
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号保存失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号保存失败");
+    }
   } finally {
     userSaving.value = false;
   }
@@ -1149,14 +1252,25 @@ async function handleDeleteUser(userId: string): Promise<void> {
     return;
   }
 
+  const requestId = configMutationRequestId.value;
+  const requestUserId = currentUser.value?.id ?? null;
   userSaving.value = true;
   try {
     await deleteUser(userId);
-    await refreshUsers();
-    await refreshLatestAuditLogs();
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    await refreshManagementData();
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
     ElMessage.success("账号已删除");
   } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号删除失败");
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "账号删除失败");
+    }
   } finally {
     userSaving.value = false;
   }
