@@ -1190,6 +1190,13 @@ body {
     max-width: 100%;
   }
 
+  .header-user-dropdown {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    max-width: calc(100vw - 20px);
+  }
+
   .app-header-actions .header-user-menu-button {
     max-width: 100%;
     overflow: hidden;

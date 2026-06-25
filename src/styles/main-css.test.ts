@@ -139,11 +139,16 @@ describe("main.css layout rules", () => {
     const mobileCss = mediaBlock("(max-width: 768px)");
     const mobileHeaderActions = ruleBlockIn(mobileCss, ".app-header-actions");
     const mobileHeaderUserMenu = ruleBlockIn(mobileCss, ".header-user-menu");
+    const mobileUserDropdown = ruleBlockIn(mobileCss, ".header-user-dropdown");
 
     expect(mobileHeaderActions).toContain("width: 100%");
     expect(mobileHeaderActions).toContain("justify-content: flex-start");
     expect(mobileHeaderUserMenu).toContain("min-width: 0");
     expect(mobileHeaderUserMenu).toContain("max-width: 100%");
+    expect(mobileUserDropdown).toContain("position: fixed");
+    expect(mobileUserDropdown).toContain("top: 10px");
+    expect(mobileUserDropdown).toContain("right: 10px");
+    expect(mobileUserDropdown).toContain("max-width: calc(100vw - 20px)");
   });
 
   it("lays out the shift palette as grouped wrapping rows", () => {
