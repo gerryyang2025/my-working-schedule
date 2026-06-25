@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ElMessage, ElMessageBox } from "element-plus";
-import { computed, onMounted, ref, watch } from "vue";
+import { CalendarDays, Printer, Settings } from "lucide-vue-next";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AppToolbar from "@/components/AppToolbar.vue";
 import BonusSettlementPanel from "@/components/BonusSettlementPanel.vue";
 import CellEditorDialog from "@/components/CellEditorDialog.vue";
@@ -97,6 +98,9 @@ const passwordChanging = ref(false);
 const passwordChangeError = ref("");
 const copyingPreviousWeek = ref(false);
 const bulkUpdatingWeek = ref(false);
+const userMenuOpen = ref(false);
+const userMenuRef = ref<HTMLElement | null>(null);
+const userMenuButtonRef = ref<HTMLButtonElement | null>(null);
 
 const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
@@ -267,24 +271,7 @@ const editableStaffIds = computed(() => {
   return [];
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
-const currentUserRoleLabel = computed(() => {
-  if (currentUser.value?.role === "admin") {
-    return "系统管理员";
-  }
-  if (currentUser.value?.role === "scheduler") {
-    return "排班管理员";
-  }
-  return "只读查看";
-});
-const currentUserIdentityLabel = computed(() => {
-  if (!currentUser.value) {
-    return "";
-  }
-
-  const displayName = currentUser.value.displayName.trim();
-  const fallbackName = displayName && displayName !== currentUserRoleLabel.value ? displayName : currentUser.value.username;
-  return `${fallbackName} · ${currentUserRoleLabel.value}`;
-});
+const currentUserAccountLabel = computed(() => currentUser.value?.username ?? "");
 const currentWeekEditableEntryCount = computed(() => {
   if (!data.value) {
     return 0;
@@ -437,6 +424,51 @@ async function handleLogout(): Promise<void> {
   users.value = [];
   auditLogs.value = [];
   ElMessage.success("已退出登录");
+}
+
+function openPasswordChangeFromMenu(): void {
+  userMenuOpen.value = false;
+  passwordDialogOpen.value = true;
+}
+
+async function handleLogoutFromMenu(): Promise<void> {
+  userMenuOpen.value = false;
+  await handleLogout();
+}
+
+function closeUserMenu(options: { restoreFocus?: boolean } = {}): void {
+  if (!userMenuOpen.value) {
+    return;
+  }
+
+  userMenuOpen.value = false;
+
+  if (options.restoreFocus) {
+    userMenuButtonRef.value?.focus();
+  }
+}
+
+function handleUserMenuKeydown(event: KeyboardEvent): void {
+  if (event.key !== "Escape") {
+    return;
+  }
+
+  event.preventDefault();
+  event.stopPropagation();
+  closeUserMenu({ restoreFocus: true });
+}
+
+function handleDocumentClick(event: MouseEvent): void {
+  if (!userMenuOpen.value) {
+    return;
+  }
+
+  const target = event.target;
+  if (target instanceof Node && userMenuRef.value?.contains(target)) {
+    return;
+  }
+
+  closeUserMenu();
 }
 
 async function handleChangePassword(payload: PasswordChangeInput): Promise<void> {
@@ -633,26 +665,6 @@ async function handleClearWeek(): Promise<void> {
     },
     "清空"
   );
-}
-
-async function handleFullscreen(): Promise<void> {
-  const root = document.documentElement;
-
-  if (!document.fullscreenEnabled || !root.requestFullscreen || !document.exitFullscreen) {
-    ElMessage.error("当前浏览器不支持全屏模式");
-    return;
-  }
-
-  try {
-    if (document.fullscreenElement) {
-      await document.exitFullscreen();
-      return;
-    }
-
-    await root.requestFullscreen();
-  } catch (caughtError) {
-    ElMessage.error(caughtError instanceof Error ? caughtError.message : "全屏切换失败");
-  }
 }
 
 function isMobileViewport(): boolean {
@@ -1025,6 +1037,7 @@ async function handleCancelSettlement(month: string): Promise<void> {
 }
 
 onMounted(async () => {
+  document.addEventListener("click", handleDocumentClick);
   try {
     currentUser.value = await getCurrentUser();
     if (currentUser.value) {
@@ -1036,6 +1049,10 @@ onMounted(async () => {
     authChecking.value = false;
   }
 });
+
+onBeforeUnmount(() => {
+  document.removeEventListener("click", handleDocumentClick);
+});
 </script>
 
 <template>
@@ -1043,24 +1060,51 @@ onMounted(async () => {
   <LoginPage v-else-if="!currentUser" :loading="loginSubmitting" :error="loginError" @login="handleLogin" />
   <main v-else class="app-shell">
     <header class="app-header">
-      <div>
+      <div class="app-title">
         <p class="eyebrow">国际医学部</p>
         <h1>护理排班管理系统</h1>
       </div>
-      <div class="header-user">{{ currentUserIdentityLabel }}</div>
+      <div class="app-header-actions">
+        <button
+          data-testid="open-management"
+          type="button"
+          :disabled="!canManageConfig"
+          @click="openManagementDrawer"
+        >
+          <Settings aria-hidden="true" />
+          配置
+        </button>
+        <button data-testid="print-week" type="button" @click="printWithMode('week')">
+          <Printer aria-hidden="true" />
+          打印周表
+        </button>
+        <button data-testid="print-month" type="button" @click="printWithMode('month')">
+          <CalendarDays aria-hidden="true" />
+          打印月表
+        </button>
+        <div ref="userMenuRef" class="header-user-menu" @keydown="handleUserMenuKeydown">
+          <button
+            ref="userMenuButtonRef"
+            class="header-user-menu-button"
+            data-testid="header-user-menu-button"
+            type="button"
+            aria-haspopup="menu"
+            :aria-expanded="userMenuOpen"
+            @click="userMenuOpen = !userMenuOpen"
+          >
+            {{ currentUserAccountLabel }}
+          </button>
+          <div v-if="userMenuOpen" class="header-user-dropdown" role="menu">
+            <button data-testid="open-password-change" type="button" role="menuitem" @click="openPasswordChangeFromMenu">
+              修改密码
+            </button>
+            <button data-testid="logout-button" type="button" role="menuitem" @click="handleLogoutFromMenu">
+              退出登录
+            </button>
+          </div>
+        </div>
+      </div>
     </header>
-
-    <AppToolbar
-      v-model:selected-date="selectedDate"
-      :admin-mode="canEditSchedule"
-      :can-manage-config="canManageConfig"
-      @open-management="openManagementDrawer"
-      @open-password-change="passwordDialogOpen = true"
-      @print-month="printWithMode('month')"
-      @print-week="printWithMode('week')"
-      @fullscreen="handleFullscreen"
-      @logout="handleLogout"
-    />
 
     <PasswordChangeDialog
       v-model="passwordDialogOpen"
@@ -1167,70 +1211,73 @@ onMounted(async () => {
             class="workbench-tab-panel"
             data-testid="workbench-panel-schedule"
           >
-            <div class="schedule-actions">
-              <button
-                data-testid="copy-previous-week-button"
-                type="button"
-                :disabled="!canEditSchedule || scheduleActionBusy"
-                @click="handleCopyPreviousWeek"
-              >
-                {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
-              </button>
-              <button
-                data-testid="batch-rest-week-button"
-                type="button"
-                :disabled="!canEditSchedule || scheduleActionBusy"
-                @click="handleBatchSetWeekShift('rest')"
-              >
-                批量休息
-              </button>
-              <button
-                data-testid="batch-office-week-button"
-                type="button"
-                :disabled="!canEditSchedule || scheduleActionBusy"
-                @click="handleBatchSetWeekShift('office')"
-              >
-                批量办公
-              </button>
-              <button
-                class="danger-action"
-                data-testid="clear-week-button"
-                type="button"
-                :disabled="!canEditSchedule || scheduleActionBusy"
-                @click="handleClearWeek"
-              >
-                批量清空
-              </button>
-            </div>
-            <div class="schedule-search" role="search" aria-label="排班人员搜索">
-              <label class="schedule-search-label" for="schedule-staff-search">搜索人员</label>
-              <input
-                id="schedule-staff-search"
-                v-model="scheduleStaffQuery"
-                class="schedule-search-input"
-                data-testid="schedule-staff-search"
-                type="search"
-                placeholder="输入姓名或工号"
-              />
-              <span class="schedule-search-count" data-testid="schedule-staff-search-count">
-                已显示 {{ filteredScheduleStaff.length }} / {{ scheduleVisibleStaff.length }} 人
-              </span>
-              <button
-                v-if="hasScheduleStaffSearch"
-                class="schedule-search-clear"
-                data-testid="clear-schedule-staff-search"
-                type="button"
-                @click="clearScheduleStaffSearch"
-              >
-                清空
-              </button>
-              <p
-                v-if="hasScheduleStaffSearch && !hasScheduleStaffSearchResults"
-                class="schedule-search-empty"
-                data-testid="schedule-staff-search-empty"
-              >
-                未找到匹配人员
-              </p>
+            <div class="schedule-operation-row">
+              <AppToolbar v-model:selected-date="selectedDate" />
+              <div class="schedule-search" role="search" aria-label="排班人员搜索">
+                <label class="schedule-search-label" for="schedule-staff-search">搜索人员</label>
+                <input
+                  id="schedule-staff-search"
+                  v-model="scheduleStaffQuery"
+                  class="schedule-search-input"
+                  data-testid="schedule-staff-search"
+                  type="search"
+                  placeholder="输入姓名或工号"
+                />
+                <span class="schedule-search-count" data-testid="schedule-staff-search-count">
+                  已显示 {{ filteredScheduleStaff.length }} / {{ scheduleVisibleStaff.length }} 人
+                </span>
+                <button
+                  v-if="hasScheduleStaffSearch"
+                  class="schedule-search-clear"
+                  data-testid="clear-schedule-staff-search"
+                  type="button"
+                  @click="clearScheduleStaffSearch"
+                >
+                  清空
+                </button>
+                <p
+                  v-if="hasScheduleStaffSearch && !hasScheduleStaffSearchResults"
+                  class="schedule-search-empty"
+                  data-testid="schedule-staff-search-empty"
+                >
+                  未找到匹配人员
+                </p>
+              </div>
+              <div class="schedule-actions">
+                <button
+                  data-testid="copy-previous-week-button"
+                  type="button"
+                  :disabled="!canEditSchedule || scheduleActionBusy"
+                  @click="handleCopyPreviousWeek"
+                >
+                  {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
+                </button>
+                <button
+                  data-testid="batch-rest-week-button"
+                  type="button"
+                  :disabled="!canEditSchedule || scheduleActionBusy"
+                  @click="handleBatchSetWeekShift('rest')"
+                >
+                  批量休息
+                </button>
+                <button
+                  data-testid="batch-office-week-button"
+                  type="button"
+                  :disabled="!canEditSchedule || scheduleActionBusy"
+                  @click="handleBatchSetWeekShift('office')"
+                >
+                  批量办公
+                </button>
+                <button
+                  class="danger-action"
+                  data-testid="clear-week-button"
+                  type="button"
+                  :disabled="!canEditSchedule || scheduleActionBusy"
+                  @click="handleClearWeek"
+                >
+                  批量清空
+                </button>
+              </div>
             </div>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid

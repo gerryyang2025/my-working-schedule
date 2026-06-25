@@ -286,26 +286,17 @@ function createSchedulerUser(managedStaffIds: string[]): AuthUser {
 
 const AppToolbarStub = defineComponent({
   name: "AppToolbar",
-  props: ["selectedDate", "adminMode", "canManageConfig"],
-  emits: ["update:selectedDate", "logout", "openManagement", "openPasswordChange", "printMonth", "printWeek"],
+  props: ["selectedDate"],
+  emits: ["update:selectedDate"],
   template: `
-    <section>
-      <button data-testid="open-management" type="button" @click="$emit('openManagement')">配置</button>
-      <button data-testid="open-password-change" type="button" @click="$emit('openPasswordChange')">修改密码</button>
-      <button data-testid="logout-button" type="button" @click="$emit('logout')">
-        退出登录
-      </button>
+    <section data-testid="schedule-week-controls">
+      <span class="schedule-week-number">第26周</span>
+      <span class="toolbar-week-range">2026-06-22 - 2026-06-28</span>
       <button data-testid="jump-date" type="button" @click="$emit('update:selectedDate', '2026-07-01')">
         jump
       </button>
       <button data-testid="jump-same-month-date" type="button" @click="$emit('update:selectedDate', '2026-06-20')">
         jump same month
-      </button>
-      <button data-testid="print-week" type="button" @click="$emit('printWeek')">
-        打印周表
-      </button>
-      <button data-testid="print-month" type="button" @click="$emit('printMonth')">
-        打印月表
       </button>
     </section>
   `
@@ -543,7 +534,13 @@ const ElButtonStub = defineComponent({
   template: '<button type="button" :disabled="disabled" v-bind="$attrs"><slot /></button>'
 });
 
-function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null = testAuthUser) {
+const mountedWrappers: Array<{ unmount: () => void }> = [];
+
+function mountApp(
+  appData: PublicAppData = testData,
+  authUser: AuthUser | null = testAuthUser,
+  options: { attachTo?: HTMLElement } = {}
+) {
   apiMocks.getCurrentUser.mockResolvedValue(authUser);
   apiMocks.loadData.mockResolvedValue(structuredClone(appData));
   apiMocks.listUsers.mockResolvedValue({
@@ -578,7 +575,8 @@ function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null =
     ]
   });
 
-  return mount(App, {
+  const wrapper = mount(App, {
+    attachTo: options.attachTo,
     global: {
       stubs: {
         AppToolbar: AppToolbarStub,
@@ -598,11 +596,13 @@ function mountApp(appData: PublicAppData = testData, authUser: AuthUser | null =
       }
     }
   });
+  mountedWrappers.push(wrapper);
+  return wrapper;
 }
 
 async function enterAdminModeForTest(wrapper: ReturnType<typeof mountApp>) {
   await flushPromises();
-  expect(wrapper.get(".header-user").text()).toContain("系统管理员");
+  expect(wrapper.get('[data-testid="header-user-menu-button"]').text()).toContain("admin");
 }
 
 async function openBonusTab(wrapper: ReturnType<typeof mountApp>) {
@@ -747,10 +747,14 @@ function expectPanelHidden(wrapper: ReturnType<typeof mountApp>, testId: string)
 
 describe("App", () => {
   afterEach(() => {
+    for (const wrapper of mountedWrappers.splice(0).reverse()) {
+      wrapper.unmount();
+    }
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.clearAllMocks();
     delete document.body.dataset.printMode;
+    document.body.innerHTML = "";
   });
 
   it("moves usage, permission, and calculation guidance into the help tab", async () => {
@@ -790,10 +794,14 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
-    expect(wrapper.get(".header-user").text()).toBe("admin · 系统管理员");
+    const userButton = wrapper.get('[data-testid="header-user-menu-button"]');
+    expect(userButton.text()).toBe("admin");
+    expect(userButton.text()).not.toContain("系统管理员");
     expect(wrapper.find(".week-chip").exists()).toBe(false);
     expect(wrapper.find('[data-testid="current-user"]').exists()).toBe(false);
 
+    await userButton.trigger("click");
+    await nextTick();
     await wrapper.get('[data-testid="logout-button"]').trigger("click");
     await flushPromises();
 
@@ -801,12 +809,79 @@ describe("App", () => {
     expect(wrapper.find(".app-shell").exists()).toBe(false);
   });
 
-  it("uses display name for scheduler header identity when it differs from the role label", async () => {
+  it("shows only the scheduler account in the header identity", async () => {
     const wrapper = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
 
     await flushPromises();
 
-    expect(wrapper.get(".header-user").text()).toBe("排班员 · 排班管理员");
+    const userButtonText = wrapper.get('[data-testid="header-user-menu-button"]').text();
+    expect(userButtonText).toBe("scheduler");
+    expect(userButtonText).not.toContain("排班员");
+    expect(userButtonText).not.toContain("排班管理员");
+  });
+
+  it("shows header actions with the user menu and removes fullscreen and role labels", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+
+    const headerActions = wrapper.get(".app-header-actions");
+    expect(headerActions.get('[data-testid="open-management"]').text()).toContain("配置");
+    expect(headerActions.get('[data-testid="print-week"]').text()).toContain("打印周表");
+    expect(headerActions.get('[data-testid="print-month"]').text()).toContain("打印月表");
+    expect(headerActions.get('[data-testid="header-user-menu-button"]').text()).toBe("admin");
+    expect(headerActions.text()).not.toContain("全屏");
+    expect(wrapper.find('[data-testid="fullscreen-button"]').exists()).toBe(false);
+    expect(wrapper.get(".app-header").text()).not.toContain("系统管理员");
+    expect(wrapper.get(".app-header").text()).not.toContain("排班管理员");
+  });
+
+  it("opens user menu with password change and logout actions", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
+
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
+
+    const dropdown = wrapper.get(".header-user-dropdown");
+    expect(dropdown.attributes("role")).toBe("menu");
+    expect(dropdown.get('[data-testid="open-password-change"]').text()).toContain("修改密码");
+    expect(dropdown.get('[data-testid="logout-button"]').text()).toContain("退出登录");
+  });
+
+  it("closes the user menu with Escape and returns focus to the user button", async () => {
+    const wrapper = mountApp(testData, testAuthUser, { attachTo: document.body });
+
+    await flushPromises();
+    const userButton = wrapper.get('[data-testid="header-user-menu-button"]');
+    await userButton.trigger("click");
+    await nextTick();
+    expect(userButton.attributes("aria-expanded")).toBe("true");
+
+    await wrapper.get(".header-user-menu").trigger("keydown", { key: "Escape" });
+    await nextTick();
+
+    expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
+    expect(userButton.attributes("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(userButton.element);
+  });
+
+  it("closes the user menu when clicking outside it", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    const userButton = wrapper.get('[data-testid="header-user-menu-button"]');
+    await userButton.trigger("click");
+    await nextTick();
+    expect(userButton.attributes("aria-expanded")).toBe("true");
+
+    document.body.click();
+    await nextTick();
+
+    expect(wrapper.find(".header-user-dropdown").exists()).toBe(false);
+    expect(userButton.attributes("aria-expanded")).toBe("false");
   });
 
   it("loads users and audit logs when opening system management", async () => {
@@ -950,6 +1025,8 @@ describe("App", () => {
     const wrapper = mountApp();
 
     await flushPromises();
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
     await wrapper.get('[data-testid="open-password-change"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="submit-password-change"]').trigger("click");
@@ -1028,6 +1105,27 @@ describe("App", () => {
     expect((wrapper.get('[data-testid="schedule-staff-search"]').element as HTMLInputElement).value).toBe("");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
     expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
+  });
+
+  it("places week controls, schedule search, count, and batch actions in one operation row", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+
+    const operationRow = wrapper.get(".schedule-operation-row");
+    expect(operationRow.find('[data-testid="schedule-week-controls"]').exists()).toBe(true);
+    expect(operationRow.text()).toContain("搜索人员");
+    expect(operationRow.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
+    expect(operationRow.find('[data-testid="copy-previous-week-button"]').exists()).toBe(true);
+    expect(operationRow.find('[data-testid="batch-rest-week-button"]').exists()).toBe(true);
+    expect(operationRow.find('[data-testid="batch-office-week-button"]').exists()).toBe(true);
+    expect(operationRow.find('[data-testid="clear-week-button"]').exists()).toBe(true);
+
+    const rowElement = operationRow.element;
+    const weekControls = operationRow.get('[data-testid="schedule-week-controls"]').element;
+    const search = operationRow.get(".schedule-search").element;
+    expect(rowElement.compareDocumentPosition(weekControls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(weekControls.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("filters schedule staff by trimmed case-insensitive job id", async () => {
