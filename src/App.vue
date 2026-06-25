@@ -392,6 +392,14 @@ async function refreshAuditLogs(query: AuditLogQuery = { limit: 100 }): Promise<
   }
 }
 
+async function handleRefreshAuditLogs(query: AuditLogQuery): Promise<void> {
+  if (!canManageConfig.value) {
+    return;
+  }
+
+  await refreshAuditLogs(query);
+}
+
 async function refreshLatestAuditLogs(): Promise<void> {
   await refreshAuditLogs({ limit: 100 });
 }
@@ -1564,7 +1572,7 @@ onBeforeUnmount(() => {
               @delete-holiday="handleDeleteHoliday"
               @save-user="handleSaveUser"
               @delete-user="handleDeleteUser"
-              @refresh-audit-logs="refreshAuditLogs"
+              @refresh-audit-logs="handleRefreshAuditLogs"
             />
           </section>
           <section

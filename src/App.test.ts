@@ -934,6 +934,39 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="management-permission"]').text()).toContain("无配置权限");
   });
 
+  it("blocks non-admin audit refresh events from calling privileged APIs", async () => {
+    const wrapper = mountApp(testData, createSchedulerUser(["staff-nurse-001"]));
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.listUsers).not.toHaveBeenCalled();
+    expect(apiMocks.listAuditLogs).not.toHaveBeenCalled();
+  });
+
+  it("allows admins to refresh audit logs from the config panel", async () => {
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    const listAuditLogsCallCountBeforeRefresh = apiMocks.listAuditLogs.mock.calls.length;
+
+    await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(listAuditLogsCallCountBeforeRefresh + 1);
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({
+      username: "admin",
+      action: "user.save",
+      keyword: "scheduler",
+      limit: 50
+    });
+  });
+
   it("saves users from the management drawer and refreshes the user list", async () => {
     apiMocks.saveUser.mockResolvedValue({
       user: {
