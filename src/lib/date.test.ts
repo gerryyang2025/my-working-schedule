@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addWeeks, getMonthDays, getWeekDays, getWeekRange, toDateKey } from "./date";
+import { addWeeks, getMonthDays, getScheduleWeekNumber, getWeekDays, getWeekRange, toDateKey } from "./date";
 
 describe("date utilities", () => {
   it("formats local date keys as yyyy-mm-dd", () => {
@@ -49,5 +49,13 @@ describe("date utilities", () => {
     expect(addWeeks("2026-06-17", -1)).toBe("2026-06-08");
     expect(addWeeks("2026-06-17", 1)).toBe("2026-06-22");
     expect(addWeeks("2026-06-21", 1)).toBe("2026-06-22");
+  });
+
+  it("returns ISO-style schedule week numbers using Monday as week start", () => {
+    expect(getScheduleWeekNumber("2026-06-22")).toBe(26);
+    expect(getScheduleWeekNumber("2026-06-25")).toBe(26);
+    expect(getScheduleWeekNumber("2026-06-28")).toBe(26);
+    expect(getScheduleWeekNumber("2026-06-21")).toBe(25);
+    expect(getScheduleWeekNumber("2026-12-30")).toBe(53);
   });
 });

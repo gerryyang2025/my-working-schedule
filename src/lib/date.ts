@@ -60,6 +60,18 @@ export function getWeekRange(dateKey: string): { start: string; end: string } {
   };
 }
 
+export function getScheduleWeekNumber(dateKey: string): number {
+  const [year, month, dateOfMonth] = dateKey.split("-").map(Number);
+  const date = new Date(Date.UTC(year, month - 1, dateOfMonth));
+  const day = date.getUTCDay() || 7;
+  const thursday = new Date(date);
+  thursday.setUTCDate(date.getUTCDate() + 4 - day);
+
+  const yearStart = Date.UTC(thursday.getUTCFullYear(), 0, 1);
+  const dayOfYear = Math.floor((thursday.getTime() - yearStart) / 86400000) + 1;
+  return Math.ceil(dayOfYear / 7);
+}
+
 export function getWeekDays(dateKey: string): CalendarDay[] {
   const { start, end } = getWeekRange(dateKey);
   return listDateKeys(start, end).map((key) => {
