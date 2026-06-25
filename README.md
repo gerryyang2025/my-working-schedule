@@ -74,6 +74,8 @@ cp config/server.example.json config/server.local.json
 
 默认管理员密码会以哈希形式保存到 `users` 表；每次服务启动都会按当前配置刷新 `admin` 账号密码，便于部署阶段通过配置文件或环境变量统一调整。
 
+如果默认 `admin` 修改密码后忘记密码，可以更新 `SCHEDULE_ADMIN_PASSWORD` 或 `config/server.local.json` 中的 `adminPassword` 后重启服务；详见 [正式部署运行手册](./docs/正式部署运行手册.md#注意事项默认-admin-密码找回)。
+
 ## SQLite 存储与正式单机部署
 
 当前版本只保留 SQLite 运行时存储。正式单机部署推荐使用 `/var/lib/my-working-schedule/schedule.db`：
