@@ -1252,6 +1252,56 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-config");
   });
 
+  it("ignores a stale config load after a newer config mutation applies", async () => {
+    const staleConfigLoad = createDeferred<PublicAppData>();
+    const staleConfigData = structuredClone(testData);
+    const newerMutationData = structuredClone(testData);
+    staleConfigData.staff = [
+      {
+        id: "staff-stale-config-load",
+        jobId: "333333",
+        name: "过期配置加载人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 33
+      }
+    ];
+    newerMutationData.staff = [
+      {
+        id: "staff-newer-mutation",
+        jobId: "222222",
+        name: "较新保存人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 22
+      }
+    ];
+    apiMocks.saveStaff.mockResolvedValueOnce(newerMutationData);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.loadData.mockReturnValueOnce(staleConfigLoad.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await nextTick();
+
+    const configLoadSignal = apiMocks.loadData.mock.calls[1][0]?.signal as AbortSignal;
+    expect(configLoadSignal.aborted).toBe(false);
+
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(configLoadSignal.aborted).toBe(true);
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-newer-mutation");
+
+    staleConfigLoad.resolve(staleConfigData);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-newer-mutation");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-stale-config-load");
+  });
+
   it("does not apply an in-flight staff save after leaving the config tab", async () => {
     const saveStaffRequest = createDeferred<PublicAppData>();
     const staleSaveData = structuredClone(testData);

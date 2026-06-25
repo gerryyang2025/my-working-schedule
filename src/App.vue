@@ -401,6 +401,12 @@ function resetConfigMutationSavingState(): void {
   userSaving.value = false;
 }
 
+function cancelConfigLoadRequest(): void {
+  configLoadAbortController.value?.abort();
+  configLoadAbortController.value = null;
+  configLoadRequestId.value += 1;
+}
+
 function cancelConfigReadRequests(): void {
   managementDataAbortController.value?.abort();
   auditLogAbortController.value?.abort();
@@ -412,9 +418,7 @@ function cancelConfigReadRequests(): void {
 }
 
 function cancelConfigRequests(): void {
-  configLoadAbortController.value?.abort();
-  configLoadAbortController.value = null;
-  configLoadRequestId.value += 1;
+  cancelConfigLoadRequest();
   cancelConfigReadRequests();
   configMutationRequestId.value += 1;
   resetConfigMutationSavingState();
@@ -474,6 +478,7 @@ function beginConfigMutation(): ConfigMutationContext | null {
   }
 
   const requestId = (configMutationRequestId.value += 1);
+  cancelConfigLoadRequest();
   cancelConfigReadRequests();
   resetConfigMutationSavingState();
   return {
