@@ -1415,6 +1415,90 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).not.toContain("staff-older-overlap");
   });
 
+  it("ignores an older mutation audit refresh after a newer config mutation starts", async () => {
+    const olderAuditRefresh = createDeferred<{ rows: AuditLogEntry[] }>();
+    const newerShiftSaveRequest = createDeferred<PublicAppData>();
+    const newerAuditRefresh = createDeferred<{ rows: AuditLogEntry[] }>();
+    const newerShiftData = structuredClone(testData);
+    const olderAuditRows: AuditLogEntry[] = [
+      {
+        id: "audit-older-mutation-refresh",
+        occurredAt: "2026-06-19T00:00:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "staff.save",
+        targetType: "staff",
+        targetId: "staff-nurse-001",
+        summary: "较早保存后的审计日志",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const newerAuditRows: AuditLogEntry[] = [
+      {
+        id: "audit-newer-mutation-refresh",
+        occurredAt: "2026-06-19T00:01:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "shift.save",
+        targetType: "shift",
+        targetId: "shift-a1",
+        summary: "较新保存后的审计日志",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    newerShiftData.staff = [
+      {
+        id: "staff-newer-refresh",
+        jobId: "444444",
+        name: "较新刷新人员",
+        type: "nurse",
+        isAdmin: false,
+        enabled: true,
+        sortOrder: 44
+      }
+    ];
+    apiMocks.saveStaff.mockResolvedValueOnce(structuredClone(testData));
+    apiMocks.saveShift.mockReturnValueOnce(newerShiftSaveRequest.promise);
+    const wrapper = mountApp();
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    apiMocks.listAuditLogs.mockReturnValueOnce(olderAuditRefresh.promise);
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-staff-saving"]').text()).toBe("saving");
+
+    await wrapper.get('[data-testid="drawer-save-shift"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
+
+    olderAuditRefresh.resolve({ rows: olderAuditRows });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("保存账号：scheduler");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("较早保存后的审计日志");
+
+    apiMocks.listAuditLogs.mockReturnValueOnce(newerAuditRefresh.promise);
+    newerShiftSaveRequest.resolve(newerShiftData);
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("saving");
+
+    newerAuditRefresh.resolve({ rows: newerAuditRows });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-shift-saving"]').text()).toBe("idle");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("较新保存后的审计日志");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("较早保存后的审计日志");
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toContain("staff-newer-refresh");
+  });
+
   it("does not refresh management users or show success after an in-flight config user save resolves post-logout", async () => {
     const saveUserRequest = createDeferred<{ user: ManagedAuthUser }>();
     const logoutRequest = createDeferred<void>();
