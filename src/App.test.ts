@@ -1596,6 +1596,77 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("过期审计日志");
   });
 
+  it("keeps management users when a standalone audit refresh wins the audit race", async () => {
+    const managementUsersRequest = createDeferred<{ rows: ManagedAuthUser[] }>();
+    const managementAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const standaloneAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
+    const loadedUsers: ManagedAuthUser[] = [
+      {
+        id: "user-loaded",
+        username: "loaded-user",
+        displayName: "已加载账号",
+        role: "admin",
+        staffId: null,
+        managedStaffIds: [],
+        enabled: true,
+        createdAt: "2026-06-19T00:00:00.000Z",
+        updatedAt: "2026-06-19T00:00:00.000Z"
+      }
+    ];
+    const olderManagementAudit: AuditLogEntry[] = [
+      {
+        id: "audit-older-management",
+        occurredAt: "2026-06-19T00:00:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "config.load",
+        targetType: "config",
+        targetId: "management",
+        summary: "older audit",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const newerStandaloneAudit: AuditLogEntry[] = [
+      {
+        id: "audit-newer-standalone",
+        occurredAt: "2026-06-19T00:01:00.000Z",
+        userId: "user-admin",
+        username: "admin",
+        action: "audit.refresh",
+        targetType: "audit",
+        targetId: "standalone",
+        summary: "newer audit",
+        ip: "127.0.0.1",
+        userAgent: "vitest"
+      }
+    ];
+    const wrapper = mountApp();
+
+    await flushPromises();
+    apiMocks.listUsers.mockReturnValueOnce(managementUsersRequest.promise);
+    apiMocks.listAuditLogs.mockReturnValueOnce(managementAuditRequest.promise);
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    apiMocks.listAuditLogs.mockReturnValueOnce(standaloneAuditRequest.promise);
+    await wrapper.get('[data-testid="drawer-refresh-audit"]').trigger("click");
+    await nextTick();
+
+    standaloneAuditRequest.resolve({ rows: newerStandaloneAudit });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("newer audit");
+
+    managementUsersRequest.resolve({ rows: loadedUsers });
+    managementAuditRequest.resolve({ rows: olderManagementAudit });
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="drawer-users"]').text()).toContain("loaded-user");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).toContain("newer audit");
+    expect(wrapper.get('[data-testid="drawer-audit"]').text()).not.toContain("older audit");
+  });
+
   it("keeps the latest audit refresh results when older requests resolve later", async () => {
     const olderAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();
     const newerAuditRequest = createDeferred<{ rows: AuditLogEntry[] }>();

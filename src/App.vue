@@ -437,14 +437,17 @@ function isCurrentConfigContext(requestId: number, userId: string | null): boole
   );
 }
 
-function canApplyManagementDataRequest(requestId: number, auditRequestId: number, userId: string | null): boolean {
+function canApplyManagementUsersRequest(requestId: number, userId: string | null): boolean {
   return (
     managementDataRequestId.value === requestId &&
-    auditLogRequestId.value === auditRequestId &&
     activeWorkbenchTab.value === "config" &&
     canManageConfig.value &&
     (currentUser.value?.id ?? null) === userId
   );
+}
+
+function canApplyManagementAuditRequest(requestId: number, auditRequestId: number, userId: string | null): boolean {
+  return canApplyManagementUsersRequest(requestId, userId) && auditLogRequestId.value === auditRequestId;
 }
 
 function canApplyAuditLogRequest(requestId: number, userId: string | null): boolean {
@@ -548,21 +551,23 @@ async function refreshManagementData(): Promise<void> {
       listUsers({ signal: controller.signal }),
       listAuditLogs({ limit: 100 }, { signal: controller.signal })
     ]);
-    if (!canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
-      return;
+
+    if (canApplyManagementUsersRequest(requestId, userId)) {
+      users.value = usersResponse.rows;
     }
 
-    users.value = usersResponse.rows;
-    auditLogs.value = auditResponse.rows;
+    if (canApplyManagementAuditRequest(requestId, auditRequestId, userId)) {
+      auditLogs.value = auditResponse.rows;
+    }
   } catch (caughtError) {
-    if (!isAbortError(caughtError) && canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+    if (!isAbortError(caughtError) && canApplyManagementUsersRequest(requestId, userId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "系统配置加载失败");
     }
   } finally {
     if (managementDataAbortController.value === controller) {
       managementDataAbortController.value = null;
     }
-    if (canApplyManagementDataRequest(requestId, auditRequestId, userId)) {
+    if (canApplyManagementAuditRequest(requestId, auditRequestId, userId)) {
       auditLoading.value = false;
     }
   }
@@ -1436,6 +1441,7 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   cancelPrintPdfRequest();
+  cancelConfigRequests();
   document.removeEventListener("click", handleDocumentClick);
 });
 </script>
