@@ -883,7 +883,7 @@ describe("App", () => {
 
     await flushPromises();
     const userButton = wrapper.get('[data-testid="header-user-menu-button"]');
-    expect(userButton.text()).toBe("当前用户：admin");
+    expect(userButton.text()).toBe("当前用户：admin ▾");
     expect(userButton.text()).not.toContain("系统管理员");
     expect(wrapper.find(".week-chip").exists()).toBe(false);
     expect(wrapper.find('[data-testid="current-user"]').exists()).toBe(false);
@@ -937,7 +937,7 @@ describe("App", () => {
     await flushPromises();
 
     const userButtonText = wrapper.get('[data-testid="header-user-menu-button"]').text();
-    expect(userButtonText).toBe("当前用户：scheduler");
+    expect(userButtonText).toBe("当前用户：scheduler ▾");
     expect(userButtonText).not.toContain("排班员");
     expect(userButtonText).not.toContain("排班管理员");
   });
@@ -951,7 +951,7 @@ describe("App", () => {
     expect(headerActions.find('[data-testid="open-management"]').exists()).toBe(false);
     expect(headerActions.find('[data-testid="print-week"]').exists()).toBe(false);
     expect(headerActions.find('[data-testid="print-month"]').exists()).toBe(false);
-    expect(headerActions.get('[data-testid="header-user-menu-button"]').text()).toBe("当前用户：admin");
+    expect(headerActions.get('[data-testid="header-user-menu-button"]').text()).toBe("当前用户：admin ▾");
     expect(headerActions.text()).not.toContain("全屏");
     expect(wrapper.find('[data-testid="fullscreen-button"]').exists()).toBe(false);
     expect(wrapper.get(".app-header").text()).not.toContain("系统管理员");

@@ -288,7 +288,7 @@ const editableStaffIds = computed(() => {
   return [];
 });
 const canEditSchedule = computed(() => editableStaffIds.value.length > 0);
-const currentUserAccountLabel = computed(() => (currentUser.value ? `当前用户：${currentUser.value.username}` : "当前用户："));
+const currentUserAccountLabel = computed(() => (currentUser.value ? `当前用户：${currentUser.value.username} ▾` : "当前用户："));
 const currentWeekEditableEntryCount = computed(() => {
   if (!data.value) {
     return 0;

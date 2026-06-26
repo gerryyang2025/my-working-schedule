@@ -58,6 +58,7 @@ describe("main.css layout rules", () => {
     const userMenuRules = ruleBlocks(".header-user-menu")[0] || "";
     const userMenuButtonRules = ruleBlocks(".app-header-actions .header-user-menu-button")[0] || "";
     const userDropdownRules = ruleBlocks(".header-user-dropdown")[0] || "";
+    const userDropdownButtonRules = ruleBlocks(".header-user-dropdown button")[0] || "";
 
     expect(appTitleRules).not.toBe("");
     expect(openUserMenuHeaderRules).toHaveLength(0);
@@ -66,12 +67,18 @@ describe("main.css layout rules", () => {
     expect(headerActionsRules).toContain("align-items: center");
     expect(userMenuRules).toContain("position: relative");
     expect(userMenuButtonRules).toContain("max-width:");
+    expect(userMenuButtonRules).toContain("min-height: 32px");
+    expect(userMenuButtonRules).toContain("font-size: 14px");
     expect(userMenuButtonRules).toContain("overflow: hidden");
     expect(userMenuButtonRules).toContain("text-overflow: ellipsis");
     expect(userDropdownRules).toContain("position: absolute");
     expect(userDropdownRules).toContain("right: 0");
     expect(userDropdownRules).toContain("top: calc(100% + 6px)");
     expect(userDropdownRules).toContain("z-index:");
+    expect(userDropdownButtonRules).toContain("min-height: 32px");
+    expect(userDropdownButtonRules).toContain("padding: 0 10px");
+    expect(userDropdownButtonRules).toContain("font-size: 14px");
+    expect(userDropdownButtonRules).toContain("font-weight: 700");
     expect(ruleBlocks(".week-chip")).toHaveLength(0);
     expect(ruleBlocks(".toolbar")).toHaveLength(0);
     expect(ruleBlocks(".toolbar-group")).toHaveLength(0);
