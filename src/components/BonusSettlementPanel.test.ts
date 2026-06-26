@@ -1,7 +1,19 @@
+import { readFileSync } from "node:fs";
 import { mount } from "@vue/test-utils";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BonusSettlementPanel from "./BonusSettlementPanel.vue";
 import type { MonthlySettlement, MonthlySummary } from "@/types/domain";
+
+const componentSource = readFileSync("src/components/BonusSettlementPanel.vue", "utf8");
+
+function escapeCssSelector(selector: string): string {
+  return selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function styleRule(selector: string): string {
+  const pattern = new RegExp(`${escapeCssSelector(selector)}\\s*\\{([^}]+)\\}`);
+  return componentSource.match(pattern)?.[1] ?? "";
+}
 
 const monthlySummary: MonthlySummary = {
   monthStart: "2026-06-01",
@@ -148,6 +160,16 @@ async function expectCancelBlocked(wrapper: ReturnType<typeof mountPanel>): Prom
 describe("BonusSettlementPanel", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it("keeps settlement controls and tables on the compact type scale", () => {
+    expect(styleRule(".settlement-range-controls span")).toContain("font-size: 13px");
+    expect(styleRule(".settlement-range-controls input")).toContain("font-size: 13px");
+    expect(styleRule(".bonus-pool-field span")).toContain("font-size: 13px");
+    expect(styleRule(".bonus-pool-field input")).toContain("font-size: 13px");
+    expect(styleRule(".settlement-actions button")).toContain("font-size: 14px");
+    expect(styleRule(".bonus-table")).toContain("font-size: 13px");
+    expect(styleRule(".bonus-person small")).toContain("font-size: 12px");
   });
 
   it("uses the shared stats panel class", () => {

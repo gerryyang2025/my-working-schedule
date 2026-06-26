@@ -97,6 +97,34 @@ describe("main.css layout rules", () => {
     expectSelectorAbsent(".admin-mode-banner");
   });
 
+  it("keeps workbench form and summary typography on the compact type scale", () => {
+    const rootRules = ruleBlocks(":root")[0] || "";
+    const tabButtonRules = ruleBlocks(".workbench-tabs button")[0] || "";
+    const scheduleActionButtonRules = ruleBlocks(".schedule-actions button")[0] || "";
+    const searchLabelRules = ruleBlocks(".schedule-search-label")[0] || "";
+    const searchInputRules = ruleBlocks(".schedule-search-input")[0] || "";
+    const searchClearRules = ruleBlocks(".schedule-search-clear")[0] || "";
+    const searchEmptyRules = ruleBlocks(".schedule-search-empty")[0] || "";
+    const queryWarningRules = ruleBlocks(".schedule-query-warning")[0] || "";
+    const statsTitleRules = ruleBlocks(".stats-panel-header h2")[0] || "";
+    const summaryTableRules = ruleBlocks(".summary-table")[0] || "";
+    const summaryJobIdRules = ruleBlocks(".summary-person small")[0] || "";
+
+    expect(rootRules).toContain("font-size: 14px");
+    expect(tabButtonRules).toContain("font-size: 14px");
+    expect(scheduleActionButtonRules).toContain("font-size: 14px");
+    expect(searchLabelRules).toContain("font-size: 13px");
+    expect(searchLabelRules).toContain("font-weight: 700");
+    expect(searchInputRules).toContain("font-size: 13px");
+    expect(searchClearRules).toContain("font-size: 14px");
+    expect(searchEmptyRules).toContain("font-size: 13px");
+    expect(queryWarningRules).toContain("font-size: 13px");
+    expect(statsTitleRules).toContain("font-size: 15px");
+    expect(statsTitleRules).toContain("font-weight: 900");
+    expect(summaryTableRules).toContain("font-size: 13px");
+    expect(summaryJobIdRules).toContain("font-size: 12px");
+  });
+
   it("styles the help page as compact full-width guidance content", () => {
     const helpPageRules = ruleBlocks(".help-page")[0] || "";
     const helpSectionRules = ruleBlocks(".help-section")[0] || "";

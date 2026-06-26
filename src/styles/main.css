@@ -1,5 +1,6 @@
 :root {
   font-family: "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+  font-size: 14px;
   color: #1f2937;
   background: #f8f9fa;
 }
@@ -264,6 +265,7 @@ body {
   border: 1px solid #dbe3ef;
   background: #ffffff;
   color: #334155;
+  font-size: 14px;
   font-weight: 700;
   text-align: left;
   cursor: pointer;
@@ -329,6 +331,7 @@ body {
   background: #eff6ff;
   color: #1d4ed8;
   padding: 0 12px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -371,7 +374,8 @@ body {
 
 .schedule-search-label {
   color: #1e3a8a;
-  font-weight: 800;
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .schedule-search-input {
@@ -382,7 +386,8 @@ body {
   background: #ffffff;
   padding: 0 10px;
   color: #0f172a;
-  font: inherit;
+  font-family: inherit;
+  font-size: 13px;
 }
 
 .schedule-search-input:focus {
@@ -403,6 +408,7 @@ body {
   background: #eff6ff;
   color: #1d4ed8;
   padding: 0 12px;
+  font-size: 14px;
   font-weight: 800;
   cursor: pointer;
 }
@@ -435,6 +441,7 @@ body {
   background: #f8fafc;
   padding: 12px;
   color: #475569;
+  font-size: 13px;
   text-align: center;
   font-weight: 700;
 }
@@ -475,6 +482,7 @@ body {
   background: #fffbeb;
   padding: 10px 12px;
   color: #92400e;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -735,7 +743,8 @@ body {
 .stats-panel-header h2 {
   margin: 0 0 4px;
   color: #0f172a;
-  font-size: 16px;
+  font-size: 15px;
+  font-weight: 900;
 }
 
 .stats-panel-header p {
@@ -756,6 +765,7 @@ body {
   width: 100%;
   border-collapse: collapse;
   margin-top: 10px;
+  font-size: 13px;
 }
 
 .summary-table th,
@@ -792,7 +802,7 @@ body {
 
 .summary-person small {
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
   white-space: nowrap;
 }
 

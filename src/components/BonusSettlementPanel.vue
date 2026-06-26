@@ -435,7 +435,8 @@ function rowNote(row: MonthlySettlementRow): string {
   border: 1px solid #cbd5e1;
   padding: 4px 8px;
   color: #0f172a;
-  font: inherit;
+  font-family: inherit;
+  font-size: 13px;
 }
 
 .settlement-range-notice {
@@ -502,7 +503,8 @@ function rowNote(row: MonthlySettlementRow): string {
   border: 1px solid #cbd5e1;
   padding: 4px 8px;
   color: #0f172a;
-  font: inherit;
+  font-family: inherit;
+  font-size: 13px;
 }
 
 .bonus-pool-field input:disabled {
@@ -523,7 +525,8 @@ function rowNote(row: MonthlySettlementRow): string {
   background: #ffffff;
   color: #1f2937;
   padding: 0 12px;
-  font: inherit;
+  font-family: inherit;
+  font-size: 14px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -599,7 +602,7 @@ function rowNote(row: MonthlySettlementRow): string {
 
 .bonus-person small {
   color: #64748b;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .bonus-table td:last-child {
