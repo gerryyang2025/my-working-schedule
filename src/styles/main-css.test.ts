@@ -351,7 +351,8 @@ describe("main.css layout rules", () => {
     expect(fieldRules).toContain("display: grid");
     expect(fieldRules).toContain("gap: 4px");
     expect(dateFieldRules).toContain("flex: 0 1 170px");
-    expect(staffFieldRules).toContain("flex: 1 1 220px");
+    expect(staffFieldRules).toContain("flex: 0 1 280px");
+    expect(staffFieldRules).toContain("max-width: 280px");
     expect(metaRules).toContain("color: #334155");
     expect(metaRules).toContain("font-size: 13px");
     expect(metaRules).toContain("font-weight: 800");

@@ -466,7 +466,8 @@ body {
 }
 
 .schedule-query-staff-field {
-  flex: 1 1 220px;
+  flex: 0 1 280px;
+  max-width: 280px;
 }
 
 .schedule-query-meta {
