@@ -998,6 +998,78 @@ describe.sequential("API routes", () => {
     expect(response.body.settings.adminPassword).toBeUndefined();
   });
 
+  it("reorders staff with continuous sort orders and records an audit log", async () => {
+    const app = createTestApp();
+    const headers = await adminHeaders(app);
+    const staffIds = ["staff-clerk-001", "staff-nurse-001", "staff-head-001"];
+
+    const response = await request(app).put("/api/data/staff-order").set(headers).send({ staffIds }).expect(200);
+
+    expect(
+      response.body.staff.map((staff: StaffMember) => ({
+        id: staff.id,
+        sortOrder: staff.sortOrder
+      }))
+    ).toEqual([
+      { id: "staff-clerk-001", sortOrder: 1 },
+      { id: "staff-nurse-001", sortOrder: 2 },
+      { id: "staff-head-001", sortOrder: 3 }
+    ]);
+    expect(response.body.settings.adminPassword).toBeUndefined();
+
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .set(headers)
+      .query({ action: "data.staff.order", keyword: "调整人员排序", limit: "20" })
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "data.staff.order",
+          targetType: "staff",
+          targetId: "order",
+          summary: "调整人员排序：1.王文员、2.李护士、3.段鸿露"
+        })
+      ])
+    );
+  });
+
+  it.each([
+    ["duplicate IDs", ["staff-head-001", "staff-head-001", "staff-clerk-001"], "人员排序信息不完整"],
+    ["missing staff ID count", ["staff-head-001", "staff-nurse-001"], "人员排序必须包含全部人员"],
+    ["unknown staff ID", ["staff-head-001", "staff-nurse-001", "staff-missing"], "人员排序包含不存在的人员"]
+  ])("rejects malformed staff order payloads with %s", async (_label, staffIds, message) => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/staff-order")
+      .set(await adminHeaders(app))
+      .send({ staffIds })
+      .expect(400);
+
+    expect(response.body).toEqual({ message });
+  });
+
+  it("rejects staff order writes without admin authentication", async () => {
+    const app = createTestApp();
+    const staffIds = ["staff-clerk-001", "staff-nurse-001", "staff-head-001"];
+
+    await request(app).put("/api/data/staff-order").send({ staffIds }).expect(401, { message: "请先登录" });
+
+    const schedulerHeaders = await createUserAndLogin(app, {
+      id: "user-staff-order-scheduler",
+      username: "staff-order-scheduler",
+      displayName: "人员排序排班员",
+      role: "scheduler",
+      managedStaffIds: ["staff-head-001", "staff-nurse-001", "staff-clerk-001"]
+    });
+
+    await request(app)
+      .put("/api/data/staff-order")
+      .set(schedulerHeaders)
+      .send({ staffIds })
+      .expect(403, { message: "当前账号没有操作权限" });
+  });
+
   it("deletes unused test staff and records an audit log", async () => {
     const data = createSeedData();
     data.staff.push({

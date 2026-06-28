@@ -3,19 +3,24 @@ import { computed, onBeforeUnmount } from "vue";
 import type { CalendarDay } from "@/lib/date";
 import type { Holiday, ScheduleEntry, Shift, StaffMember, StaffType } from "@/types/domain";
 
-const props = defineProps<{
-  staff: StaffMember[];
-  days: CalendarDay[];
-  holidays: Holiday[];
-  shifts: Shift[];
-  entries: ScheduleEntry[];
-  selectedShiftId: string;
-  editableStaffIds: string[];
-}>();
+const props = withDefaults(
+  defineProps<{
+    staff: StaffMember[];
+    days: CalendarDay[];
+    holidays: Holiday[];
+    shifts: Shift[];
+    entries: ScheduleEntry[];
+    selectedShiftId: string;
+    editableStaffIds: string[];
+    canReorderStaff?: boolean;
+  }>(),
+  { canReorderStaff: false }
+);
 
 const emit = defineEmits<{
   quickFill: [staffId: string, date: string];
   editCell: [staffId: string, date: string];
+  reorderStaff: [staffIds: string[]];
 }>();
 
 const STAFF_TYPE_LABELS: Record<StaffType, string> = {
@@ -24,9 +29,9 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
   clerk: "文员"
 };
 
-const SORT_COLUMN_WIDTH = 54;
+const SORT_COLUMN_WIDTH = 68;
 const TYPE_COLUMN_WIDTH = 58;
-const SORT_COLUMN_MOBILE_WIDTH = 42;
+const SORT_COLUMN_MOBILE_WIDTH = 58;
 const TYPE_COLUMN_MOBILE_WIDTH = 46;
 
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
@@ -42,6 +47,7 @@ const sortedStaff = computed(() =>
     .filter((item) => item.enabled || staffWithVisibleEntries.value.has(item.id))
     .sort((left, right) => left.sortOrder - right.sortOrder)
 );
+const showStaffReorderControls = computed(() => props.canReorderStaff && sortedStaff.value.length > 1);
 const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
@@ -105,6 +111,31 @@ function canEditStaff(staff: StaffMember): boolean {
   return staff.enabled && editableStaffIdSet.value.has(staff.id);
 }
 
+function canMoveStaff(staffId: string, direction: "up" | "down"): boolean {
+  if (!showStaffReorderControls.value) {
+    return false;
+  }
+
+  const staffIndex = sortedStaff.value.findIndex((staff) => staff.id === staffId);
+  if (staffIndex === -1) {
+    return false;
+  }
+
+  return direction === "up" ? staffIndex > 0 : staffIndex < sortedStaff.value.length - 1;
+}
+
+function moveStaff(staffId: string, direction: "up" | "down"): void {
+  if (!canMoveStaff(staffId, direction)) {
+    return;
+  }
+
+  const staffIds = sortedStaff.value.map((staff) => staff.id);
+  const staffIndex = staffIds.indexOf(staffId);
+  const swapIndex = direction === "up" ? staffIndex - 1 : staffIndex + 1;
+  [staffIds[staffIndex], staffIds[swapIndex]] = [staffIds[swapIndex], staffIds[staffIndex]];
+  emit("reorderStaff", staffIds);
+}
+
 function handleCellClick(staff: StaffMember, date: string): void {
   if (!canEditStaff(staff)) {
     return;
@@ -154,7 +185,31 @@ onBeforeUnmount(() => {
       </thead>
       <tbody>
         <tr v-for="person in sortedStaff" :key="person.id" :class="{ 'disabled-historical-row': !person.enabled }">
-          <th class="sticky-col sort-col">{{ person.sortOrder }}</th>
+          <th class="sticky-col sort-col">
+            <span class="sort-order-value">{{ person.sortOrder }}</span>
+            <span v-if="showStaffReorderControls" class="staff-reorder-controls">
+              <button
+                type="button"
+                class="staff-reorder-button"
+                :data-testid="`move-staff-up-${person.id}`"
+                :aria-label="`${person.name} 上移`"
+                :disabled="!canMoveStaff(person.id, 'up')"
+                @click.stop="moveStaff(person.id, 'up')"
+              >
+                ↑
+              </button>
+              <button
+                type="button"
+                class="staff-reorder-button"
+                :data-testid="`move-staff-down-${person.id}`"
+                :aria-label="`${person.name} 下移`"
+                :disabled="!canMoveStaff(person.id, 'down')"
+                @click.stop="moveStaff(person.id, 'down')"
+              >
+                ↓
+              </button>
+            </span>
+          </th>
           <th class="sticky-col person-col">
             <strong>{{ person.name }}</strong>
             <small>{{ person.jobId }}</small>

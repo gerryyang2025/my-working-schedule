@@ -292,6 +292,13 @@ export function saveStaff(staff: StaffMember): Promise<PublicAppData> {
   });
 }
 
+export function saveStaffOrder(staffIds: string[]): Promise<PublicAppData> {
+  return requestJson<PublicAppData>("/api/data/staff-order", {
+    method: "PUT",
+    body: JSON.stringify({ staffIds })
+  });
+}
+
 export function deleteStaff(id: string): Promise<PublicAppData> {
   return requestJson<PublicAppData>(`/api/data/staff/${encodeURIComponent(id)}`, {
     method: "DELETE"

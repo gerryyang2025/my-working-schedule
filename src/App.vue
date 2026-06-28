@@ -31,6 +31,7 @@ import {
   saveScheduleEntry,
   saveShift,
   saveStaff,
+  saveStaffOrder,
   saveUser
 } from "@/api/client";
 import type {
@@ -87,6 +88,7 @@ const configLoadRequestId = ref(0);
 const managementDataRequestId = ref(0);
 const auditLogRequestId = ref(0);
 const configMutationRequestId = ref(0);
+const staffOrderRequestId = ref(0);
 const configLoadAbortController = ref<AbortController | null>(null);
 const managementDataAbortController = ref<AbortController | null>(null);
 const auditLogAbortController = ref<AbortController | null>(null);
@@ -108,6 +110,8 @@ const passwordChanging = ref(false);
 const passwordChangeError = ref("");
 const copyingPreviousWeek = ref(false);
 const bulkUpdatingWeek = ref(false);
+const scheduleEntrySaving = ref(false);
+const staffOrderSaving = ref(false);
 const userMenuOpen = ref(false);
 const userMenuRef = ref<HTMLElement | null>(null);
 const userMenuButtonRef = ref<HTMLButtonElement | null>(null);
@@ -271,7 +275,7 @@ const shiftCoefficientDescriptions = computed(() =>
 );
 const managedStaffIdSet = computed(() => new Set(currentUser.value?.managedStaffIds ?? []));
 const editableStaffIds = computed(() => {
-  if (!data.value || !currentUser.value) {
+  if (!data.value || !currentUser.value || staffOrderSaving.value) {
     return [];
   }
 
@@ -300,7 +304,9 @@ const currentWeekEditableEntryCount = computed(() => {
 });
 const restShift = computed(() => findEnabledShift(["休"], ["休息"]));
 const officeShift = computed(() => findEnabledShift(["办公"], ["办公"]));
-const scheduleActionBusy = computed(() => copyingPreviousWeek.value || bulkUpdatingWeek.value);
+const scheduleActionBusy = computed(
+  () => copyingPreviousWeek.value || bulkUpdatingWeek.value || scheduleEntrySaving.value || staffOrderSaving.value
+);
 const canOperateCurrentSettlement = computed(() => {
   if (!currentUser.value || isBonusRangeMode.value) {
     return false;
@@ -319,6 +325,15 @@ const canOperateCurrentSettlement = computed(() => {
   return rows ? rows.every((row) => managedStaffIdSet.value.has(row.staffId)) : false;
 });
 const canManageConfig = computed(() => currentUser.value?.role === "admin");
+const canReorderScheduleStaff = computed(
+  () =>
+    activeWorkbenchTab.value === "schedule" &&
+    canManageConfig.value &&
+    !hasScheduleStaffSearch.value &&
+    !scheduleActionBusy.value &&
+    Boolean(data.value) &&
+    scheduleVisibleStaff.value.length > 1
+);
 const configPanelOpen = computed(() => activeWorkbenchTab.value === "config");
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
@@ -422,6 +437,11 @@ function cancelConfigRequests(): void {
   resetConfigMutationSavingState();
 }
 
+function cancelStaffOrderRequest(): void {
+  staffOrderRequestId.value += 1;
+  staffOrderSaving.value = false;
+}
+
 function isAbortError(caughtError: unknown): boolean {
   return (
     typeof caughtError === "object" &&
@@ -470,8 +490,12 @@ function canApplyConfigMutation(requestId: number, userId: string | null): boole
   );
 }
 
+function canApplyStaffOrderRequest(requestId: number, userId: string | null): boolean {
+  return staffOrderRequestId.value === requestId && canManageConfig.value && (currentUser.value?.id ?? null) === userId;
+}
+
 function beginConfigMutation(): ConfigMutationContext | null {
-  if (!canManageConfig.value || activeWorkbenchTab.value !== "config") {
+  if (!canManageConfig.value || activeWorkbenchTab.value !== "config" || staffOrderSaving.value) {
     return null;
   }
 
@@ -630,6 +654,7 @@ async function handleLogin(payload: { username: string; password: string }): Pro
 async function handleLogout(): Promise<void> {
   cancelPrintPdfRequest();
   cancelConfigRequests();
+  cancelStaffOrderRequest();
   activeWorkbenchTab.value = "schedule";
   await logout();
   currentUser.value = null;
@@ -697,6 +722,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     passwordDialogOpen.value = false;
     cancelPrintPdfRequest();
     cancelConfigRequests();
+    cancelStaffOrderRequest();
     activeWorkbenchTab.value = "schedule";
     await logout();
     currentUser.value = null;
@@ -1071,17 +1097,52 @@ async function handlePreviewPdfShare(): Promise<void> {
 }
 
 async function saveEntry(staffId: string, date: string, shiftIds: string[], note = ""): Promise<boolean> {
+  if (scheduleEntrySaving.value) {
+    return false;
+  }
+
+  scheduleEntrySaving.value = true;
   try {
     data.value = await saveScheduleEntry({ staffId, date, shiftIds, note });
     return true;
   } catch (caughtError) {
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "排班保存失败");
     return false;
+  } finally {
+    scheduleEntrySaving.value = false;
   }
 }
 
 function canEditStaffId(staffId: string): boolean {
   return editableStaffIds.value.includes(staffId);
+}
+
+function mergeVisibleStaffOrder(visibleStaffIds: string[]): string[] {
+  if (!data.value) {
+    return [];
+  }
+
+  const visibleStaffIdSet = new Set(scheduleVisibleStaff.value.map((staff) => staff.id));
+  const nextVisibleStaffIds = [...visibleStaffIds];
+
+  return [...data.value.staff]
+    .sort((left, right) => left.sortOrder - right.sortOrder)
+    .map((staff) => {
+      if (!visibleStaffIdSet.has(staff.id)) {
+        return staff.id;
+      }
+
+      return nextVisibleStaffIds.shift() ?? staff.id;
+    });
+}
+
+function hasCompleteVisibleStaffOrder(visibleStaffIds: string[]): boolean {
+  const visibleStaffIdSet = new Set(scheduleVisibleStaff.value.map((staff) => staff.id));
+  return (
+    visibleStaffIds.length === visibleStaffIdSet.size &&
+    new Set(visibleStaffIds).size === visibleStaffIds.length &&
+    visibleStaffIds.every((staffId) => visibleStaffIdSet.has(staffId))
+  );
 }
 
 function clearScheduleStaffSearch(): void {
@@ -1125,6 +1186,60 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 
   if (await saveEntry(editingStaffId.value, editingDate.value, shiftIds, note)) {
     editorOpen.value = false;
+  }
+}
+
+async function handleReorderStaff(visibleStaffIds: unknown): Promise<void> {
+  if (!data.value || !canReorderScheduleStaff.value || staffOrderSaving.value) {
+    return;
+  }
+
+  if (!Array.isArray(visibleStaffIds) || !visibleStaffIds.every((staffId) => typeof staffId === "string")) {
+    ElMessage.error("人员排序保存失败");
+    return;
+  }
+
+  if (!hasCompleteVisibleStaffOrder(visibleStaffIds)) {
+    ElMessage.error("人员排序保存失败");
+    return;
+  }
+
+  const staffIds = mergeVisibleStaffOrder(visibleStaffIds);
+  if (staffIds.length !== data.value.staff.length || new Set(staffIds).size !== data.value.staff.length) {
+    ElMessage.error("人员排序保存失败");
+    return;
+  }
+
+  const requestId = (staffOrderRequestId.value += 1);
+  const requestUserId = currentUser.value?.id ?? null;
+  staffOrderSaving.value = true;
+  try {
+    const savedData = await saveStaffOrder(staffIds);
+    if (!canApplyStaffOrderRequest(requestId, requestUserId)) {
+      return;
+    }
+
+    if (activeWorkbenchTab.value === "config") {
+      cancelConfigLoadRequest();
+      cancelConfigReadRequests();
+    }
+
+    data.value = savedData;
+    staffSaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
+    if (!canApplyStaffOrderRequest(requestId, requestUserId)) {
+      return;
+    }
+
+    ElMessage.success("人员顺序已更新");
+  } catch (caughtError) {
+    if (canApplyStaffOrderRequest(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员排序保存失败");
+    }
+  } finally {
+    if (staffOrderRequestId.value === requestId) {
+      staffOrderSaving.value = false;
+    }
   }
 }
 
@@ -1444,6 +1559,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   cancelPrintPdfRequest();
   cancelConfigRequests();
+  cancelStaffOrderRequest();
   document.removeEventListener("click", handleDocumentClick);
 });
 </script>
@@ -1640,8 +1756,10 @@ onBeforeUnmount(() => {
               :entries="data.scheduleEntries"
               :selected-shift-id="selectedShiftId"
               :editable-staff-ids="editableStaffIds"
+              :can-reorder-staff="canReorderScheduleStaff"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
+              @reorder-staff="handleReorderStaff"
             />
           </section>
           <section v-show="activeWorkbenchTab === 'query'" class="workbench-tab-panel" data-testid="workbench-panel-query">

@@ -439,6 +439,28 @@ function parseStaffPayload(body: unknown, id: string): StaffMember | null {
   return { id, jobId: jobId.trim(), name: name.trim(), type, isAdmin, enabled, sortOrder };
 }
 
+function parseStaffOrderPayload(body: unknown): string[] | null {
+  if (!isRecord(body) || !Array.isArray(body.staffIds)) {
+    return null;
+  }
+
+  const staffIds: string[] = [];
+  for (const staffId of body.staffIds) {
+    if (!isNonEmptyString(staffId)) {
+      return null;
+    }
+
+    staffIds.push(staffId.trim());
+  }
+
+  const uniqueStaffIds = new Set(staffIds);
+  if (uniqueStaffIds.size !== staffIds.length) {
+    return null;
+  }
+
+  return staffIds;
+}
+
 function parseShiftPayload(body: unknown, id: string): Shift | null {
   if (!isRecord(body)) {
     return null;
@@ -1005,6 +1027,43 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         authStore.countAuditLogs(normalizedQuery)
       ]);
       response.json({ rows, total, page, pageSize });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.put("/data/staff-order", requireAdmin, async (request, response, next) => {
+    try {
+      const staffIds = parseStaffOrderPayload(request.body);
+      if (!staffIds) {
+        response.status(400).json({ message: "人员排序信息不完整" });
+        return;
+      }
+
+      const nextData = await storage.update((data) => {
+        if (staffIds.length !== data.staff.length) {
+          throw new HttpResponseError(400, "人员排序必须包含全部人员");
+        }
+
+        const staffById = new Map(data.staff.map((staff) => [staff.id, staff]));
+        const staff = staffIds.map((staffId, index) => {
+          const staffMember = staffById.get(staffId);
+          if (!staffMember) {
+            throw new HttpResponseError(400, "人员排序包含不存在的人员");
+          }
+
+          return { ...staffMember, sortOrder: index + 1 };
+        });
+
+        return {
+          ...data,
+          staff
+        };
+      });
+
+      const summary = `调整人员排序：${nextData.staff.map((staff, index) => `${index + 1}.${staff.name}`).join("、")}`;
+      await recordAudit(request, "data.staff.order", "staff", "order", summary);
+      response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);
     }

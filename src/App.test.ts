@@ -24,6 +24,7 @@ const apiMocks = vi.hoisted(() => ({
   saveScheduleEntry: vi.fn(),
   saveShift: vi.fn(),
   saveStaff: vi.fn(),
+  saveStaffOrder: vi.fn(),
   saveUser: vi.fn()
 }));
 
@@ -137,6 +138,53 @@ const mixedCaseStaffData: PublicAppData = {
       sortOrder: 3
     }
   ]
+};
+
+const threeStaffData: PublicAppData = {
+  ...mixedCaseStaffData
+};
+
+const hiddenStaffOrderData: PublicAppData = {
+  ...testData,
+  staff: [
+    {
+      id: "staff-visible-001",
+      jobId: "200001",
+      name: "可见一",
+      type: "nurse",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 1
+    },
+    {
+      id: "staff-hidden-002",
+      jobId: "200002",
+      name: "隐藏二",
+      type: "nurse",
+      isAdmin: false,
+      enabled: false,
+      sortOrder: 2
+    },
+    {
+      id: "staff-visible-003",
+      jobId: "200003",
+      name: "可见三",
+      type: "nurse",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 3
+    },
+    {
+      id: "staff-visible-004",
+      jobId: "200004",
+      name: "可见四",
+      type: "clerk",
+      isAdmin: false,
+      enabled: true,
+      sortOrder: 4
+    }
+  ],
+  scheduleEntries: []
 };
 
 const queryStaffData: PublicAppData = {
@@ -304,13 +352,42 @@ const AppToolbarStub = defineComponent({
 
 const ScheduleGridStub = defineComponent({
   name: "ScheduleGrid",
-  props: ["staff", "days", "editableStaffIds"],
-  emits: ["quickFill", "editCell"],
+  props: ["staff", "days", "editableStaffIds", "canReorderStaff"],
+  emits: ["quickFill", "editCell", "reorderStaff"],
   template: `
     <section>
       <span data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</span>
       <span data-testid="schedule-staff-ids">{{ staff.map((person) => person.id).join(",") }}</span>
       <span data-testid="schedule-editable-staff-ids">{{ editableStaffIds?.join(",") }}</span>
+      <span data-testid="schedule-can-reorder-staff">{{ String(canReorderStaff) }}</span>
+      <button
+        data-testid="emit-reorder-staff"
+        type="button"
+        @click="$emit('reorderStaff', staff.slice().sort((left, right) => left.sortOrder - right.sortOrder).map((person) => person.id).reverse())"
+      >
+        reorder staff
+      </button>
+      <button
+        data-testid="emit-invalid-reorder-staff"
+        type="button"
+        @click="$emit('reorderStaff', staff.slice(0, 1).map((person) => person.id))"
+      >
+        invalid reorder staff
+      </button>
+      <button
+        data-testid="emit-non-array-reorder-staff"
+        type="button"
+        @click="$emit('reorderStaff', 'abc')"
+      >
+        non-array reorder staff
+      </button>
+      <button
+        data-testid="emit-duplicate-reorder-staff"
+        type="button"
+        @click="$emit('reorderStaff', [staff[0]?.id, staff[0]?.id, 'staff-missing'])"
+      >
+        duplicate reorder staff
+      </button>
       <button
         data-testid="emit-unmanaged-quick-fill"
         type="button"
@@ -2002,6 +2079,254 @@ describe("App", () => {
     expect((wrapper.get('[data-testid="schedule-staff-search"]').element as HTMLInputElement).value).toBe("");
     expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001,staff-nurse-002");
     expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
+  });
+
+  it("persists schedule reorder for admins with the full staff order", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("true");
+
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).toHaveBeenCalledWith([
+      "staff-clerk-abc",
+      "staff-nurse-002",
+      "staff-nurse-001"
+    ]);
+    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("人员顺序已更新");
+  });
+
+  it("does not let schedulers reorder schedule staff", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(
+      threeStaffData,
+      createSchedulerUser(["staff-nurse-001", "staff-nurse-002", "staff-clerk-abc"])
+    );
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("false");
+
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+  });
+
+  it("disables schedule reorder while a staff search is active", async () => {
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("true");
+
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("王护士");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-002");
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("false");
+  });
+
+  it("ignores schedule reorder events while a staff search is active", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("王护士");
+    await nextTick();
+
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+  });
+
+  it("preserves hidden staff positions when saving a schedule reorder", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(hiddenStaffOrderData));
+    const wrapper = mountApp(hiddenStaffOrderData);
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe(
+      "staff-visible-001,staff-visible-003,staff-visible-004"
+    );
+
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).toHaveBeenCalledWith([
+      "staff-visible-004",
+      "staff-hidden-002",
+      "staff-visible-003",
+      "staff-visible-001"
+    ]);
+  });
+
+  it("rejects malformed schedule reorder payloads without saving", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(hiddenStaffOrderData));
+    const wrapper = mountApp(hiddenStaffOrderData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-invalid-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+    expect(elementPlusMocks.ElMessage.error).toHaveBeenCalledWith("人员排序保存失败");
+  });
+
+  it("rejects non-array schedule reorder payloads without saving", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(hiddenStaffOrderData));
+    const wrapper = mountApp(hiddenStaffOrderData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-non-array-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+    expect(elementPlusMocks.ElMessage.error).toHaveBeenCalledWith("人员排序保存失败");
+  });
+
+  it("rejects duplicate and unknown schedule reorder payloads without saving", async () => {
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(hiddenStaffOrderData));
+    const wrapper = mountApp(hiddenStaffOrderData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-duplicate-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+    expect(elementPlusMocks.ElMessage.error).toHaveBeenCalledWith("人员排序保存失败");
+  });
+
+  it("keeps schedule cells read-only and ignores cell edits while staff order is saving", async () => {
+    const saveStaffOrderRequest = createDeferred<PublicAppData>();
+    apiMocks.saveStaffOrder.mockReturnValueOnce(saveStaffOrderRequest.promise);
+    apiMocks.saveScheduleEntry.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="select-shift-a1"]').trigger("click");
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-editable-staff-ids"]').text()).toBe("");
+
+    await wrapper.get('[data-testid="emit-unmanaged-quick-fill"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveScheduleEntry).not.toHaveBeenCalled();
+
+    await wrapper.get('[data-testid="emit-unmanaged-edit-cell"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.find('[data-testid="cell-editor"]').exists()).toBe(false);
+
+    saveStaffOrderRequest.resolve(structuredClone(threeStaffData));
+    await flushPromises();
+  });
+
+  it("blocks schedule reorder while a schedule entry save is pending", async () => {
+    const saveEntryRequest = createDeferred<PublicAppData>();
+    apiMocks.saveScheduleEntry.mockReturnValueOnce(saveEntryRequest.promise);
+    apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="select-shift-a1"]').trigger("click");
+    await wrapper.get('[data-testid="emit-unmanaged-quick-fill"]').trigger("click");
+    await nextTick();
+
+    expect(apiMocks.saveScheduleEntry).toHaveBeenCalledWith({
+      staffId: "staff-nurse-002",
+      date: "2026-06-15",
+      shiftIds: ["shift-a1"],
+      note: ""
+    });
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("false");
+
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+
+    saveEntryRequest.resolve(structuredClone(threeStaffData));
+    await flushPromises();
+
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("true");
+  });
+
+  it("blocks config mutations while staff order is saving", async () => {
+    const saveStaffOrderRequest = createDeferred<PublicAppData>();
+    apiMocks.saveStaffOrder.mockReturnValueOnce(saveStaffOrderRequest.promise);
+    apiMocks.saveStaff.mockResolvedValue(structuredClone(threeStaffData));
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await nextTick();
+
+    expect(apiMocks.saveStaffOrder).toHaveBeenCalledTimes(1);
+
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-save-staff"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.saveStaff).not.toHaveBeenCalled();
+
+    saveStaffOrderRequest.resolve(structuredClone(threeStaffData));
+    await flushPromises();
+  });
+
+  it("refreshes latest audit logs if the config tab is active when schedule reorder completes", async () => {
+    const saveStaffOrderRequest = createDeferred<PublicAppData>();
+    apiMocks.saveStaffOrder.mockReturnValueOnce(saveStaffOrderRequest.promise);
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await nextTick();
+
+    await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(1);
+
+    saveStaffOrderRequest.resolve(structuredClone(threeStaffData));
+    await flushPromises();
+
+    expect(apiMocks.listAuditLogs).toHaveBeenCalledTimes(2);
+    expect(apiMocks.listAuditLogs).toHaveBeenLastCalledWith({ page: 1, pageSize: 20 }, expect.any(Object));
+  });
+
+  it("ignores stale schedule reorder completions after logout", async () => {
+    const saveStaffOrderRequest = createDeferred<PublicAppData>();
+    apiMocks.saveStaffOrder.mockReturnValueOnce(saveStaffOrderRequest.promise);
+    apiMocks.logout.mockResolvedValueOnce(undefined);
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await nextTick();
+
+    await wrapper.get('[data-testid="header-user-menu-button"]').trigger("click");
+    await nextTick();
+    await wrapper.get('[data-testid="logout-button"]').trigger("click");
+    await flushPromises();
+
+    expect(wrapper.find(".app-shell").exists()).toBe(false);
+    elementPlusMocks.ElMessage.success.mockClear();
+
+    saveStaffOrderRequest.resolve(structuredClone(threeStaffData));
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessage.success).not.toHaveBeenCalledWith("人员顺序已更新");
+    expect(wrapper.find(".app-shell").exists()).toBe(false);
   });
 
   it("places week controls, schedule search, count, and batch actions in one operation row", async () => {

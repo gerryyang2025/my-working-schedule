@@ -403,36 +403,58 @@ describe("main.css layout rules", () => {
     expect(stickyHeader).toContain("z-index: 6");
 
     expect(sortColumnRules).toHaveLength(2);
-    expect(sortColumnRules[0]).toContain("width: var(--sort-col-width, 54px)");
-    expect(sortColumnRules[0]).toContain("min-width: var(--sort-col-width, 54px)");
-    expect(sortColumnRules[0]).toContain("max-width: var(--sort-col-width, 54px)");
+    expect(sortColumnRules[0]).toContain("width: var(--sort-col-width, 68px)");
+    expect(sortColumnRules[0]).toContain("min-width: var(--sort-col-width, 68px)");
+    expect(sortColumnRules[0]).toContain("max-width: var(--sort-col-width, 68px)");
     expect(sortColumnRules[0]).toContain("left: 0");
-    expect(sortColumnRules[1]).toContain("width: var(--sort-col-mobile-width, 42px)");
-    expect(sortColumnRules[1]).toContain("min-width: var(--sort-col-mobile-width, 42px)");
-    expect(sortColumnRules[1]).toContain("max-width: var(--sort-col-mobile-width, 42px)");
+    expect(sortColumnRules[1]).toContain("width: var(--sort-col-mobile-width, 58px)");
+    expect(sortColumnRules[1]).toContain("min-width: var(--sort-col-mobile-width, 58px)");
+    expect(sortColumnRules[1]).toContain("max-width: var(--sort-col-mobile-width, 58px)");
 
     expect(personColumnRules).toHaveLength(2);
     expect(personColumnRules[0]).toContain("width: var(--person-col-width, 88px)");
     expect(personColumnRules[0]).toContain("min-width: var(--person-col-width, 88px)");
     expect(personColumnRules[0]).toContain("max-width: var(--person-col-width, 88px)");
-    expect(personColumnRules[0]).toContain("left: var(--person-col-left, 54px)");
+    expect(personColumnRules[0]).toContain("left: var(--person-col-left, 68px)");
     expect(personColumnRules[0]).toContain("text-align: left");
     expect(personColumnRules[0]).toContain("padding: 0 6px");
     expect(personColumnRules[1]).toContain("width: var(--person-col-mobile-width, 72px)");
     expect(personColumnRules[1]).toContain("min-width: var(--person-col-mobile-width, 72px)");
     expect(personColumnRules[1]).toContain("max-width: var(--person-col-mobile-width, 72px)");
-    expect(personColumnRules[1]).toContain("left: var(--person-col-mobile-left, 42px)");
+    expect(personColumnRules[1]).toContain("left: var(--person-col-mobile-left, 58px)");
     expect(personColumnRules[1]).toContain("padding: 0 5px");
 
     expect(typeColumnRules).toHaveLength(2);
     expect(typeColumnRules[0]).toContain("width: var(--type-col-width, 58px)");
     expect(typeColumnRules[0]).toContain("min-width: var(--type-col-width, 58px)");
     expect(typeColumnRules[0]).toContain("max-width: var(--type-col-width, 58px)");
-    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 142px)");
+    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 156px)");
     expect(typeColumnRules[1]).toContain("width: var(--type-col-mobile-width, 46px)");
     expect(typeColumnRules[1]).toContain("min-width: var(--type-col-mobile-width, 46px)");
     expect(typeColumnRules[1]).toContain("max-width: var(--type-col-mobile-width, 46px)");
-    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 114px)");
+    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 130px)");
+  });
+
+  it("styles staff reorder controls as compact usable sort-column controls", () => {
+    const sortOrderValue = ruleBlocks(".schedule-grid .sort-order-value")[0] ?? "";
+    const reorderControls = ruleBlocks(".schedule-grid .staff-reorder-controls")[0] ?? "";
+    const reorderButton = ruleBlocks(".schedule-grid .staff-reorder-button")[0] ?? "";
+    const disabledReorderButton = ruleBlocks(".schedule-grid .staff-reorder-button:disabled")[0] ?? "";
+
+    expect(sortOrderValue).toContain("display: block");
+    expect(sortOrderValue).toContain("font-weight: 800");
+    expect(reorderControls).toContain("display: inline-flex");
+    expect(reorderControls).toContain("align-items: center");
+    expect(reorderControls).toContain("justify-content: center");
+    expect(reorderControls).toContain("gap: 2px");
+    expect(reorderButton).toContain("display: inline-flex");
+    expect(reorderButton).toContain("align-items: center");
+    expect(reorderButton).toContain("justify-content: center");
+    expect(reorderButton).toContain("width: 24px");
+    expect(reorderButton).toContain("height: 24px");
+    expect(reorderButton).toContain("min-width: 24px");
+    expect(disabledReorderButton).toContain("cursor: not-allowed");
+    expect(disabledReorderButton).toContain("opacity: 0.45");
   });
 
   it("renders live shift marks as centered text without chip boxes", () => {

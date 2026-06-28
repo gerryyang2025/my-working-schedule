@@ -35,6 +35,36 @@ const staff: StaffMember[] = [
   }
 ];
 
+const reorderableStaff: StaffMember[] = [
+  {
+    id: "staff-a",
+    jobId: "N001",
+    name: "甲护士",
+    type: "nurse",
+    isAdmin: false,
+    enabled: true,
+    sortOrder: 1
+  },
+  {
+    id: "staff-b",
+    jobId: "N002",
+    name: "乙护士",
+    type: "nurse",
+    isAdmin: false,
+    enabled: true,
+    sortOrder: 2
+  },
+  {
+    id: "staff-c",
+    jobId: "N003",
+    name: "丙护士",
+    type: "nurse",
+    isAdmin: false,
+    enabled: true,
+    sortOrder: 3
+  }
+];
+
 const shifts: Shift[] = [
   {
     id: "shift-day",
@@ -85,6 +115,57 @@ describe("ScheduleGrid", () => {
     expect(firstRow.get(".person-col").text()).toContain("在职护士");
     expect(firstRow.get(".person-col").text()).toContain("N001");
     expect(firstRow.get(".type-col").text()).toBe("护士");
+  });
+
+  it("emits reordered visible staff ids from staff move controls", async () => {
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true
+    });
+
+    await wrapper.get('[data-testid="move-staff-down-staff-a"]').trigger("click");
+    expect(wrapper.emitted("reorderStaff")).toEqual([[["staff-b", "staff-a", "staff-c"]]]);
+
+    await wrapper.setProps({
+      staff: [
+        { ...reorderableStaff[1], sortOrder: 1 },
+        { ...reorderableStaff[0], sortOrder: 2 },
+        { ...reorderableStaff[2], sortOrder: 3 }
+      ]
+    });
+
+    await wrapper.get('[data-testid="move-staff-up-staff-c"]').trigger("click");
+
+    expect(wrapper.emitted("reorderStaff")).toEqual([
+      [["staff-b", "staff-a", "staff-c"]],
+      [["staff-b", "staff-c", "staff-a"]]
+    ]);
+  });
+
+  it("disables staff move controls at the visible list edges", () => {
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true
+    });
+
+    expect(wrapper.get('[data-testid="move-staff-up-staff-a"]').attributes("disabled")).toBeDefined();
+    expect(wrapper.get('[data-testid="move-staff-down-staff-a"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('[data-testid="move-staff-up-staff-b"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('[data-testid="move-staff-down-staff-b"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('[data-testid="move-staff-up-staff-c"]').attributes("disabled")).toBeUndefined();
+    expect(wrapper.get('[data-testid="move-staff-down-staff-c"]').attributes("disabled")).toBeDefined();
+  });
+
+  it("hides staff move controls unless staff reordering is enabled", () => {
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id)
+    });
+
+    expect(wrapper.find('[data-testid="move-staff-up-staff-a"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="move-staff-down-staff-a"]').exists()).toBe(false);
   });
 
   it("shows all configured staff type labels and keeps rows sorted by sort id", () => {
@@ -198,14 +279,14 @@ describe("ScheduleGrid", () => {
 
     expect(tableStyle.getPropertyValue("--person-col-width")).toBe("88px");
     expect(tableStyle.getPropertyValue("--person-col-mobile-width")).toBe("80px");
-    expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("54px");
+    expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("68px");
     expect(tableStyle.getPropertyValue("--type-col-width")).toBe("58px");
-    expect(tableStyle.getPropertyValue("--person-col-left")).toBe("54px");
-    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("142px");
-    expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("42px");
+    expect(tableStyle.getPropertyValue("--person-col-left")).toBe("68px");
+    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("156px");
+    expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("58px");
     expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("46px");
-    expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("42px");
-    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("122px");
+    expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("58px");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("138px");
   });
 
   it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {

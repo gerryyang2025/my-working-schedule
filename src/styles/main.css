@@ -632,19 +632,61 @@ body {
 }
 
 .schedule-grid .sort-col {
-  width: var(--sort-col-width, 54px);
-  min-width: var(--sort-col-width, 54px);
-  max-width: var(--sort-col-width, 54px);
+  width: var(--sort-col-width, 68px);
+  min-width: var(--sort-col-width, 68px);
+  max-width: var(--sort-col-width, 68px);
   left: 0;
   text-align: center;
   padding: 0 4px;
+}
+
+.schedule-grid .sort-order-value {
+  display: block;
+  color: #0f172a;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.schedule-grid .staff-reorder-controls {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 3px;
+  white-space: nowrap;
+}
+
+.schedule-grid .staff-reorder-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #1e293b;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.schedule-grid .staff-reorder-button:disabled {
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .schedule-grid .person-col {
   width: var(--person-col-width, 88px);
   min-width: var(--person-col-width, 88px);
   max-width: var(--person-col-width, 88px);
-  left: var(--person-col-left, 54px);
+  left: var(--person-col-left, 68px);
   text-align: left;
   padding: 0 6px;
 }
@@ -653,7 +695,7 @@ body {
   width: var(--type-col-width, 58px);
   min-width: var(--type-col-width, 58px);
   max-width: var(--type-col-width, 58px);
-  left: var(--type-col-left, 142px);
+  left: var(--type-col-left, 156px);
   text-align: center;
   padding: 0 4px;
   font-weight: 700;
@@ -1429,9 +1471,9 @@ body {
   }
 
   .schedule-grid .sort-col {
-    width: var(--sort-col-mobile-width, 42px);
-    min-width: var(--sort-col-mobile-width, 42px);
-    max-width: var(--sort-col-mobile-width, 42px);
+    width: var(--sort-col-mobile-width, 58px);
+    min-width: var(--sort-col-mobile-width, 58px);
+    max-width: var(--sort-col-mobile-width, 58px);
     padding: 0 3px;
   }
 
@@ -1439,7 +1481,7 @@ body {
     width: var(--person-col-mobile-width, 72px);
     min-width: var(--person-col-mobile-width, 72px);
     max-width: var(--person-col-mobile-width, 72px);
-    left: var(--person-col-mobile-left, 42px);
+    left: var(--person-col-mobile-left, 58px);
     padding: 0 5px;
   }
 
@@ -1447,7 +1489,7 @@ body {
     width: var(--type-col-mobile-width, 46px);
     min-width: var(--type-col-mobile-width, 46px);
     max-width: var(--type-col-mobile-width, 46px);
-    left: var(--type-col-mobile-left, 114px);
+    left: var(--type-col-mobile-left, 130px);
     padding: 0 3px;
   }
 
