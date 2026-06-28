@@ -435,6 +435,28 @@ body {
   justify-content: flex-end;
 }
 
+.schedule-efficiency-tools {
+  display: flex;
+  flex: 1 1 520px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+  margin-left: auto;
+}
+
+.schedule-efficiency-title {
+  flex: 0 0 auto;
+  color: #334155;
+  font-size: 13px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.schedule-operation-row .schedule-efficiency-tools .schedule-actions {
+  margin-left: 0;
+}
+
 .schedule-search-empty {
   margin: 0 0 8px;
   border: 1px dashed #cbd5e1;
@@ -601,6 +623,13 @@ body {
   border: 1px solid #dbe3ef;
   padding: 8px;
   background: #ffffff;
+}
+
+.schedule-efficiency-tools .schedule-reorder-toolbar {
+  flex: 0 1 auto;
+  border: 0;
+  background: transparent;
+  padding: 0;
 }
 
 .schedule-reorder-controls {
@@ -1481,6 +1510,21 @@ body {
 
   .schedule-operation-row .schedule-search-input {
     flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .schedule-efficiency-tools {
+    display: grid;
+    width: 100%;
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .schedule-efficiency-title {
+    width: 100%;
+  }
+
+  .schedule-efficiency-tools .schedule-reorder-toolbar {
     width: 100%;
   }
 

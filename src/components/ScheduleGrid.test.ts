@@ -173,48 +173,29 @@ describe("ScheduleGrid", () => {
     expect(wrapper.find(".staff-reorder-button").exists()).toBe(false);
   });
 
-  it("emits reordered visible staff ids from the shared staff toolbar", async () => {
-    const upWrapper = mountGrid([], {
+  it("does not render reorder toolbar controls inside the schedule grid", () => {
+    const wrapper = mountGrid([], {
       staff: reorderableStaff,
       editableStaffIds: reorderableStaff.map((person) => person.id),
       canReorderStaff: true,
       selectedStaffId: "staff-b"
     });
 
-    expect(upWrapper.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员和排班排序");
-    expect(upWrapper.get('[data-testid="schedule-only-reorder-label"]').text()).toBe("仅排班排序");
-    expect(upWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("已选：乙护士 N002");
-
-    await upWrapper.get('[data-testid="schedule-reorder-up"]').trigger("click");
-    expect(upWrapper.emitted("reorderStaff")).toEqual([[["staff-b", "staff-a", "staff-c"]]]);
-    await upWrapper.get('[data-testid="schedule-only-reorder-up"]').trigger("click");
-    expect(upWrapper.emitted("swapSchedule")).toEqual([["up"]]);
-
-    const downWrapper = mountGrid([], {
-      staff: reorderableStaff,
-      editableStaffIds: reorderableStaff.map((person) => person.id),
-      canReorderStaff: true,
-      selectedStaffId: "staff-b"
-    });
-
-    await downWrapper.get('[data-testid="schedule-reorder-down"]').trigger("click");
-    expect(downWrapper.emitted("reorderStaff")).toEqual([[["staff-a", "staff-c", "staff-b"]]]);
-    await downWrapper.get('[data-testid="schedule-only-reorder-down"]').trigger("click");
-    expect(downWrapper.emitted("swapSchedule")).toEqual([["down"]]);
+    expect(wrapper.find('[data-testid="schedule-reorder-toolbar"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="schedule-reorder-up"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="schedule-only-reorder-up"]').exists()).toBe(false);
+    expect(wrapper.get("tbody tr.selected-staff-row").text()).toContain("乙护士");
   });
 
-  it("disables shared staff toolbar actions with no selection or edge selections", () => {
+  it("keeps row selection edge states without rendering toolbar buttons", () => {
     const noSelectionWrapper = mountGrid([], {
       staff: reorderableStaff,
       editableStaffIds: reorderableStaff.map((person) => person.id),
       canReorderStaff: true
     });
 
-    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("请选择人员");
-    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
-    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
-    expect(noSelectionWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeDefined();
-    expect(noSelectionWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeDefined();
+    expect(noSelectionWrapper.find('[data-testid="schedule-reorder-toolbar"]').exists()).toBe(false);
+    expect(noSelectionWrapper.findAll("tbody tr.selected-staff-row")).toHaveLength(0);
 
     const firstWrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -223,10 +204,7 @@ describe("ScheduleGrid", () => {
       selectedStaffId: "staff-a"
     });
 
-    expect(firstWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
-    expect(firstWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeUndefined();
-    expect(firstWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeDefined();
-    expect(firstWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeUndefined();
+    expect(firstWrapper.get("tbody tr.selected-staff-row").text()).toContain("甲护士");
 
     const lastWrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -235,10 +213,7 @@ describe("ScheduleGrid", () => {
       selectedStaffId: "staff-c"
     });
 
-    expect(lastWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeUndefined();
-    expect(lastWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
-    expect(lastWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeUndefined();
-    expect(lastWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeDefined();
+    expect(lastWrapper.get("tbody tr.selected-staff-row").text()).toContain("丙护士");
   });
 
   it("hides the shared staff toolbar unless staff reordering is available", () => {

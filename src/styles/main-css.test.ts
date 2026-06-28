@@ -243,6 +243,10 @@ describe("main.css layout rules", () => {
     const rowSearchRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search");
     const rowSearchInputRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search-input");
     const rowActionsRules = ruleBlockIn(css, ".schedule-operation-row .schedule-actions");
+    const efficiencyRules = ruleBlocks(".schedule-efficiency-tools")[0] ?? "";
+    const efficiencyTitleRules = ruleBlocks(".schedule-efficiency-title")[0] ?? "";
+    const efficiencyToolbarRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-reorder-toolbar");
+    const efficiencyActionsRules = ruleBlockIn(css, ".schedule-operation-row .schedule-efficiency-tools .schedule-actions");
 
     expect(operationRowRules).toContain("display: flex");
     expect(operationRowRules).toContain("flex-wrap: wrap");
@@ -282,6 +286,17 @@ describe("main.css layout rules", () => {
     expect(rowActionsRules).toContain("margin-left: auto");
     expect(rowActionsRules).toContain("margin-bottom: 0");
     expect(rowActionsRules).toContain("justify-content: flex-end");
+    expect(efficiencyRules).toContain("display: flex");
+    expect(efficiencyRules).toContain("flex: 1 1 520px");
+    expect(efficiencyRules).toContain("justify-content: flex-end");
+    expect(efficiencyRules).toContain("gap: 8px");
+    expect(efficiencyRules).toContain("margin-left: auto");
+    expect(efficiencyTitleRules).toContain("font-size: 13px");
+    expect(efficiencyTitleRules).toContain("font-weight: 800");
+    expect(efficiencyTitleRules).toContain("white-space: nowrap");
+    expect(efficiencyToolbarRules).toContain("border: 0");
+    expect(efficiencyToolbarRules).toContain("padding: 0");
+    expect(efficiencyActionsRules).toContain("margin-left: 0");
   });
 
   it("stacks the schedule staff search controls on mobile", () => {
@@ -296,6 +311,9 @@ describe("main.css layout rules", () => {
     const mobileRowSearch = ruleBlockIn(mobileCss, ".schedule-operation-row .schedule-search");
     const mobileRowSearchInput = ruleBlockIn(mobileCss, ".schedule-operation-row .schedule-search-input");
     const mobileActions = ruleBlockIn(mobileCss, ".schedule-actions");
+    const mobileEfficiency = ruleBlockIn(mobileCss, ".schedule-efficiency-tools");
+    const mobileEfficiencyTitle = ruleBlockIn(mobileCss, ".schedule-efficiency-title");
+    const mobileEfficiencyToolbar = ruleBlockIn(mobileCss, ".schedule-efficiency-tools .schedule-reorder-toolbar");
 
     expect(mobileSearch).toContain("display: grid");
     expect(mobileSearch).toContain("grid-template-columns: 1fr");
@@ -316,6 +334,12 @@ describe("main.css layout rules", () => {
     expect(mobileRowSearchInput).toContain("width: 100%");
     expect(mobileRowSearchInput).toContain("flex: 1 1 auto");
     expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(mobileEfficiency).toContain("display: grid");
+    expect(mobileEfficiency).toContain("width: 100%");
+    expect(mobileEfficiency).toContain("margin-left: 0");
+    expect(mobileEfficiency).toContain("justify-content: stretch");
+    expect(mobileEfficiencyTitle).toContain("width: 100%");
+    expect(mobileEfficiencyToolbar).toContain("width: 100%");
   });
 
   it("hides compact app controls for print", () => {

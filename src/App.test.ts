@@ -2133,7 +2133,7 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("");
   });
 
-  it("persists schedule reorder for admins with the full staff order", async () => {
+  it("persists schedule reorder from the operation row for admins with the full staff order", async () => {
     apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
     const wrapper = mountApp(threeStaffData);
 
@@ -2144,19 +2144,15 @@ describe("App", () => {
     await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
     await nextTick();
 
-    await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-reorder-up"]').trigger("click");
     await flushPromises();
 
-    expect(apiMocks.saveStaffOrder).toHaveBeenCalledWith([
-      "staff-clerk-abc",
-      "staff-nurse-002",
-      "staff-nurse-001"
-    ]);
+    expect(apiMocks.saveStaffOrder).toHaveBeenCalledWith(["staff-nurse-002", "staff-nurse-001", "staff-clerk-abc"]);
     expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
     expect(elementPlusMocks.ElMessage.success).not.toHaveBeenCalledWith("人员顺序已更新");
   });
 
-  it("swaps only the selected week schedule with the adjacent staff without reordering staff", async () => {
+  it("swaps only the selected week schedule from the operation row without reordering staff", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 5, 17));
     apiMocks.swapWeekSchedule.mockResolvedValue({
@@ -2169,7 +2165,7 @@ describe("App", () => {
     await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
     await nextTick();
 
-    await wrapper.get('[data-testid="emit-swap-schedule-up"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-only-reorder-up"]').trigger("click");
     await flushPromises();
 
     expect(apiMocks.swapWeekSchedule).toHaveBeenCalledWith({
@@ -2410,7 +2406,7 @@ describe("App", () => {
     expect(wrapper.find(".app-shell").exists()).toBe(false);
   });
 
-  it("places week controls, schedule search, count, and batch actions in one operation row", async () => {
+  it("places week controls, schedule search, count, sorting, and batch actions in one operation row", async () => {
     const wrapper = mountApp(twoStaffData);
 
     await flushPromises();
@@ -2419,6 +2415,13 @@ describe("App", () => {
     expect(operationRow.find('[data-testid="schedule-week-controls"]').exists()).toBe(true);
     expect(operationRow.text()).toContain("搜索人员");
     expect(operationRow.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
+    expect(operationRow.find('[data-testid="schedule-efficiency-tools"]').exists()).toBe(true);
+    expect(operationRow.get(".schedule-efficiency-title").text()).toBe("排班效率工具");
+    expect(operationRow.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员和排班排序");
+    expect(operationRow.get('[data-testid="schedule-only-reorder-label"]').text()).toBe("仅排班排序");
+    expect(operationRow.get('[data-testid="schedule-reorder-selected"]').text()).toBe("请选择人员");
+    expect(operationRow.find('[data-testid="schedule-reorder-up"]').exists()).toBe(true);
+    expect(operationRow.find('[data-testid="schedule-only-reorder-up"]').exists()).toBe(true);
     expect(operationRow.find('[data-testid="copy-previous-week-button"]').exists()).toBe(true);
     expect(operationRow.find('[data-testid="batch-rest-week-button"]').exists()).toBe(true);
     expect(operationRow.find('[data-testid="batch-office-week-button"]').exists()).toBe(true);
@@ -2427,8 +2430,10 @@ describe("App", () => {
     const rowElement = operationRow.element;
     const weekControls = operationRow.get('[data-testid="schedule-week-controls"]').element;
     const search = operationRow.get(".schedule-search").element;
+    const efficiencyTools = operationRow.get('[data-testid="schedule-efficiency-tools"]').element;
     expect(rowElement.compareDocumentPosition(weekControls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(weekControls.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(search.compareDocumentPosition(efficiencyTools) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("filters schedule staff by trimmed case-insensitive job id", async () => {

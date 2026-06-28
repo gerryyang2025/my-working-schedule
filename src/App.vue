@@ -345,6 +345,23 @@ const canReorderScheduleStaff = computed(
     Boolean(data.value) &&
     scheduleVisibleStaff.value.length > 1
 );
+const canShowScheduleReorderTools = computed(
+  () =>
+    activeWorkbenchTab.value === "schedule" &&
+    canManageConfig.value &&
+    !hasScheduleStaffSearch.value &&
+    Boolean(data.value) &&
+    scheduleVisibleStaff.value.length > 1
+);
+const selectedScheduleStaff = computed(
+  () => filteredScheduleStaff.value.find((staff) => staff.id === selectedScheduleStaffId.value) ?? null
+);
+const selectedScheduleStaffIndex = computed(() =>
+  selectedScheduleStaffId.value ? filteredScheduleStaff.value.findIndex((staff) => staff.id === selectedScheduleStaffId.value) : -1
+);
+const selectedScheduleStaffLabel = computed(() =>
+  selectedScheduleStaff.value ? `已选：${selectedScheduleStaff.value.name} ${selectedScheduleStaff.value.jobId}` : "请选择人员"
+);
 const configPanelOpen = computed(() => activeWorkbenchTab.value === "config");
 const printPreviewOpen = computed({
   get: () => printPreviewMode.value !== null,
@@ -1181,13 +1198,35 @@ function adjacentScheduleStaffId(direction: ReorderDirection): string | null {
   }
 
   const visibleStaffIds = filteredScheduleStaff.value.map((staff) => staff.id);
-  const selectedIndex = visibleStaffIds.indexOf(selectedScheduleStaffId.value);
+  const selectedIndex = selectedScheduleStaffIndex.value;
   if (selectedIndex === -1) {
     return null;
   }
 
   const targetIndex = direction === "up" ? selectedIndex - 1 : selectedIndex + 1;
   return visibleStaffIds[targetIndex] ?? null;
+}
+
+function canMoveSelectedScheduleStaff(direction: ReorderDirection): boolean {
+  if (!canReorderScheduleStaff.value || selectedScheduleStaffIndex.value === -1) {
+    return false;
+  }
+
+  return direction === "up"
+    ? selectedScheduleStaffIndex.value > 0
+    : selectedScheduleStaffIndex.value < filteredScheduleStaff.value.length - 1;
+}
+
+function moveSelectedScheduleStaff(direction: ReorderDirection): void {
+  if (!canMoveSelectedScheduleStaff(direction)) {
+    return;
+  }
+
+  const staffIds = filteredScheduleStaff.value.map((staff) => staff.id);
+  const selectedIndex = selectedScheduleStaffIndex.value;
+  const targetIndex = direction === "up" ? selectedIndex - 1 : selectedIndex + 1;
+  [staffIds[selectedIndex], staffIds[targetIndex]] = [staffIds[targetIndex], staffIds[selectedIndex]];
+  void handleReorderStaff(staffIds);
 }
 
 function clearScheduleStaffSearch(): void {
@@ -1825,41 +1864,105 @@ onBeforeUnmount(() => {
                   未找到匹配人员
                 </p>
               </div>
-              <div class="schedule-actions">
-                <button
-                  data-testid="copy-previous-week-button"
-                  type="button"
-                  :disabled="!canEditSchedule || scheduleActionBusy"
-                  @click="handleCopyPreviousWeek"
+              <section class="schedule-efficiency-tools" data-testid="schedule-efficiency-tools" aria-label="排班效率工具">
+                <strong class="schedule-efficiency-title">排班效率工具</strong>
+                <div
+                  v-if="canShowScheduleReorderTools"
+                  class="schedule-reorder-toolbar"
+                  data-testid="schedule-reorder-toolbar"
                 >
-                  {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
-                </button>
-                <button
-                  data-testid="batch-rest-week-button"
-                  type="button"
-                  :disabled="!canEditSchedule || scheduleActionBusy"
-                  @click="handleBatchSetWeekShift('rest')"
-                >
-                  批量休息
-                </button>
-                <button
-                  data-testid="batch-office-week-button"
-                  type="button"
-                  :disabled="!canEditSchedule || scheduleActionBusy"
-                  @click="handleBatchSetWeekShift('office')"
-                >
-                  批量办公
-                </button>
-                <button
-                  class="danger-action"
-                  data-testid="clear-week-button"
-                  type="button"
-                  :disabled="!canEditSchedule || scheduleActionBusy"
-                  @click="handleClearWeek"
-                >
-                  批量清空
-                </button>
-              </div>
+                  <div class="schedule-reorder-controls">
+                    <div class="schedule-reorder-control-group">
+                      <span class="schedule-reorder-label" data-testid="schedule-reorder-label">人员和排班排序</span>
+                      <div class="schedule-reorder-actions" aria-label="调整人员和排班顺序">
+                        <button
+                          type="button"
+                          class="schedule-reorder-action"
+                          data-testid="schedule-reorder-up"
+                          aria-label="上移所选人员和排班"
+                          :disabled="!canMoveSelectedScheduleStaff('up')"
+                          @click="moveSelectedScheduleStaff('up')"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          class="schedule-reorder-action"
+                          data-testid="schedule-reorder-down"
+                          aria-label="下移所选人员和排班"
+                          :disabled="!canMoveSelectedScheduleStaff('down')"
+                          @click="moveSelectedScheduleStaff('down')"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                    <div class="schedule-reorder-control-group">
+                      <span class="schedule-reorder-label" data-testid="schedule-only-reorder-label">仅排班排序</span>
+                      <div class="schedule-reorder-actions" aria-label="仅调整排班顺序">
+                        <button
+                          type="button"
+                          class="schedule-reorder-action"
+                          data-testid="schedule-only-reorder-up"
+                          aria-label="上移所选人员的当前周排班"
+                          :disabled="!canMoveSelectedScheduleStaff('up')"
+                          @click="handleSwapSchedule('up')"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          type="button"
+                          class="schedule-reorder-action"
+                          data-testid="schedule-only-reorder-down"
+                          aria-label="下移所选人员的当前周排班"
+                          :disabled="!canMoveSelectedScheduleStaff('down')"
+                          @click="handleSwapSchedule('down')"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
+                    {{ selectedScheduleStaffLabel }}
+                  </span>
+                </div>
+                <div class="schedule-actions" aria-label="批量排班工具">
+                  <button
+                    data-testid="copy-previous-week-button"
+                    type="button"
+                    :disabled="!canEditSchedule || scheduleActionBusy"
+                    @click="handleCopyPreviousWeek"
+                  >
+                    {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
+                  </button>
+                  <button
+                    data-testid="batch-rest-week-button"
+                    type="button"
+                    :disabled="!canEditSchedule || scheduleActionBusy"
+                    @click="handleBatchSetWeekShift('rest')"
+                  >
+                    批量休息
+                  </button>
+                  <button
+                    data-testid="batch-office-week-button"
+                    type="button"
+                    :disabled="!canEditSchedule || scheduleActionBusy"
+                    @click="handleBatchSetWeekShift('office')"
+                  >
+                    批量办公
+                  </button>
+                  <button
+                    class="danger-action"
+                    data-testid="clear-week-button"
+                    type="button"
+                    :disabled="!canEditSchedule || scheduleActionBusy"
+                    @click="handleClearWeek"
+                  >
+                    批量清空
+                  </button>
+                </div>
+              </section>
             </div>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid

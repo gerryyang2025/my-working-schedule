@@ -51,8 +51,6 @@ const sortedStaff = computed(() =>
     .sort((left, right) => left.sortOrder - right.sortOrder)
 );
 const showStaffReorderControls = computed(() => props.canReorderStaff && sortedStaff.value.length > 1);
-const selectedStaffIndex = computed(() => sortedStaff.value.findIndex((staff) => staff.id === props.selectedStaffId));
-const selectedStaff = computed(() => sortedStaff.value[selectedStaffIndex.value] ?? null);
 const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
@@ -116,34 +114,6 @@ function canEditStaff(staff: StaffMember): boolean {
   return staff.enabled && editableStaffIdSet.value.has(staff.id);
 }
 
-function canMoveSelectedStaff(direction: "up" | "down"): boolean {
-  if (!showStaffReorderControls.value || selectedStaff.value === null) {
-    return false;
-  }
-
-  return direction === "up" ? selectedStaffIndex.value > 0 : selectedStaffIndex.value < sortedStaff.value.length - 1;
-}
-
-function moveSelectedStaff(direction: "up" | "down"): void {
-  if (!canMoveSelectedStaff(direction)) {
-    return;
-  }
-
-  const staffIds = sortedStaff.value.map((staff) => staff.id);
-  const staffIndex = selectedStaffIndex.value;
-  const swapIndex = direction === "up" ? staffIndex - 1 : staffIndex + 1;
-  [staffIds[staffIndex], staffIds[swapIndex]] = [staffIds[swapIndex], staffIds[staffIndex]];
-  emit("reorderStaff", staffIds);
-}
-
-function swapSelectedSchedule(direction: "up" | "down"): void {
-  if (!canMoveSelectedStaff(direction)) {
-    return;
-  }
-
-  emit("swapSchedule", direction);
-}
-
 function selectStaff(staffId: string): void {
   if (!props.canReorderStaff) {
     return;
@@ -186,63 +156,6 @@ onBeforeUnmount(() => {
 
 <template>
   <section class="schedule-grid-panel">
-    <div v-if="showStaffReorderControls" class="schedule-reorder-toolbar" data-testid="schedule-reorder-toolbar">
-      <div class="schedule-reorder-controls">
-        <div class="schedule-reorder-control-group">
-          <span class="schedule-reorder-label" data-testid="schedule-reorder-label">人员和排班排序</span>
-          <div class="schedule-reorder-actions" aria-label="调整人员和排班顺序">
-            <button
-              type="button"
-              class="schedule-reorder-action"
-              data-testid="schedule-reorder-up"
-              aria-label="上移所选人员和排班"
-              :disabled="!canMoveSelectedStaff('up')"
-              @click="moveSelectedStaff('up')"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              class="schedule-reorder-action"
-              data-testid="schedule-reorder-down"
-              aria-label="下移所选人员和排班"
-              :disabled="!canMoveSelectedStaff('down')"
-              @click="moveSelectedStaff('down')"
-            >
-              ↓
-            </button>
-          </div>
-        </div>
-        <div class="schedule-reorder-control-group">
-          <span class="schedule-reorder-label" data-testid="schedule-only-reorder-label">仅排班排序</span>
-          <div class="schedule-reorder-actions" aria-label="仅调整排班顺序">
-            <button
-              type="button"
-              class="schedule-reorder-action"
-              data-testid="schedule-only-reorder-up"
-              aria-label="上移所选人员的当前周排班"
-              :disabled="!canMoveSelectedStaff('up')"
-              @click="swapSelectedSchedule('up')"
-            >
-              ↑
-            </button>
-            <button
-              type="button"
-              class="schedule-reorder-action"
-              data-testid="schedule-only-reorder-down"
-              aria-label="下移所选人员的当前周排班"
-              :disabled="!canMoveSelectedStaff('down')"
-              @click="swapSelectedSchedule('down')"
-            >
-              ↓
-            </button>
-          </div>
-        </div>
-      </div>
-      <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
-        {{ selectedStaff ? `已选：${selectedStaff.name} ${selectedStaff.jobId}` : "请选择人员" }}
-      </span>
-    </div>
     <section class="schedule-grid-wrap">
       <table class="schedule-grid" :style="personColumnStyle">
         <thead>
