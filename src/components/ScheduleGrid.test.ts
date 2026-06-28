@@ -181,6 +181,7 @@ describe("ScheduleGrid", () => {
       selectedStaffId: "staff-b"
     });
 
+    expect(upWrapper.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员排序");
     expect(upWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("已选：乙护士 N002");
 
     await upWrapper.get('[data-testid="schedule-reorder-up"]').trigger("click");

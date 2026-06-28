@@ -2138,7 +2138,7 @@ describe("App", () => {
       "staff-nurse-001"
     ]);
     expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
-    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("人员顺序已更新");
+    expect(elementPlusMocks.ElMessage.success).not.toHaveBeenCalledWith("人员顺序已更新");
   });
 
   it("does not let schedulers reorder schedule staff", async () => {

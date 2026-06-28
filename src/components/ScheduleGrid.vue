@@ -178,27 +178,30 @@ onBeforeUnmount(() => {
 <template>
   <section class="schedule-grid-panel">
     <div v-if="showStaffReorderControls" class="schedule-reorder-toolbar" data-testid="schedule-reorder-toolbar">
-      <div class="schedule-reorder-actions" aria-label="调整人员顺序">
-        <button
-          type="button"
-          class="schedule-reorder-action"
-          data-testid="schedule-reorder-up"
-          aria-label="上移所选人员"
-          :disabled="!canMoveSelectedStaff('up')"
-          @click="moveSelectedStaff('up')"
-        >
-          ↑
-        </button>
-        <button
-          type="button"
-          class="schedule-reorder-action"
-          data-testid="schedule-reorder-down"
-          aria-label="下移所选人员"
-          :disabled="!canMoveSelectedStaff('down')"
-          @click="moveSelectedStaff('down')"
-        >
-          ↓
-        </button>
+      <div class="schedule-reorder-control-group">
+        <span class="schedule-reorder-label" data-testid="schedule-reorder-label">人员排序</span>
+        <div class="schedule-reorder-actions" aria-label="调整人员顺序">
+          <button
+            type="button"
+            class="schedule-reorder-action"
+            data-testid="schedule-reorder-up"
+            aria-label="上移所选人员"
+            :disabled="!canMoveSelectedStaff('up')"
+            @click="moveSelectedStaff('up')"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            class="schedule-reorder-action"
+            data-testid="schedule-reorder-down"
+            aria-label="下移所选人员"
+            :disabled="!canMoveSelectedStaff('down')"
+            @click="moveSelectedStaff('down')"
+          >
+            ↓
+          </button>
+        </div>
       </div>
       <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
         {{ selectedStaff ? `已选：${selectedStaff.name} ${selectedStaff.jobId}` : "请选择人员" }}

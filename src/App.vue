@@ -1258,8 +1258,6 @@ async function handleReorderStaff(visibleStaffIds: unknown): Promise<void> {
     if (!canApplyStaffOrderRequest(requestId, requestUserId)) {
       return;
     }
-
-    ElMessage.success("人员顺序已更新");
   } catch (caughtError) {
     if (canApplyStaffOrderRequest(requestId, requestUserId)) {
       ElMessage.error(caughtError instanceof Error ? caughtError.message : "人员排序保存失败");

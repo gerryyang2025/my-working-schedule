@@ -603,6 +603,21 @@ body {
   background: #ffffff;
 }
 
+.schedule-reorder-control-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 0 0 auto;
+}
+
+.schedule-reorder-label {
+  color: #334155;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .schedule-reorder-actions {
   display: inline-flex;
   align-items: center;
@@ -1396,6 +1411,13 @@ body {
   .schedule-reorder-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .schedule-reorder-control-group {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    width: 100%;
   }
 
   .schedule-reorder-actions {
