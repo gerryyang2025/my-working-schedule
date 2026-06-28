@@ -352,14 +352,22 @@ const AppToolbarStub = defineComponent({
 
 const ScheduleGridStub = defineComponent({
   name: "ScheduleGrid",
-  props: ["staff", "days", "editableStaffIds", "canReorderStaff"],
-  emits: ["quickFill", "editCell", "reorderStaff"],
+  props: ["staff", "days", "editableStaffIds", "canReorderStaff", "selectedStaffId"],
+  emits: ["quickFill", "editCell", "reorderStaff", "selectStaff"],
   template: `
     <section>
       <span data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</span>
       <span data-testid="schedule-staff-ids">{{ staff.map((person) => person.id).join(",") }}</span>
       <span data-testid="schedule-editable-staff-ids">{{ editableStaffIds?.join(",") }}</span>
       <span data-testid="schedule-can-reorder-staff">{{ String(canReorderStaff) }}</span>
+      <span data-testid="schedule-selected-staff-id">{{ selectedStaffId }}</span>
+      <button
+        data-testid="emit-select-staff-b"
+        type="button"
+        @click="$emit('selectStaff', 'staff-nurse-002')"
+      >
+        select staff b
+      </button>
       <button
         data-testid="emit-reorder-staff"
         type="button"
@@ -2081,6 +2089,35 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-staff-search-count"]').text()).toBe("已显示 2 / 2 人");
   });
 
+  it("stores selected schedule staff emitted by the grid", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("");
+
+    await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
+  });
+
+  it("search hides the selected row clears selected id", async () => {
+    const wrapper = mountApp(twoStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
+
+    await wrapper.get('[data-testid="schedule-staff-search"]').setValue("李护士");
+    await nextTick();
+
+    expect(wrapper.get('[data-testid="schedule-staff-ids"]').text()).toBe("staff-nurse-001");
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("");
+  });
+
   it("persists schedule reorder for admins with the full staff order", async () => {
     apiMocks.saveStaffOrder.mockResolvedValue(structuredClone(threeStaffData));
     const wrapper = mountApp(threeStaffData);
@@ -2088,6 +2125,9 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="schedule-can-reorder-staff"]').text()).toBe("true");
+
+    await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
+    await nextTick();
 
     await wrapper.get('[data-testid="emit-reorder-staff"]').trigger("click");
     await flushPromises();
@@ -2097,6 +2137,7 @@ describe("App", () => {
       "staff-nurse-002",
       "staff-nurse-001"
     ]);
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
     expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("人员顺序已更新");
   });
 

@@ -435,26 +435,51 @@ describe("main.css layout rules", () => {
     expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 130px)");
   });
 
-  it("styles staff reorder controls as compact usable sort-column controls", () => {
+  it("styles the shared staff reorder toolbar and selected row highlight", () => {
+    const gridPanel = ruleBlocks(".schedule-grid-panel")[0] ?? "";
+    const toolbar = ruleBlocks(".schedule-reorder-toolbar")[0] ?? "";
+    const actions = ruleBlocks(".schedule-reorder-actions")[0] ?? "";
+    const actionButton = ruleBlocks(".schedule-reorder-actions button")[0] ?? "";
+    const disabledActionButton = ruleBlocks(".schedule-reorder-actions button:disabled")[0] ?? "";
+    const selectedLabel = ruleBlocks(".schedule-reorder-selected")[0] ?? "";
     const sortOrderValue = ruleBlocks(".schedule-grid .sort-order-value")[0] ?? "";
-    const reorderControls = ruleBlocks(".schedule-grid .staff-reorder-controls")[0] ?? "";
-    const reorderButton = ruleBlocks(".schedule-grid .staff-reorder-button")[0] ?? "";
-    const disabledReorderButton = ruleBlocks(".schedule-grid .staff-reorder-button:disabled")[0] ?? "";
+    const selectedRowCells = ruleBlockIn(
+      css,
+      ".schedule-grid tr.selected-staff-row > th,\n.schedule-grid tr.selected-staff-row > td"
+    );
+    const selectedSortColumn = ruleBlocks(".schedule-grid tr.selected-staff-row > .sort-col")[0] ?? "";
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const mobileToolbar = ruleBlockIn(mobileCss, ".schedule-reorder-toolbar");
+    const mobileActions = ruleBlockIn(mobileCss, ".schedule-reorder-actions");
+    const mobileActionButton = ruleBlockIn(mobileCss, ".schedule-reorder-actions button");
 
+    expect(gridPanel).toContain("display: grid");
+    expect(gridPanel).toContain("gap: 8px");
+    expect(toolbar).toContain("display: flex");
+    expect(toolbar).toContain("align-items: center");
+    expect(toolbar).toContain("border: 1px solid #dbe3ef");
+    expect(toolbar).toContain("background: #ffffff");
+    expect(toolbar).toContain("padding: 8px");
+    expect(actions).toContain("display: inline-flex");
+    expect(actions).toContain("align-items: center");
+    expect(actionButton).toContain("min-height: 30px");
+    expect(actionButton).toContain("font-size: 13px");
+    expect(disabledActionButton).toContain("cursor: not-allowed");
+    expect(selectedLabel).toContain("font-weight: 700");
+    expect(selectedLabel).toContain("overflow: hidden");
+    expect(selectedLabel).toContain("text-overflow: ellipsis");
+    expect(selectedLabel).toContain("white-space: nowrap");
     expect(sortOrderValue).toContain("display: block");
     expect(sortOrderValue).toContain("font-weight: 800");
-    expect(reorderControls).toContain("display: inline-flex");
-    expect(reorderControls).toContain("align-items: center");
-    expect(reorderControls).toContain("justify-content: center");
-    expect(reorderControls).toContain("gap: 2px");
-    expect(reorderButton).toContain("display: inline-flex");
-    expect(reorderButton).toContain("align-items: center");
-    expect(reorderButton).toContain("justify-content: center");
-    expect(reorderButton).toContain("width: 24px");
-    expect(reorderButton).toContain("height: 24px");
-    expect(reorderButton).toContain("min-width: 24px");
-    expect(disabledReorderButton).toContain("cursor: not-allowed");
-    expect(disabledReorderButton).toContain("opacity: 0.45");
+    expect(selectedRowCells).toContain("box-shadow:");
+    expect(selectedRowCells).toContain("rgba(37, 99, 235");
+    expect(selectedSortColumn).toContain("inset 3px 0 0 #2563eb");
+    expect(mobileToolbar).toContain("flex-direction: column");
+    expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(mobileActionButton).toContain("min-height: 34px");
+    expectSelectorAbsent(".schedule-grid .staff-reorder-controls");
+    expectSelectorAbsent(".schedule-grid .staff-reorder-button");
+    expectSelectorAbsent(".schedule-grid .staff-reorder-button:disabled");
   });
 
   it("renders live shift marks as centered text without chip boxes", () => {

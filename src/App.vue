@@ -69,6 +69,7 @@ const loginError = ref("");
 const selectedDate = ref(today);
 const selectedShiftId = ref("");
 const scheduleStaffQuery = ref("");
+const selectedScheduleStaffId = ref("");
 const scheduleQueryStartDate = ref(getWeekRange(today).start);
 const scheduleQueryEndDate = ref(getWeekRange(today).end);
 const scheduleQueryStaffQuery = ref("");
@@ -206,6 +207,7 @@ const filteredScheduleStaff = computed<StaffMember[]>(() => {
     (staff) => staff.name.toLowerCase().includes(query) || staff.jobId.toLowerCase().includes(query)
   );
 });
+const filteredScheduleStaffIds = computed(() => filteredScheduleStaff.value.map((staff) => staff.id));
 const hasScheduleStaffSearch = computed(() => normalizedScheduleStaffQuery.value.length > 0);
 const hasScheduleStaffSearchResults = computed(() => filteredScheduleStaff.value.length > 0);
 const scheduleQueryRange = computed(() =>
@@ -401,6 +403,10 @@ watch(selectedWeek, (nextWeek) => {
 
   scheduleQueryStartDate.value = nextWeek.start;
   scheduleQueryEndDate.value = nextWeek.end;
+});
+
+watch(filteredScheduleStaffIds, () => {
+  clearInvisibleSelectedScheduleStaff();
 });
 
 async function refreshData(): Promise<void> {
@@ -1149,6 +1155,28 @@ function clearScheduleStaffSearch(): void {
   scheduleStaffQuery.value = "";
 }
 
+function handleSelectScheduleStaff(staffId: string): void {
+  if (!canReorderScheduleStaff.value) {
+    return;
+  }
+
+  if (!filteredScheduleStaffIds.value.includes(staffId)) {
+    return;
+  }
+
+  selectedScheduleStaffId.value = staffId;
+}
+
+function clearInvisibleSelectedScheduleStaff(): void {
+  if (!selectedScheduleStaffId.value) {
+    return;
+  }
+
+  if (!filteredScheduleStaffIds.value.includes(selectedScheduleStaffId.value)) {
+    selectedScheduleStaffId.value = "";
+  }
+}
+
 function markScheduleQueryRangeDirty(): void {
   scheduleQueryRangeDirty.value = true;
 }
@@ -1755,11 +1783,13 @@ onBeforeUnmount(() => {
               :shifts="data.shifts"
               :entries="data.scheduleEntries"
               :selected-shift-id="selectedShiftId"
+              :selected-staff-id="selectedScheduleStaffId"
               :editable-staff-ids="editableStaffIds"
               :can-reorder-staff="canReorderScheduleStaff"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
               @reorder-staff="handleReorderStaff"
+              @select-staff="handleSelectScheduleStaff"
             />
           </section>
           <section v-show="activeWorkbenchTab === 'query'" class="workbench-tab-panel" data-testid="workbench-panel-query">

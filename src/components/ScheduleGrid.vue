@@ -13,14 +13,16 @@ const props = withDefaults(
     selectedShiftId: string;
     editableStaffIds: string[];
     canReorderStaff?: boolean;
+    selectedStaffId?: string;
   }>(),
-  { canReorderStaff: false }
+  { canReorderStaff: false, selectedStaffId: "" }
 );
 
 const emit = defineEmits<{
   quickFill: [staffId: string, date: string];
   editCell: [staffId: string, date: string];
   reorderStaff: [staffIds: string[]];
+  selectStaff: [staffId: string];
 }>();
 
 const STAFF_TYPE_LABELS: Record<StaffType, string> = {
@@ -48,6 +50,8 @@ const sortedStaff = computed(() =>
     .sort((left, right) => left.sortOrder - right.sortOrder)
 );
 const showStaffReorderControls = computed(() => props.canReorderStaff && sortedStaff.value.length > 1);
+const selectedStaffIndex = computed(() => sortedStaff.value.findIndex((staff) => staff.id === props.selectedStaffId));
+const selectedStaff = computed(() => sortedStaff.value[selectedStaffIndex.value] ?? null);
 const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
@@ -111,29 +115,32 @@ function canEditStaff(staff: StaffMember): boolean {
   return staff.enabled && editableStaffIdSet.value.has(staff.id);
 }
 
-function canMoveStaff(staffId: string, direction: "up" | "down"): boolean {
-  if (!showStaffReorderControls.value) {
+function canMoveSelectedStaff(direction: "up" | "down"): boolean {
+  if (!showStaffReorderControls.value || selectedStaff.value === null) {
     return false;
   }
 
-  const staffIndex = sortedStaff.value.findIndex((staff) => staff.id === staffId);
-  if (staffIndex === -1) {
-    return false;
-  }
-
-  return direction === "up" ? staffIndex > 0 : staffIndex < sortedStaff.value.length - 1;
+  return direction === "up" ? selectedStaffIndex.value > 0 : selectedStaffIndex.value < sortedStaff.value.length - 1;
 }
 
-function moveStaff(staffId: string, direction: "up" | "down"): void {
-  if (!canMoveStaff(staffId, direction)) {
+function moveSelectedStaff(direction: "up" | "down"): void {
+  if (!canMoveSelectedStaff(direction)) {
     return;
   }
 
   const staffIds = sortedStaff.value.map((staff) => staff.id);
-  const staffIndex = staffIds.indexOf(staffId);
+  const staffIndex = selectedStaffIndex.value;
   const swapIndex = direction === "up" ? staffIndex - 1 : staffIndex + 1;
   [staffIds[staffIndex], staffIds[swapIndex]] = [staffIds[swapIndex], staffIds[staffIndex]];
   emit("reorderStaff", staffIds);
+}
+
+function selectStaff(staffId: string): void {
+  if (!props.canReorderStaff) {
+    return;
+  }
+
+  emit("selectStaff", staffId);
 }
 
 function handleCellClick(staff: StaffMember, date: string): void {
@@ -169,74 +176,93 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="schedule-grid-wrap">
-    <table class="schedule-grid" :style="personColumnStyle">
-      <thead>
-        <tr>
-          <th class="sticky-col sort-col">排序ID</th>
-          <th class="sticky-col person-col">人员</th>
-          <th class="sticky-col type-col">类型</th>
-          <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
-            <span>{{ day.dayOfMonth }}</span>
-            <small>{{ day.weekdayName }}</small>
-            <em v-if="holidayMap.has(day.key)">{{ holidayMap.get(day.key)?.name }}</em>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="person in sortedStaff" :key="person.id" :class="{ 'disabled-historical-row': !person.enabled }">
-          <th class="sticky-col sort-col">
-            <span class="sort-order-value">{{ person.sortOrder }}</span>
-            <span v-if="showStaffReorderControls" class="staff-reorder-controls">
-              <button
-                type="button"
-                class="staff-reorder-button"
-                :data-testid="`move-staff-up-${person.id}`"
-                :aria-label="`${person.name} 上移`"
-                :disabled="!canMoveStaff(person.id, 'up')"
-                @click.stop="moveStaff(person.id, 'up')"
-              >
-                ↑
-              </button>
-              <button
-                type="button"
-                class="staff-reorder-button"
-                :data-testid="`move-staff-down-${person.id}`"
-                :aria-label="`${person.name} 下移`"
-                :disabled="!canMoveStaff(person.id, 'down')"
-                @click.stop="moveStaff(person.id, 'down')"
-              >
-                ↓
-              </button>
-            </span>
-          </th>
-          <th class="sticky-col person-col">
-            <strong>{{ person.name }}</strong>
-            <small>{{ person.jobId }}</small>
-            <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
-          </th>
-          <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
-          <td
-            v-for="day in days"
-            :key="`${person.id}-${day.key}`"
-            :data-testid="`schedule-cell-${person.id}-${day.key}`"
-            :class="{ editable: canEditStaff(person), weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
-            @click="handleCellClick(person, day.key)"
-            @dblclick="handleCellDoubleClick(person, day.key)"
+  <section class="schedule-grid-panel">
+    <div v-if="showStaffReorderControls" class="schedule-reorder-toolbar" data-testid="schedule-reorder-toolbar">
+      <div class="schedule-reorder-actions" aria-label="调整人员顺序">
+        <button
+          type="button"
+          class="schedule-reorder-action"
+          data-testid="schedule-reorder-up"
+          aria-label="上移所选人员"
+          :disabled="!canMoveSelectedStaff('up')"
+          @click="moveSelectedStaff('up')"
+        >
+          ↑
+        </button>
+        <button
+          type="button"
+          class="schedule-reorder-action"
+          data-testid="schedule-reorder-down"
+          aria-label="下移所选人员"
+          :disabled="!canMoveSelectedStaff('down')"
+          @click="moveSelectedStaff('down')"
+        >
+          ↓
+        </button>
+      </div>
+      <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
+        {{ selectedStaff ? `已选：${selectedStaff.name} ${selectedStaff.jobId}` : "请选择人员" }}
+      </span>
+    </div>
+    <section class="schedule-grid-wrap">
+      <table class="schedule-grid" :style="personColumnStyle">
+        <thead>
+          <tr>
+            <th class="sticky-col sort-col">排序ID</th>
+            <th class="sticky-col person-col">人员</th>
+            <th class="sticky-col type-col">类型</th>
+            <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
+              <span>{{ day.dayOfMonth }}</span>
+              <small>{{ day.weekdayName }}</small>
+              <em v-if="holidayMap.has(day.key)">{{ holidayMap.get(day.key)?.name }}</em>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr
+            v-for="person in sortedStaff"
+            :key="person.id"
+            :class="{
+              'disabled-historical-row': !person.enabled,
+              'selected-staff-row': showStaffReorderControls && person.id === selectedStaffId
+            }"
+            :tabindex="showStaffReorderControls ? 0 : undefined"
+            :aria-selected="showStaffReorderControls ? person.id === selectedStaffId : undefined"
+            @click="selectStaff(person.id)"
+            @keydown.enter.prevent="selectStaff(person.id)"
+            @keydown.space.prevent="selectStaff(person.id)"
           >
-            <div class="cell-shifts">
-              <span
-                v-for="shiftId in entryFor(person.id, day.key)?.shiftIds ?? []"
-                :key="shiftId"
-                class="shift-chip"
-                :style="{ color: shiftMap.get(shiftId)?.color, borderColor: shiftMap.get(shiftId)?.color }"
-              >
-                {{ shiftMap.get(shiftId)?.shortName }}
-              </span>
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            <th class="sticky-col sort-col">
+              <span class="sort-order-value">{{ person.sortOrder }}</span>
+            </th>
+            <th class="sticky-col person-col">
+              <strong>{{ person.name }}</strong>
+              <small>{{ person.jobId }}</small>
+              <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
+            </th>
+            <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
+            <td
+              v-for="day in days"
+              :key="`${person.id}-${day.key}`"
+              :data-testid="`schedule-cell-${person.id}-${day.key}`"
+              :class="{ editable: canEditStaff(person), weekend: day.isWeekend, holiday: holidayMap.has(day.key) }"
+              @click="handleCellClick(person, day.key)"
+              @dblclick="handleCellDoubleClick(person, day.key)"
+            >
+              <div class="cell-shifts">
+                <span
+                  v-for="shiftId in entryFor(person.id, day.key)?.shiftIds ?? []"
+                  :key="shiftId"
+                  class="shift-chip"
+                  :style="{ color: shiftMap.get(shiftId)?.color, borderColor: shiftMap.get(shiftId)?.color }"
+                >
+                  {{ shiftMap.get(shiftId)?.shortName }}
+                </span>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
   </section>
 </template>

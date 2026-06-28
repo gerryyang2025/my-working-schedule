@@ -117,55 +117,137 @@ describe("ScheduleGrid", () => {
     expect(firstRow.get(".type-col").text()).toBe("护士");
   });
 
-  it("emits reordered visible staff ids from staff move controls", async () => {
+  it("emits selected staff row changes and marks the selected row", async () => {
     const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true,
+      selectedStaffId: "staff-b"
+    });
+
+    const rows = wrapper.findAll("tbody tr");
+    expect(rows[0].classes()).not.toContain("selected-staff-row");
+    expect(rows[0].attributes("tabindex")).toBe("0");
+    expect(rows[0].attributes("aria-selected")).toBe("false");
+    expect(rows[1].classes()).toContain("selected-staff-row");
+    expect(rows[1].attributes("tabindex")).toBe("0");
+    expect(rows[1].attributes("aria-selected")).toBe("true");
+    expect(rows[2].classes()).not.toContain("selected-staff-row");
+    expect(rows[2].attributes("tabindex")).toBe("0");
+    expect(rows[2].attributes("aria-selected")).toBe("false");
+
+    await rows[2].trigger("click");
+    await rows[0].trigger("keydown.enter");
+    await rows[1].trigger("keydown.space");
+    expect(wrapper.emitted("selectStaff")).toEqual([["staff-c"], ["staff-a"], ["staff-b"]]);
+  });
+
+  it("only emits selected staff row changes when staff reordering is enabled", async () => {
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      selectedStaffId: "staff-b"
+    });
+
+    await wrapper.get("tbody tr").trigger("click");
+
+    expect(wrapper.emitted("selectStaff")).toBeUndefined();
+    for (const row of wrapper.findAll("tbody tr")) {
+      expect(row.attributes("tabindex")).toBeUndefined();
+      expect(row.attributes("aria-selected")).toBeUndefined();
+      expect(row.classes()).not.toContain("selected-staff-row");
+    }
+  });
+
+  it("removes per-row staff move controls from schedule rows", () => {
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true,
+      selectedStaffId: "staff-b"
+    });
+
+    expect(wrapper.find('[data-testid="move-staff-up-staff-a"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="move-staff-down-staff-a"]').exists()).toBe(false);
+    expect(wrapper.find(".staff-reorder-controls").exists()).toBe(false);
+    expect(wrapper.find(".staff-reorder-button").exists()).toBe(false);
+  });
+
+  it("emits reordered visible staff ids from the shared staff toolbar", async () => {
+    const upWrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true,
+      selectedStaffId: "staff-b"
+    });
+
+    expect(upWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("已选：乙护士 N002");
+
+    await upWrapper.get('[data-testid="schedule-reorder-up"]').trigger("click");
+    expect(upWrapper.emitted("reorderStaff")).toEqual([[["staff-b", "staff-a", "staff-c"]]]);
+
+    const downWrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true,
+      selectedStaffId: "staff-b"
+    });
+
+    await downWrapper.get('[data-testid="schedule-reorder-down"]').trigger("click");
+    expect(downWrapper.emitted("reorderStaff")).toEqual([[["staff-a", "staff-c", "staff-b"]]]);
+  });
+
+  it("disables shared staff toolbar actions with no selection or edge selections", () => {
+    const noSelectionWrapper = mountGrid([], {
       staff: reorderableStaff,
       editableStaffIds: reorderableStaff.map((person) => person.id),
       canReorderStaff: true
     });
 
-    await wrapper.get('[data-testid="move-staff-down-staff-a"]').trigger("click");
-    expect(wrapper.emitted("reorderStaff")).toEqual([[["staff-b", "staff-a", "staff-c"]]]);
+    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("请选择人员");
+    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
+    expect(noSelectionWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
 
-    await wrapper.setProps({
-      staff: [
-        { ...reorderableStaff[1], sortOrder: 1 },
-        { ...reorderableStaff[0], sortOrder: 2 },
-        { ...reorderableStaff[2], sortOrder: 3 }
-      ]
-    });
-
-    await wrapper.get('[data-testid="move-staff-up-staff-c"]').trigger("click");
-
-    expect(wrapper.emitted("reorderStaff")).toEqual([
-      [["staff-b", "staff-a", "staff-c"]],
-      [["staff-b", "staff-c", "staff-a"]]
-    ]);
-  });
-
-  it("disables staff move controls at the visible list edges", () => {
-    const wrapper = mountGrid([], {
+    const firstWrapper = mountGrid([], {
       staff: reorderableStaff,
       editableStaffIds: reorderableStaff.map((person) => person.id),
-      canReorderStaff: true
+      canReorderStaff: true,
+      selectedStaffId: "staff-a"
     });
 
-    expect(wrapper.get('[data-testid="move-staff-up-staff-a"]').attributes("disabled")).toBeDefined();
-    expect(wrapper.get('[data-testid="move-staff-down-staff-a"]').attributes("disabled")).toBeUndefined();
-    expect(wrapper.get('[data-testid="move-staff-up-staff-b"]').attributes("disabled")).toBeUndefined();
-    expect(wrapper.get('[data-testid="move-staff-down-staff-b"]').attributes("disabled")).toBeUndefined();
-    expect(wrapper.get('[data-testid="move-staff-up-staff-c"]').attributes("disabled")).toBeUndefined();
-    expect(wrapper.get('[data-testid="move-staff-down-staff-c"]').attributes("disabled")).toBeDefined();
+    expect(firstWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
+    expect(firstWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeUndefined();
+
+    const lastWrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true,
+      selectedStaffId: "staff-c"
+    });
+
+    expect(lastWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeUndefined();
+    expect(lastWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
   });
 
-  it("hides staff move controls unless staff reordering is enabled", () => {
+  it("hides the shared staff toolbar unless staff reordering is available", () => {
     const wrapper = mountGrid([], {
       staff: reorderableStaff,
       editableStaffIds: reorderableStaff.map((person) => person.id)
     });
 
-    expect(wrapper.find('[data-testid="move-staff-up-staff-a"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="move-staff-down-staff-a"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="schedule-reorder-toolbar"]').exists()).toBe(false);
+
+    const singleStaffWrapper = mountGrid([], {
+      staff: [reorderableStaff[0]],
+      editableStaffIds: ["staff-a"],
+      canReorderStaff: true,
+      selectedStaffId: "staff-a"
+    });
+
+    expect(singleStaffWrapper.find('[data-testid="schedule-reorder-toolbar"]').exists()).toBe(false);
+    expect(singleStaffWrapper.get("tbody tr").attributes("tabindex")).toBeUndefined();
+    expect(singleStaffWrapper.get("tbody tr").attributes("aria-selected")).toBeUndefined();
+    expect(singleStaffWrapper.get("tbody tr").classes()).not.toContain("selected-staff-row");
   });
 
   it("shows all configured staff type labels and keeps rows sorted by sort id", () => {
@@ -298,6 +380,44 @@ describe("ScheduleGrid", () => {
     vi.advanceTimersByTime(200);
 
     expect(wrapper.emitted("quickFill")).toEqual([["staff-enabled", "2026-06-19"]]);
+  });
+
+  it("selects the staff row immediately and quick-fills after the editable cell click timer", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true
+    });
+    const cell = wrapper.get('[data-testid="schedule-cell-staff-a-2026-06-19"]');
+
+    await cell.trigger("click");
+
+    expect(wrapper.emitted("selectStaff")).toEqual([["staff-a"]]);
+    expect(wrapper.emitted("quickFill")).toBeUndefined();
+
+    vi.advanceTimersByTime(200);
+
+    expect(wrapper.emitted("quickFill")).toEqual([["staff-a", "2026-06-19"]]);
+  });
+
+  it("selects the staff row and cancels quick-fill when an editable cell is double-clicked", async () => {
+    vi.useFakeTimers();
+    const wrapper = mountGrid([], {
+      staff: reorderableStaff,
+      editableStaffIds: reorderableStaff.map((person) => person.id),
+      canReorderStaff: true
+    });
+    const cell = wrapper.get('[data-testid="schedule-cell-staff-a-2026-06-19"]');
+
+    await cell.trigger("click");
+    await cell.trigger("click");
+    await cell.trigger("dblclick");
+    vi.advanceTimersByTime(200);
+
+    expect(wrapper.emitted("selectStaff")).toEqual([["staff-a"], ["staff-a"]]);
+    expect(wrapper.emitted("quickFill")).toBeUndefined();
+    expect(wrapper.emitted("editCell")).toEqual([["staff-a", "2026-06-19"]]);
   });
 
   it("does not emit quick-fill or edit events for disabled historical cells", async () => {
