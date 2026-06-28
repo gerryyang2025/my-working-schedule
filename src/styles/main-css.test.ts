@@ -466,6 +466,26 @@ describe("main.css print month layout rules", () => {
     expect(actionRules).toContain("flex-wrap: wrap");
   });
 
+  it("renders logical print pages as preview pages and browser print pages", () => {
+    const activePrintViewRules = ruleBlocks(".print-preview-content .print-view.print-preview-active")[0] ?? "";
+    const previewPageRules = ruleBlocks(".print-preview-content .print-pdf-page")[0] ?? "";
+    const previewNextPageRules = ruleBlocks(".print-preview-content .print-pdf-page + .print-pdf-page")[0] ?? "";
+    const printMedia = mediaBlock("print");
+    const printPageRules = ruleBlockIn(printMedia, ".print-pdf-page");
+    const lastPrintPageRules = ruleBlockIn(printMedia, ".print-pdf-page:last-child");
+
+    expect(activePrintViewRules).toContain("display: grid");
+    expect(activePrintViewRules).toContain("gap: 12px");
+    expect(previewPageRules).toContain("background: #ffffff");
+    expect(previewPageRules).toContain("break-inside: avoid");
+    expect(previewPageRules).toContain("page-break-inside: avoid");
+    expect(previewNextPageRules).toContain("border-top: 1px dashed #cbd5e1");
+    expect(printPageRules).toContain("break-after: page");
+    expect(printPageRules).toContain("page-break-after: always");
+    expect(lastPrintPageRules).toContain("break-after: auto");
+    expect(lastPrintPageRules).toContain("page-break-after: auto");
+  });
+
   it("keeps the month detail table on a scrollable print canvas instead of squeezing it on mobile", () => {
     const monthTable = ruleBlocks(".print-preview-content .print-month .print-month-detail-table")[0] ?? "";
     const monthCells =

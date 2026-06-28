@@ -145,56 +145,58 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
 
 <template>
   <section class="print-view print-month" :class="{ 'print-preview-active': previewMode === 'month' }">
-    <h1>国际医学部护理月排班表</h1>
-    <p>
-      {{ monthStart }} 至 {{ monthEnd }}；共 {{ days.length }} 天；节假日 {{ monthHolidays.length }} 个。
-    </p>
-    <p v-if="monthHolidays.length">
-      节假日：{{ monthHolidays.map((holiday) => `${holiday.date} ${holiday.name}`).join("、") }}
-    </p>
-    <table class="print-table print-month-detail-table">
-      <thead>
-        <tr>
-          <th class="print-sort-col">排序ID</th>
-          <th class="print-person-col">人员</th>
-          <th class="print-type-col">类型</th>
-          <th v-for="day in days" :key="day.key" class="print-day-col">
-            <span class="print-day-heading">
-              <span>{{ day.dayOfMonth }}</span>
-              <span>{{ day.weekdayName }}</span>
-              <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
-            </span>
-          </th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="staff in printedStaff" :key="staff.id" :class="{ 'disabled-historical-row': !staff.enabled }">
-          <th class="print-sort-col">{{ staff.sortOrder }}</th>
-          <th class="print-person-col">
-            <span class="print-person">
-              <strong>{{ staff.name }}</strong>
-              <small>{{ staff.jobId }}</small>
-            </span>
-            <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
-          </th>
-          <td class="print-type-col">{{ getStaffTypeLabel(staff.type) }}</td>
-          <td v-for="day in days" :key="`${staff.id}-${day.key}`" class="print-day-col">
-            <span class="print-cell-shifts">
-              <span
-                v-for="shift in getCellShifts(staff.id, day.key)"
-                :key="shift.id"
-                class="print-shift-chip"
-                :style="{ color: shift.color, borderColor: shift.color }"
-              >
-                {{ shift.shortName }}
+    <section class="print-pdf-page print-pdf-schedule-page">
+      <h1>国际医学部护理月排班表</h1>
+      <p>
+        {{ monthStart }} 至 {{ monthEnd }}；共 {{ days.length }} 天；节假日 {{ monthHolidays.length }} 个。
+      </p>
+      <p v-if="monthHolidays.length">
+        节假日：{{ monthHolidays.map((holiday) => `${holiday.date} ${holiday.name}`).join("、") }}
+      </p>
+      <table class="print-table print-month-detail-table">
+        <thead>
+          <tr>
+            <th class="print-sort-col">排序ID</th>
+            <th class="print-person-col">人员</th>
+            <th class="print-type-col">类型</th>
+            <th v-for="day in days" :key="day.key" class="print-day-col">
+              <span class="print-day-heading">
+                <span>{{ day.dayOfMonth }}</span>
+                <span>{{ day.weekdayName }}</span>
+                <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
               </span>
-            </span>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="staff in printedStaff" :key="staff.id" :class="{ 'disabled-historical-row': !staff.enabled }">
+            <th class="print-sort-col">{{ staff.sortOrder }}</th>
+            <th class="print-person-col">
+              <span class="print-person">
+                <strong>{{ staff.name }}</strong>
+                <small>{{ staff.jobId }}</small>
+              </span>
+              <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
+            </th>
+            <td class="print-type-col">{{ getStaffTypeLabel(staff.type) }}</td>
+            <td v-for="day in days" :key="`${staff.id}-${day.key}`" class="print-day-col">
+              <span class="print-cell-shifts">
+                <span
+                  v-for="shift in getCellShifts(staff.id, day.key)"
+                  :key="shift.id"
+                  class="print-shift-chip"
+                  :style="{ color: shift.color, borderColor: shift.color }"
+                >
+                  {{ shift.shortName }}
+                </span>
+              </span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
 
-    <section v-if="monthlySummary || monthlySettlement" class="print-month-summary">
+    <section v-if="monthlySummary || monthlySettlement" class="print-pdf-page print-month-summary">
       <h2>月度汇总</h2>
       <table class="print-table print-summary-table">
         <thead>
@@ -230,7 +232,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
       </table>
     </section>
 
-    <section v-if="monthlySettlement" class="print-bonus-summary">
+    <section v-if="monthlySettlement" class="print-pdf-page print-bonus-summary">
       <h2>奖金分配</h2>
       <div class="print-bonus-meta">
         <p>奖金总额 {{ formatMoney(monthlySettlement.bonusPool) }}</p>
@@ -274,88 +276,94 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
   </section>
 
   <section class="print-view print-week" :class="{ 'print-preview-active': previewMode === 'week' }">
-    <h1>国际医学部护理周统计表</h1>
-    <p>
-      {{ summary.weekStart }} 至 {{ summary.weekEnd }}；满勤 {{ summary.requiredShifts }} 个班次；节假日扣减
-      {{ summary.holidayDeduction }} 个。
-    </p>
-    <p v-if="summary.holidayNames.length">节假日：{{ summary.holidayNames.join("、") }}</p>
+    <section class="print-pdf-page print-pdf-schedule-page">
+      <h1>国际医学部护理周统计表</h1>
+      <p>
+        {{ summary.weekStart }} 至 {{ summary.weekEnd }}；满勤 {{ summary.requiredShifts }} 个班次；节假日扣减
+        {{ summary.holidayDeduction }} 个。
+      </p>
+      <p v-if="summary.holidayNames.length">节假日：{{ summary.holidayNames.join("、") }}</p>
 
-    <section class="print-week-detail">
-      <h2>周排班明细</h2>
-      <table class="print-table print-week-detail-table">
+      <section class="print-week-detail">
+        <h2>周排班明细</h2>
+        <table class="print-table print-week-detail-table">
+          <thead>
+            <tr>
+              <th class="print-sort-col">排序ID</th>
+              <th class="print-person-col">人员</th>
+              <th class="print-type-col">类型</th>
+              <th v-for="day in weekDays" :key="day.key" class="print-day-col">
+                <span class="print-day-heading">
+                  <span>{{ day.dayOfMonth }}</span>
+                  <span>{{ day.weekdayName }}</span>
+                  <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="row in summary.rows" :key="row.staffId">
+              <th class="print-sort-col">{{ getStaffSortOrder(row.staffId) }}</th>
+              <th class="print-person-col">
+                <span class="print-person">
+                  <strong>{{ row.staffName }}</strong>
+                  <small>{{ row.staffJobId }}</small>
+                </span>
+              </th>
+              <td class="print-type-col">{{ getStaffTypeLabel(row.staffType) }}</td>
+              <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`" class="print-day-col">
+                <span class="print-cell-shifts">
+                  <span
+                    v-for="shift in getCellShifts(row.staffId, day.key)"
+                    :key="shift.id"
+                    class="print-shift-chip"
+                    :style="{ color: shift.color, borderColor: shift.color }"
+                  >
+                    {{ shift.shortName }}
+                  </span>
+                </span>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </section>
+
+    <section class="print-pdf-page print-week-summary">
+      <h2>周统计汇总</h2>
+      <table class="print-table">
         <thead>
           <tr>
-            <th class="print-sort-col">排序ID</th>
-            <th class="print-person-col">人员</th>
-            <th class="print-type-col">类型</th>
-            <th v-for="day in weekDays" :key="day.key" class="print-day-col">
-              <span class="print-day-heading">
-                <span>{{ day.dayOfMonth }}</span>
-                <span>{{ day.weekdayName }}</span>
-                <span v-if="getHolidayName(day.key)" class="print-holiday-name">{{ getHolidayName(day.key) }}</span>
-              </span>
-            </th>
+            <th>人员</th>
+            <th>出勤班次</th>
+            <th>满勤标准</th>
+            <th>出勤盈亏</th>
+            <th>加班班次</th>
+            <th>总系数</th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="row in summary.rows" :key="row.staffId">
-            <th class="print-sort-col">{{ getStaffSortOrder(row.staffId) }}</th>
-            <th class="print-person-col">
+            <td>
               <span class="print-person">
                 <strong>{{ row.staffName }}</strong>
                 <small>{{ row.staffJobId }}</small>
               </span>
-            </th>
-            <td class="print-type-col">{{ getStaffTypeLabel(row.staffType) }}</td>
-            <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`" class="print-day-col">
-              <span class="print-cell-shifts">
-                <span
-                  v-for="shift in getCellShifts(row.staffId, day.key)"
-                  :key="shift.id"
-                  class="print-shift-chip"
-                  :style="{ color: shift.color, borderColor: shift.color }"
-                >
-                  {{ shift.shortName }}
-                </span>
-              </span>
             </td>
+            <td>{{ row.attendanceShifts }}</td>
+            <td>{{ row.requiredShifts }}</td>
+            <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>
+            <td>{{ row.overtimeShifts }}</td>
+            <td>{{ row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2) }}</td>
           </tr>
         </tbody>
       </table>
     </section>
-
-    <table class="print-table">
-      <thead>
-        <tr>
-          <th>人员</th>
-          <th>出勤班次</th>
-          <th>满勤标准</th>
-          <th>出勤盈亏</th>
-          <th>加班班次</th>
-          <th>总系数</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="row in summary.rows" :key="row.staffId">
-          <td>
-            <span class="print-person">
-              <strong>{{ row.staffName }}</strong>
-              <small>{{ row.staffJobId }}</small>
-            </span>
-          </td>
-          <td>{{ row.attendanceShifts }}</td>
-          <td>{{ row.requiredShifts }}</td>
-          <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>
-          <td>{{ row.overtimeShifts }}</td>
-          <td>{{ row.coefficientTotal === null ? row.coefficientExcludedReason : row.coefficientTotal.toFixed(2) }}</td>
-        </tr>
-      </tbody>
-    </table>
   </section>
 </template>
 
 <style scoped>
+.print-week-summary .print-table,
 .print-month-summary .print-table,
 .print-bonus-summary .print-table {
   width: 100%;
@@ -364,6 +372,8 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
   table-layout: auto;
 }
 
+.print-week-summary .print-table th:first-child,
+.print-week-summary .print-table td:first-child,
 .print-month-summary .print-table th:first-child,
 .print-month-summary .print-table td:first-child,
 .print-bonus-summary .print-table th:first-child,
@@ -371,13 +381,15 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
   width: auto;
 }
 
-.print-bonus-summary {
-  margin-top: 12px;
-}
-
+.print-week-summary h2,
+.print-month-summary h2,
 .print-bonus-summary h2 {
   margin: 0 0 8px;
   font-size: 14px;
+}
+
+.print-bonus-summary {
+  margin-top: 12px;
 }
 
 .print-bonus-meta {
@@ -395,10 +407,14 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
 }
 
 @media print {
+  .print-week-summary,
+  .print-month-summary,
   .print-bonus-summary {
     margin: 8px 0 10px;
   }
 
+  .print-week-summary h2,
+  .print-month-summary h2,
   .print-bonus-summary h2 {
     margin: 0 0 6px;
     font-size: 13px;

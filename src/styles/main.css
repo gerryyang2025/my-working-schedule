@@ -1003,7 +1003,19 @@ body {
 }
 
 .print-preview-content .print-view.print-preview-active {
-  display: block;
+  display: grid;
+  gap: 12px;
+}
+
+.print-preview-content .print-pdf-page {
+  background: #ffffff;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.print-preview-content .print-pdf-page + .print-pdf-page {
+  border-top: 1px dashed #cbd5e1;
+  padding-top: 12px;
 }
 
 .print-preview-content .print-view h1 {
@@ -1664,6 +1676,18 @@ body {
   body[data-print-mode="month"] .print-month,
   body[data-print-mode="week"] .print-week {
     display: block;
+  }
+
+  .print-pdf-page {
+    break-after: page;
+    page-break-after: always;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-pdf-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
   }
 
   .print-view h1 {

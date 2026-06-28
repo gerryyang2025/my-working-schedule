@@ -5,6 +5,7 @@ interface CreatePrintPdfFileOptions {
 
 const PDF_MARGIN_MM = 8;
 const PDF_CAPTURE_MIN_WIDTH_PX = 960;
+const PDF_PAGE_SELECTOR = ".print-pdf-page";
 
 interface PdfCaptureTarget {
   element: HTMLElement;
@@ -13,13 +14,11 @@ interface PdfCaptureTarget {
   cleanup: () => void;
 }
 
-interface PdfPageTile {
-  sourceX: number;
-  sourceY: number;
-  sourceWidth: number;
-  sourceHeight: number;
-  tileWidth: number;
-  tileHeight: number;
+interface PdfImagePlacement {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
 }
 
 function getElementDimension(element: HTMLElement, dimensionNames: Array<"clientWidth" | "offsetWidth" | "scrollWidth">): number;
@@ -33,6 +32,16 @@ function getElementDimension(
   return Math.max(0, ...dimensionNames.map((dimensionName) => element[dimensionName] || 0));
 }
 
+function getPrintViewContextClasses(sourceElement: HTMLElement): string[] {
+  const printView = sourceElement.closest<HTMLElement>(".print-view");
+
+  if (!printView || printView === sourceElement) {
+    return [];
+  }
+
+  return Array.from(printView.classList).filter((className) => className !== "print-preview-active");
+}
+
 function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   let width = Math.max(
     PDF_CAPTURE_MIN_WIDTH_PX,
@@ -41,6 +50,7 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   const sourceHeight = getElementDimension(sourceElement, ["scrollHeight", "offsetHeight", "clientHeight"]);
   const host = document.createElement("div");
   const clonedElement = sourceElement.cloneNode(true) as HTMLElement;
+  clonedElement.classList.add(...getPrintViewContextClasses(sourceElement));
 
   host.className = "print-preview-content print-pdf-capture-host";
   host.setAttribute("aria-hidden", "true");
@@ -86,53 +96,37 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   };
 }
 
-function createPdfPageTiles(canvas: HTMLCanvasElement, captureWidth: number, printableWidth: number, printableHeight: number): PdfPageTile[] {
-  const captureScale = canvas.width / Math.max(1, captureWidth);
-  const tileWidth = Math.min(canvas.width, Math.max(1, Math.floor(PDF_CAPTURE_MIN_WIDTH_PX * captureScale)));
-  const tileHeight = Math.max(1, Math.floor((printableHeight / printableWidth) * tileWidth));
-  const tiles: PdfPageTile[] = [];
-
-  for (let sourceY = 0; sourceY < canvas.height; sourceY += tileHeight) {
-    for (let sourceX = 0; sourceX < canvas.width; sourceX += tileWidth) {
-      tiles.push({
-        sourceX,
-        sourceY,
-        sourceWidth: Math.min(tileWidth, canvas.width - sourceX),
-        sourceHeight: Math.min(tileHeight, canvas.height - sourceY),
-        tileWidth,
-        tileHeight
-      });
-    }
+function getLogicalPrintPages(sourceElement: HTMLElement): HTMLElement[] {
+  if (sourceElement.matches(PDF_PAGE_SELECTOR)) {
+    return [sourceElement];
   }
 
-  return tiles;
+  const pages = Array.from(sourceElement.querySelectorAll<HTMLElement>(PDF_PAGE_SELECTOR));
+  return pages.length ? pages : [sourceElement];
 }
 
-function createPdfPageSliceCanvas(sourceCanvas: HTMLCanvasElement, tile: PdfPageTile): HTMLCanvasElement {
-  const sliceCanvas = document.createElement("canvas");
-  sliceCanvas.width = tile.tileWidth;
-  sliceCanvas.height = tile.tileHeight;
+function calculatePdfImagePlacement(
+  canvas: HTMLCanvasElement,
+  pageWidth: number,
+  pageHeight: number,
+  printableWidth: number,
+  printableHeight: number
+): PdfImagePlacement {
+  const imageRatio = canvas.width / Math.max(1, canvas.height);
+  let imageWidth = printableWidth;
+  let imageHeight = imageWidth / imageRatio;
 
-  const context = sliceCanvas.getContext("2d");
-  if (!context) {
-    throw new Error("打印内容不可用");
+  if (imageHeight > printableHeight) {
+    imageHeight = printableHeight;
+    imageWidth = imageHeight * imageRatio;
   }
 
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height);
-  context.drawImage(
-    sourceCanvas,
-    tile.sourceX,
-    tile.sourceY,
-    tile.sourceWidth,
-    tile.sourceHeight,
-    0,
-    0,
-    tile.sourceWidth,
-    tile.sourceHeight
-  );
-
-  return sliceCanvas;
+  return {
+    x: (pageWidth - imageWidth) / 2,
+    y: (pageHeight - imageHeight) / 2,
+    width: imageWidth,
+    height: imageHeight
+  };
 }
 
 export async function createPrintPdfFile({ element, filename }: CreatePrintPdfFileOptions): Promise<File> {
@@ -141,44 +135,43 @@ export async function createPrintPdfFile({ element, filename }: CreatePrintPdfFi
   }
 
   const [{ default: html2canvas }, { jsPDF }] = await Promise.all([import("html2canvas"), import("jspdf")]);
-  const captureTarget = createPdfCaptureTarget(element);
-  const canvas = await html2canvas(captureTarget.element, {
-    backgroundColor: "#ffffff",
-    scale: 2,
-    width: captureTarget.width,
-    height: captureTarget.height,
-    windowWidth: captureTarget.width,
-    windowHeight: captureTarget.height,
-    scrollX: 0,
-    scrollY: 0
-  }).finally(captureTarget.cleanup);
-
-  if (canvas.width <= 0 || canvas.height <= 0) {
-    throw new Error("打印内容不可用");
-  }
-
   const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pageWidth = pdf.internal.pageSize.getWidth();
   const pageHeight = pdf.internal.pageSize.getHeight();
   const printableWidth = pageWidth - PDF_MARGIN_MM * 2;
   const printableHeight = pageHeight - PDF_MARGIN_MM * 2;
-  const pageTiles = createPdfPageTiles(canvas, captureTarget.width, printableWidth, printableHeight);
+  const logicalPages = getLogicalPrintPages(element);
 
-  for (const [pageIndex, pageTile] of pageTiles.entries()) {
+  for (const [pageIndex, logicalPage] of logicalPages.entries()) {
     if (pageIndex > 0) {
       pdf.addPage();
     }
 
-    const pageSliceCanvas = createPdfPageSliceCanvas(canvas, pageTile);
-    const pageImageHeight = Math.min(printableHeight, (pageTile.tileHeight * printableWidth) / pageTile.tileWidth);
+    const captureTarget = createPdfCaptureTarget(logicalPage);
+    const canvas = await html2canvas(captureTarget.element, {
+      backgroundColor: "#ffffff",
+      scale: 2,
+      width: captureTarget.width,
+      height: captureTarget.height,
+      windowWidth: captureTarget.width,
+      windowHeight: captureTarget.height,
+      scrollX: 0,
+      scrollY: 0
+    }).finally(captureTarget.cleanup);
+
+    if (canvas.width <= 0 || canvas.height <= 0) {
+      throw new Error("打印内容不可用");
+    }
+
+    const placement = calculatePdfImagePlacement(canvas, pageWidth, pageHeight, printableWidth, printableHeight);
 
     pdf.addImage(
-      pageSliceCanvas.toDataURL("image/png"),
+      canvas.toDataURL("image/png"),
       "PNG",
-      PDF_MARGIN_MM,
-      PDF_MARGIN_MM,
-      printableWidth,
-      pageImageHeight
+      placement.x,
+      placement.y,
+      placement.width,
+      placement.height
     );
   }
 

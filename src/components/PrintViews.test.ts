@@ -470,6 +470,31 @@ describe("PrintViews", () => {
     expect(bonusSummary.text()).toContain("607.59");
   });
 
+  it("separates month schedule, monthly summary and bonus summary into logical PDF pages", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary,
+        monthlySummary,
+        monthlySettlement
+      }
+    });
+
+    const pages = wrapper.findAll(".print-month > .print-pdf-page");
+
+    expect(pages).toHaveLength(3);
+    expect(pages[0].classes()).toContain("print-pdf-schedule-page");
+    expect(pages[0].find(".print-month-detail-table").exists()).toBe(true);
+    expect(pages[0].text()).toContain("国际医学部护理月排班表");
+    expect(pages[0].text()).not.toContain("月度汇总");
+    expect(pages[1].classes()).toContain("print-month-summary");
+    expect(pages[1].text()).toContain("月度汇总");
+    expect(pages[1].find(".print-month-detail-table").exists()).toBe(false);
+    expect(pages[2].classes()).toContain("print-bonus-summary");
+    expect(pages[2].text()).toContain("奖金分配");
+  });
+
   it("uses settled snapshot rows for printed monthly totals", () => {
     const wrapper = mount(PrintViews, {
       props: {
@@ -540,6 +565,28 @@ describe("PrintViews", () => {
     expectPersonCellText(weeklyPrint.text(), "王护士", "N001");
   });
 
+  it("separates weekly schedule detail and weekly summary into logical PDF pages", () => {
+    const wrapper = mount(PrintViews, {
+      props: {
+        data: createData([]),
+        days,
+        summary
+      }
+    });
+
+    const pages = wrapper.findAll(".print-week > .print-pdf-page");
+
+    expect(pages).toHaveLength(2);
+    expect(pages[0].classes()).toContain("print-pdf-schedule-page");
+    expect(pages[0].find(".print-week-detail-table").exists()).toBe(true);
+    expect(pages[0].text()).toContain("国际医学部护理周统计表");
+    expect(pages[0].text()).not.toContain("出勤班次");
+    expect(pages[1].classes()).toContain("print-week-summary");
+    expect(pages[1].text()).toContain("周统计汇总");
+    expect(pages[1].text()).toContain("出勤班次");
+    expect(pages[1].find(".print-week-detail-table").exists()).toBe(false);
+  });
+
   it("marks only the selected print view as active in preview mode", () => {
     const wrapper = mount(PrintViews, {
       props: {
@@ -591,7 +638,7 @@ describe("PrintViews", () => {
       }
     });
 
-    const weeklySummaryRow = wrapper.get(".print-week > .print-table tbody tr");
+    const weeklySummaryRow = wrapper.get(".print-week-summary .print-table tbody tr");
 
     expectPersonCellText(weeklySummaryRow.findAll("td")[0].text(), "王护士", "N001");
   });
