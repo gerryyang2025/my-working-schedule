@@ -25,6 +25,7 @@ const apiMocks = vi.hoisted(() => ({
   saveShift: vi.fn(),
   saveStaff: vi.fn(),
   saveStaffOrder: vi.fn(),
+  swapWeekSchedule: vi.fn(),
   saveUser: vi.fn()
 }));
 
@@ -353,7 +354,7 @@ const AppToolbarStub = defineComponent({
 const ScheduleGridStub = defineComponent({
   name: "ScheduleGrid",
   props: ["staff", "days", "editableStaffIds", "canReorderStaff", "selectedStaffId"],
-  emits: ["quickFill", "editCell", "reorderStaff", "selectStaff"],
+  emits: ["quickFill", "editCell", "reorderStaff", "selectStaff", "swapSchedule"],
   template: `
     <section>
       <span data-testid="schedule-grid">{{ days.map((day) => day.key).join(",") }}</span>
@@ -374,6 +375,20 @@ const ScheduleGridStub = defineComponent({
         @click="$emit('reorderStaff', staff.slice().sort((left, right) => left.sortOrder - right.sortOrder).map((person) => person.id).reverse())"
       >
         reorder staff
+      </button>
+      <button
+        data-testid="emit-swap-schedule-up"
+        type="button"
+        @click="$emit('swapSchedule', 'up')"
+      >
+        swap schedule up
+      </button>
+      <button
+        data-testid="emit-swap-schedule-down"
+        type="button"
+        @click="$emit('swapSchedule', 'down')"
+      >
+        swap schedule down
       </button>
       <button
         data-testid="emit-invalid-reorder-staff"
@@ -2139,6 +2154,31 @@ describe("App", () => {
     ]);
     expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
     expect(elementPlusMocks.ElMessage.success).not.toHaveBeenCalledWith("人员顺序已更新");
+  });
+
+  it("swaps only the selected week schedule with the adjacent staff without reordering staff", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+    apiMocks.swapWeekSchedule.mockResolvedValue({
+      data: structuredClone(threeStaffData),
+      result: { swappedDays: 2 }
+    });
+    const wrapper = mountApp(threeStaffData);
+
+    await flushPromises();
+    await wrapper.get('[data-testid="emit-select-staff-b"]').trigger("click");
+    await nextTick();
+
+    await wrapper.get('[data-testid="emit-swap-schedule-up"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.swapWeekSchedule).toHaveBeenCalledWith({
+      weekStart: "2026-06-15",
+      sourceStaffId: "staff-nurse-002",
+      targetStaffId: "staff-nurse-001"
+    });
+    expect(apiMocks.saveStaffOrder).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="schedule-selected-staff-id"]').text()).toBe("staff-nurse-002");
   });
 
   it("does not let schedulers reorder schedule staff", async () => {

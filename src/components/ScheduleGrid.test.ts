@@ -181,11 +181,14 @@ describe("ScheduleGrid", () => {
       selectedStaffId: "staff-b"
     });
 
-    expect(upWrapper.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员排序");
+    expect(upWrapper.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员和排班排序");
+    expect(upWrapper.get('[data-testid="schedule-only-reorder-label"]').text()).toBe("仅排班排序");
     expect(upWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("已选：乙护士 N002");
 
     await upWrapper.get('[data-testid="schedule-reorder-up"]').trigger("click");
     expect(upWrapper.emitted("reorderStaff")).toEqual([[["staff-b", "staff-a", "staff-c"]]]);
+    await upWrapper.get('[data-testid="schedule-only-reorder-up"]').trigger("click");
+    expect(upWrapper.emitted("swapSchedule")).toEqual([["up"]]);
 
     const downWrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -196,6 +199,8 @@ describe("ScheduleGrid", () => {
 
     await downWrapper.get('[data-testid="schedule-reorder-down"]').trigger("click");
     expect(downWrapper.emitted("reorderStaff")).toEqual([[["staff-a", "staff-c", "staff-b"]]]);
+    await downWrapper.get('[data-testid="schedule-only-reorder-down"]').trigger("click");
+    expect(downWrapper.emitted("swapSchedule")).toEqual([["down"]]);
   });
 
   it("disables shared staff toolbar actions with no selection or edge selections", () => {
@@ -208,6 +213,8 @@ describe("ScheduleGrid", () => {
     expect(noSelectionWrapper.get('[data-testid="schedule-reorder-selected"]').text()).toBe("请选择人员");
     expect(noSelectionWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
     expect(noSelectionWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
+    expect(noSelectionWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeDefined();
+    expect(noSelectionWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeDefined();
 
     const firstWrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -218,6 +225,8 @@ describe("ScheduleGrid", () => {
 
     expect(firstWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeDefined();
     expect(firstWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeUndefined();
+    expect(firstWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeDefined();
+    expect(firstWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeUndefined();
 
     const lastWrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -228,6 +237,8 @@ describe("ScheduleGrid", () => {
 
     expect(lastWrapper.get('[data-testid="schedule-reorder-up"]').attributes("disabled")).toBeUndefined();
     expect(lastWrapper.get('[data-testid="schedule-reorder-down"]').attributes("disabled")).toBeDefined();
+    expect(lastWrapper.get('[data-testid="schedule-only-reorder-up"]').attributes("disabled")).toBeUndefined();
+    expect(lastWrapper.get('[data-testid="schedule-only-reorder-down"]').attributes("disabled")).toBeDefined();
   });
 
   it("hides the shared staff toolbar unless staff reordering is available", () => {

@@ -32,6 +32,7 @@ import {
   saveShift,
   saveStaff,
   saveStaffOrder,
+  swapWeekSchedule,
   saveUser
 } from "@/api/client";
 import type {
@@ -55,6 +56,7 @@ import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
 type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "print" | "config" | "help";
+type ReorderDirection = "up" | "down";
 
 const today = toDateKey(new Date());
 const data = ref<PublicAppData | null>(null);
@@ -90,6 +92,7 @@ const managementDataRequestId = ref(0);
 const auditLogRequestId = ref(0);
 const configMutationRequestId = ref(0);
 const staffOrderRequestId = ref(0);
+const scheduleSwapRequestId = ref(0);
 const configLoadAbortController = ref<AbortController | null>(null);
 const managementDataAbortController = ref<AbortController | null>(null);
 const auditLogAbortController = ref<AbortController | null>(null);
@@ -113,6 +116,7 @@ const copyingPreviousWeek = ref(false);
 const bulkUpdatingWeek = ref(false);
 const scheduleEntrySaving = ref(false);
 const staffOrderSaving = ref(false);
+const scheduleSwapSaving = ref(false);
 const userMenuOpen = ref(false);
 const userMenuRef = ref<HTMLElement | null>(null);
 const userMenuButtonRef = ref<HTMLButtonElement | null>(null);
@@ -277,7 +281,7 @@ const shiftCoefficientDescriptions = computed(() =>
 );
 const managedStaffIdSet = computed(() => new Set(currentUser.value?.managedStaffIds ?? []));
 const editableStaffIds = computed(() => {
-  if (!data.value || !currentUser.value || staffOrderSaving.value) {
+  if (!data.value || !currentUser.value || staffOrderSaving.value || scheduleSwapSaving.value) {
     return [];
   }
 
@@ -307,7 +311,12 @@ const currentWeekEditableEntryCount = computed(() => {
 const restShift = computed(() => findEnabledShift(["休"], ["休息"]));
 const officeShift = computed(() => findEnabledShift(["办公"], ["办公"]));
 const scheduleActionBusy = computed(
-  () => copyingPreviousWeek.value || bulkUpdatingWeek.value || scheduleEntrySaving.value || staffOrderSaving.value
+  () =>
+    copyingPreviousWeek.value ||
+    bulkUpdatingWeek.value ||
+    scheduleEntrySaving.value ||
+    staffOrderSaving.value ||
+    scheduleSwapSaving.value
 );
 const canOperateCurrentSettlement = computed(() => {
   if (!currentUser.value || isBonusRangeMode.value) {
@@ -448,6 +457,11 @@ function cancelStaffOrderRequest(): void {
   staffOrderSaving.value = false;
 }
 
+function cancelScheduleSwapRequest(): void {
+  scheduleSwapRequestId.value += 1;
+  scheduleSwapSaving.value = false;
+}
+
 function isAbortError(caughtError: unknown): boolean {
   return (
     typeof caughtError === "object" &&
@@ -500,8 +514,12 @@ function canApplyStaffOrderRequest(requestId: number, userId: string | null): bo
   return staffOrderRequestId.value === requestId && canManageConfig.value && (currentUser.value?.id ?? null) === userId;
 }
 
+function canApplyScheduleSwapRequest(requestId: number, userId: string | null): boolean {
+  return scheduleSwapRequestId.value === requestId && canManageConfig.value && (currentUser.value?.id ?? null) === userId;
+}
+
 function beginConfigMutation(): ConfigMutationContext | null {
-  if (!canManageConfig.value || activeWorkbenchTab.value !== "config" || staffOrderSaving.value) {
+  if (!canManageConfig.value || activeWorkbenchTab.value !== "config" || staffOrderSaving.value || scheduleSwapSaving.value) {
     return null;
   }
 
@@ -661,6 +679,7 @@ async function handleLogout(): Promise<void> {
   cancelPrintPdfRequest();
   cancelConfigRequests();
   cancelStaffOrderRequest();
+  cancelScheduleSwapRequest();
   activeWorkbenchTab.value = "schedule";
   await logout();
   currentUser.value = null;
@@ -729,6 +748,7 @@ async function handleChangePassword(payload: PasswordChangeInput): Promise<void>
     cancelPrintPdfRequest();
     cancelConfigRequests();
     cancelStaffOrderRequest();
+    cancelScheduleSwapRequest();
     activeWorkbenchTab.value = "schedule";
     await logout();
     currentUser.value = null;
@@ -1151,6 +1171,25 @@ function hasCompleteVisibleStaffOrder(visibleStaffIds: string[]): boolean {
   );
 }
 
+function isReorderDirection(value: unknown): value is ReorderDirection {
+  return value === "up" || value === "down";
+}
+
+function adjacentScheduleStaffId(direction: ReorderDirection): string | null {
+  if (!selectedScheduleStaffId.value) {
+    return null;
+  }
+
+  const visibleStaffIds = filteredScheduleStaff.value.map((staff) => staff.id);
+  const selectedIndex = visibleStaffIds.indexOf(selectedScheduleStaffId.value);
+  if (selectedIndex === -1) {
+    return null;
+  }
+
+  const targetIndex = direction === "up" ? selectedIndex - 1 : selectedIndex + 1;
+  return visibleStaffIds[targetIndex] ?? null;
+}
+
 function clearScheduleStaffSearch(): void {
   scheduleStaffQuery.value = "";
 }
@@ -1218,7 +1257,7 @@ async function handleEditorSave(shiftIds: string[], note: string): Promise<void>
 }
 
 async function handleReorderStaff(visibleStaffIds: unknown): Promise<void> {
-  if (!data.value || !canReorderScheduleStaff.value || staffOrderSaving.value) {
+  if (!data.value || !canReorderScheduleStaff.value || staffOrderSaving.value || scheduleSwapSaving.value) {
     return;
   }
 
@@ -1265,6 +1304,55 @@ async function handleReorderStaff(visibleStaffIds: unknown): Promise<void> {
   } finally {
     if (staffOrderRequestId.value === requestId) {
       staffOrderSaving.value = false;
+    }
+  }
+}
+
+async function handleSwapSchedule(direction: unknown): Promise<void> {
+  if (!data.value || !canReorderScheduleStaff.value || scheduleSwapSaving.value) {
+    return;
+  }
+  if (!isReorderDirection(direction)) {
+    ElMessage.error("仅排班排序失败");
+    return;
+  }
+
+  const targetStaffId = adjacentScheduleStaffId(direction);
+  if (!selectedScheduleStaffId.value || !targetStaffId) {
+    ElMessage.error("仅排班排序失败");
+    return;
+  }
+
+  const requestId = (scheduleSwapRequestId.value += 1);
+  const requestUserId = currentUser.value?.id ?? null;
+  scheduleSwapSaving.value = true;
+  try {
+    const response = await swapWeekSchedule({
+      weekStart: selectedWeek.value.start,
+      sourceStaffId: selectedScheduleStaffId.value,
+      targetStaffId
+    });
+    if (!canApplyScheduleSwapRequest(requestId, requestUserId)) {
+      return;
+    }
+
+    if (activeWorkbenchTab.value === "config") {
+      cancelConfigLoadRequest();
+      cancelConfigReadRequests();
+    }
+
+    data.value = response.data;
+    await refreshLatestAuditLogsIfManaging();
+    if (!canApplyScheduleSwapRequest(requestId, requestUserId)) {
+      return;
+    }
+  } catch (caughtError) {
+    if (canApplyScheduleSwapRequest(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "仅排班排序失败");
+    }
+  } finally {
+    if (scheduleSwapRequestId.value === requestId) {
+      scheduleSwapSaving.value = false;
     }
   }
 }
@@ -1586,6 +1674,7 @@ onBeforeUnmount(() => {
   cancelPrintPdfRequest();
   cancelConfigRequests();
   cancelStaffOrderRequest();
+  cancelScheduleSwapRequest();
   document.removeEventListener("click", handleDocumentClick);
 });
 </script>
@@ -1787,6 +1876,7 @@ onBeforeUnmount(() => {
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
               @reorder-staff="handleReorderStaff"
+              @swap-schedule="handleSwapSchedule"
               @select-staff="handleSelectScheduleStaff"
             />
           </section>

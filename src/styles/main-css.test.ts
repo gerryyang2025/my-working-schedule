@@ -438,6 +438,7 @@ describe("main.css layout rules", () => {
   it("styles the shared staff reorder toolbar and selected row highlight", () => {
     const gridPanel = ruleBlocks(".schedule-grid-panel")[0] ?? "";
     const toolbar = ruleBlocks(".schedule-reorder-toolbar")[0] ?? "";
+    const controls = ruleBlocks(".schedule-reorder-controls")[0] ?? "";
     const controlGroup = ruleBlocks(".schedule-reorder-control-group")[0] ?? "";
     const label = ruleBlocks(".schedule-reorder-label")[0] ?? "";
     const actions = ruleBlocks(".schedule-reorder-actions")[0] ?? "";
@@ -452,6 +453,7 @@ describe("main.css layout rules", () => {
     const selectedSortColumn = ruleBlocks(".schedule-grid tr.selected-staff-row > .sort-col")[0] ?? "";
     const mobileCss = mediaBlock("(max-width: 768px)");
     const mobileToolbar = ruleBlockIn(mobileCss, ".schedule-reorder-toolbar");
+    const mobileControls = ruleBlockIn(mobileCss, ".schedule-reorder-controls");
     const mobileControlGroup = ruleBlockIn(mobileCss, ".schedule-reorder-control-group");
     const mobileActions = ruleBlockIn(mobileCss, ".schedule-reorder-actions");
     const mobileActionButton = ruleBlockIn(mobileCss, ".schedule-reorder-actions button");
@@ -463,6 +465,8 @@ describe("main.css layout rules", () => {
     expect(toolbar).toContain("border: 1px solid #dbe3ef");
     expect(toolbar).toContain("background: #ffffff");
     expect(toolbar).toContain("padding: 8px");
+    expect(controls).toContain("display: flex");
+    expect(controls).toContain("flex-wrap: wrap");
     expect(controlGroup).toContain("display: inline-flex");
     expect(controlGroup).toContain("align-items: center");
     expect(label).toContain("font-size: 13px");
@@ -483,6 +487,7 @@ describe("main.css layout rules", () => {
     expect(selectedRowCells).toContain("rgba(37, 99, 235");
     expect(selectedSortColumn).toContain("inset 3px 0 0 #2563eb");
     expect(mobileToolbar).toContain("flex-direction: column");
+    expect(mobileControls).toContain("display: grid");
     expect(mobileControlGroup).toContain("grid-template-columns: auto minmax(0, 1fr)");
     expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(mobileActionButton).toContain("min-height: 34px");

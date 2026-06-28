@@ -38,6 +38,16 @@ interface CopyPreviousWeekResult {
   skipped: number;
 }
 
+interface ScheduleSwapWeekPayload {
+  weekStart: string;
+  sourceStaffId: string;
+  targetStaffId: string;
+}
+
+interface ScheduleSwapWeekResult {
+  swappedDays: number;
+}
+
 type BulkWeekOperation = "set-shift" | "clear";
 
 type BulkWeekPayload =
@@ -601,6 +611,29 @@ function parseBulkWeekPayload(body: unknown): PayloadResult<BulkWeekPayload> {
   };
 }
 
+function parseScheduleSwapWeekPayload(body: unknown): PayloadResult<ScheduleSwapWeekPayload> {
+  if (!isRecord(body)) {
+    return { ok: false, message: "排班排序信息不完整" };
+  }
+
+  const { weekStart, sourceStaffId, targetStaffId } = body;
+  if (!isNonEmptyString(weekStart) || !isNonEmptyString(sourceStaffId) || !isNonEmptyString(targetStaffId)) {
+    return { ok: false, message: "排班排序信息不完整" };
+  }
+  if (sourceStaffId === targetStaffId) {
+    return { ok: false, message: "排班排序信息不完整" };
+  }
+
+  return {
+    ok: true,
+    value: {
+      weekStart,
+      sourceStaffId,
+      targetStaffId
+    }
+  };
+}
+
 function copyPreviousWeekEntries(
   data: AppData,
   user: AuthUser | undefined,
@@ -722,6 +755,80 @@ function bulkUpdateWeekEntries(data: AppData, user: AuthUser | undefined, payloa
       scheduleEntries: [...entriesById.values()]
     },
     result: { updated, skipped }
+  };
+}
+
+function swapWeekScheduleEntries(
+  data: AppData,
+  user: AuthUser | undefined,
+  payload: ScheduleSwapWeekPayload
+): { data: AppData; result: ScheduleSwapWeekResult } {
+  const weekRange = getWeekRange(payload.weekStart);
+  const targetDates = listDateKeys(weekRange.start, weekRange.end);
+  for (const targetDate of targetDates) {
+    if (isMonthSettled(data, getMonthKey(targetDate))) {
+      throw new HttpResponseError(400, "该月份已月结，不能修改排班");
+    }
+  }
+
+  const sourceStaff = data.staff.find((staff) => staff.id === payload.sourceStaffId);
+  const targetStaff = data.staff.find((staff) => staff.id === payload.targetStaffId);
+  if (!sourceStaff || !targetStaff) {
+    throw new HttpResponseError(400, "人员不存在");
+  }
+  if (!sourceStaff.enabled || !targetStaff.enabled) {
+    throw new HttpResponseError(400, "人员已停用，不能调整排班排序");
+  }
+  if (!canManageStaff(user, sourceStaff.id) || !canManageStaff(user, targetStaff.id)) {
+    throw new HttpResponseError(403, "当前账号没有该人员操作权限");
+  }
+
+  const entriesById = new Map(data.scheduleEntries.map((entry) => [entry.id, entry]));
+  let swappedDays = 0;
+
+  for (const targetDate of targetDates) {
+    const sourceEntryId = `${targetDate}__${sourceStaff.id}`;
+    const targetEntryId = `${targetDate}__${targetStaff.id}`;
+    const sourceEntry = entriesById.get(sourceEntryId);
+    const targetEntry = entriesById.get(targetEntryId);
+    if (!sourceEntry && !targetEntry) {
+      continue;
+    }
+
+    entriesById.delete(sourceEntryId);
+    entriesById.delete(targetEntryId);
+
+    if (targetEntry) {
+      entriesById.set(sourceEntryId, {
+        ...targetEntry,
+        id: sourceEntryId,
+        date: targetDate,
+        staffId: sourceStaff.id,
+        shiftIds: [...targetEntry.shiftIds],
+        note: targetEntry.note ?? ""
+      });
+    }
+
+    if (sourceEntry) {
+      entriesById.set(targetEntryId, {
+        ...sourceEntry,
+        id: targetEntryId,
+        date: targetDate,
+        staffId: targetStaff.id,
+        shiftIds: [...sourceEntry.shiftIds],
+        note: sourceEntry.note ?? ""
+      });
+    }
+
+    swappedDays += 1;
+  }
+
+  return {
+    data: {
+      ...data,
+      scheduleEntries: [...entriesById.values()]
+    },
+    result: { swappedDays }
   };
 }
 
@@ -1326,6 +1433,39 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         `${operationText}，${weekStart}，更新 ${bulkResult.updated} 个，跳过 ${bulkResult.skipped} 个`
       );
       response.json({ data: toPublicData(nextData), result: bulkResult });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/data/schedule-swap-week", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const payload = parseScheduleSwapWeekPayload(request.body);
+      if (payload.ok === false) {
+        response.status(400).json({ message: payload.message });
+        return;
+      }
+
+      if (!isValidDateKey(payload.value.weekStart)) {
+        response.status(400).json({ message: "日期格式不正确" });
+        return;
+      }
+
+      let swapResult: ScheduleSwapWeekResult = { swappedDays: 0 };
+      const weekStart = getWeekRange(payload.value.weekStart).start;
+      const nextData = await storage.update((data) => {
+        const swapped = swapWeekScheduleEntries(data, request.authUser, payload.value);
+        swapResult = swapped.result;
+        return swapped.data;
+      });
+      await recordAudit(
+        request,
+        "data.schedule_entry.swap_week",
+        "week",
+        weekStart,
+        `仅排班排序：${weekStart}，${payload.value.sourceStaffId} 与 ${payload.value.targetStaffId}，调整 ${swapResult.swappedDays} 天`
+      );
+      response.json({ data: toPublicData(nextData), result: swapResult });
     } catch (error) {
       handleRouteError(error, response, next);
     }

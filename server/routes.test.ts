@@ -1816,6 +1816,143 @@ describe.sequential("API routes", () => {
     ]);
   });
 
+  it("swaps only schedule entries between two staff for the selected week", async () => {
+    const initialData = createSeedData();
+    const originalStaffOrder = initialData.staff.map((staff) => ({ id: staff.id, sortOrder: staff.sortOrder }));
+    initialData.scheduleEntries = [
+      {
+        id: "2026-06-15__staff-head-001",
+        date: "2026-06-15",
+        staffId: "staff-head-001",
+        shiftIds: ["shift-a1"],
+        note: "head monday"
+      },
+      {
+        id: "2026-06-15__staff-nurse-001",
+        date: "2026-06-15",
+        staffId: "staff-nurse-001",
+        shiftIds: ["shift-p1"],
+        note: "nurse monday"
+      },
+      {
+        id: "2026-06-16__staff-head-001",
+        date: "2026-06-16",
+        staffId: "staff-head-001",
+        shiftIds: ["shift-n1"],
+        note: "head tuesday"
+      },
+      {
+        id: "2026-06-22__staff-head-001",
+        date: "2026-06-22",
+        staffId: "staff-head-001",
+        shiftIds: ["shift-rest"],
+        note: "outside week"
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-swap-week")
+      .set(await adminHeaders(app))
+      .send({
+        weekStart: "2026-06-15",
+        sourceStaffId: "staff-nurse-001",
+        targetStaffId: "staff-head-001"
+      })
+      .expect(200);
+
+    expect(response.body.result).toEqual({ swappedDays: 2 });
+    expect(response.body.data.staff.map((staff: StaffMember) => ({ id: staff.id, sortOrder: staff.sortOrder }))).toEqual(
+      originalStaffOrder
+    );
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: "2026-06-15__staff-head-001",
+          date: "2026-06-15",
+          staffId: "staff-head-001",
+          shiftIds: ["shift-p1"],
+          note: "nurse monday"
+        }),
+        expect.objectContaining({
+          id: "2026-06-15__staff-nurse-001",
+          date: "2026-06-15",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-a1"],
+          note: "head monday"
+        }),
+        expect.objectContaining({
+          id: "2026-06-16__staff-nurse-001",
+          date: "2026-06-16",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-n1"],
+          note: "head tuesday"
+        }),
+        expect.objectContaining({
+          id: "2026-06-22__staff-head-001",
+          shiftIds: ["shift-rest"],
+          note: "outside week"
+        })
+      ])
+    );
+    expect(response.body.data.scheduleEntries).not.toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: "2026-06-16__staff-head-001" })])
+    );
+  });
+
+  it("rejects schedule-only week swaps when the scheduler cannot manage both staff", async () => {
+    const app = createTestApp();
+    const schedulerHeaders = await createUserAndLogin(app, {
+      id: "user-swap-scheduler",
+      username: "swap-scheduler",
+      displayName: "排班管理员",
+      role: "scheduler",
+      managedStaffIds: ["staff-nurse-001"]
+    });
+
+    const response = await request(app)
+      .post("/api/data/schedule-swap-week")
+      .set(schedulerHeaders)
+      .send({
+        weekStart: "2026-06-15",
+        sourceStaffId: "staff-nurse-001",
+        targetStaffId: "staff-head-001"
+      })
+      .expect(403);
+
+    expect(response.body.message).toBe("当前账号没有该人员操作权限");
+  });
+
+  it("rejects schedule-only week swaps in a settled month", async () => {
+    const initialData = createSeedData();
+    initialData.monthlySettlements = [
+      {
+        id: "settlement-2026-06",
+        month: "2026-06",
+        monthStart: "2026-06-01",
+        monthEnd: "2026-06-30",
+        totalDays: 30,
+        bonusPool: 0,
+        coefficientTotal: 0,
+        settledAt: "2026-06-30T00:00:00.000Z",
+        rows: []
+      }
+    ];
+    const app = createTestApp(initialData);
+
+    const response = await request(app)
+      .post("/api/data/schedule-swap-week")
+      .set(await adminHeaders(app))
+      .send({
+        weekStart: "2026-06-15",
+        sourceStaffId: "staff-nurse-001",
+        targetStaffId: "staff-head-001"
+      })
+      .expect(400);
+
+    expect(response.body.message).toBe("该月份已月结，不能修改排班");
+  });
+
   it("rejects batch week operations in a settled month", async () => {
     const initialData = createSeedData();
     initialData.monthlySettlements = [

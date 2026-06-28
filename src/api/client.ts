@@ -48,6 +48,16 @@ export interface BulkWeekScheduleResult {
   skipped: number;
 }
 
+export interface ScheduleSwapWeekPayload {
+  weekStart: string;
+  sourceStaffId: string;
+  targetStaffId: string;
+}
+
+export interface ScheduleSwapWeekResult {
+  swappedDays: number;
+}
+
 export type BulkWeekSchedulePayload =
   | {
       weekStart: string;
@@ -349,6 +359,15 @@ export function bulkUpdateWeekSchedule(
   payload: BulkWeekSchedulePayload
 ): Promise<{ data: PublicAppData; result: BulkWeekScheduleResult }> {
   return requestJson<{ data: PublicAppData; result: BulkWeekScheduleResult }>("/api/data/schedule-bulk-week", {
+    method: "POST",
+    body: JSON.stringify(payload)
+  });
+}
+
+export function swapWeekSchedule(
+  payload: ScheduleSwapWeekPayload
+): Promise<{ data: PublicAppData; result: ScheduleSwapWeekResult }> {
+  return requestJson<{ data: PublicAppData; result: ScheduleSwapWeekResult }>("/api/data/schedule-swap-week", {
     method: "POST",
     body: JSON.stringify(payload)
   });

@@ -603,6 +603,14 @@ body {
   background: #ffffff;
 }
 
+.schedule-reorder-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
 .schedule-reorder-control-group {
   display: inline-flex;
   align-items: center;
@@ -1411,6 +1419,11 @@ body {
   .schedule-reorder-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .schedule-reorder-controls {
+    display: grid;
+    gap: 8px;
   }
 
   .schedule-reorder-control-group {
