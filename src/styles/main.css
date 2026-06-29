@@ -1515,6 +1515,7 @@ body {
 
   .schedule-efficiency-tools {
     display: grid;
+    flex: 0 0 auto;
     width: 100%;
     margin-left: 0;
     justify-content: stretch;

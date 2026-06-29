@@ -335,6 +335,7 @@ describe("main.css layout rules", () => {
     expect(mobileRowSearchInput).toContain("flex: 1 1 auto");
     expect(mobileActions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
     expect(mobileEfficiency).toContain("display: grid");
+    expect(mobileEfficiency).toContain("flex: 0 0 auto");
     expect(mobileEfficiency).toContain("width: 100%");
     expect(mobileEfficiency).toContain("margin-left: 0");
     expect(mobileEfficiency).toContain("justify-content: stretch");
