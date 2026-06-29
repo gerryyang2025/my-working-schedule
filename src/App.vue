@@ -1864,6 +1864,8 @@ onBeforeUnmount(() => {
                   未找到匹配人员
                 </p>
               </div>
+            </div>
+            <section class="schedule-efficiency-row" aria-label="排班效率工具区域">
               <section class="schedule-efficiency-tools" data-testid="schedule-efficiency-tools" aria-label="排班效率工具">
                 <strong class="schedule-efficiency-title">排班效率工具</strong>
                 <div
@@ -1963,7 +1965,7 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </section>
-            </div>
+            </section>
             <ShiftPalette :shifts="data.shifts" :selected-shift-id="selectedShiftId" @select="selectedShiftId = $event" />
             <ScheduleGrid
               v-if="!hasScheduleStaffSearch || hasScheduleStaffSearchResults"

@@ -242,11 +242,11 @@ describe("main.css layout rules", () => {
     const weekRangeRules = ruleBlocks(".schedule-week-range")[0] ?? "";
     const rowSearchRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search");
     const rowSearchInputRules = ruleBlockIn(css, ".schedule-operation-row .schedule-search-input");
-    const rowActionsRules = ruleBlockIn(css, ".schedule-operation-row .schedule-actions");
+    const efficiencyRowRules = ruleBlocks(".schedule-efficiency-row")[0] ?? "";
     const efficiencyRules = ruleBlocks(".schedule-efficiency-tools")[0] ?? "";
     const efficiencyTitleRules = ruleBlocks(".schedule-efficiency-title")[0] ?? "";
     const efficiencyToolbarRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-reorder-toolbar");
-    const efficiencyActionsRules = ruleBlockIn(css, ".schedule-operation-row .schedule-efficiency-tools .schedule-actions");
+    const efficiencyActionsRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-actions");
 
     expect(operationRowRules).toContain("display: flex");
     expect(operationRowRules).toContain("flex-wrap: wrap");
@@ -283,14 +283,18 @@ describe("main.css layout rules", () => {
     expect(rowSearchInputRules).toContain("flex: 0 0 280px");
     expect(rowSearchInputRules).toContain("width: 280px");
     expect(rowSearchInputRules).toContain("max-width: 100%");
-    expect(rowActionsRules).toContain("margin-left: auto");
-    expect(rowActionsRules).toContain("margin-bottom: 0");
-    expect(rowActionsRules).toContain("justify-content: flex-end");
+    expect(efficiencyRowRules).toContain("display: flex");
+    expect(efficiencyRowRules).toContain("align-items: center");
+    expect(efficiencyRowRules).toContain("border: 1px solid #dbeafe");
+    expect(efficiencyRowRules).toContain("background: #f8fbff");
+    expect(efficiencyRowRules).toContain("padding: 8px");
+    expect(efficiencyRowRules).toContain("margin: 0 0 8px");
     expect(efficiencyRules).toContain("display: flex");
-    expect(efficiencyRules).toContain("flex: 1 1 520px");
-    expect(efficiencyRules).toContain("justify-content: flex-end");
+    expect(efficiencyRules).toContain("flex-wrap: wrap");
+    expect(efficiencyRules).toContain("width: 100%");
+    expect(efficiencyRules).toContain("justify-content: flex-start");
     expect(efficiencyRules).toContain("gap: 8px");
-    expect(efficiencyRules).toContain("margin-left: auto");
+    expect(efficiencyRules).toContain("margin-left: 0");
     expect(efficiencyTitleRules).toContain("font-size: 13px");
     expect(efficiencyTitleRules).toContain("font-weight: 800");
     expect(efficiencyTitleRules).toContain("white-space: nowrap");
@@ -305,6 +309,7 @@ describe("main.css layout rules", () => {
     const mobileInput = ruleBlockIn(mobileCss, ".schedule-search-input");
     const mobileClear = ruleBlockIn(mobileCss, ".schedule-search-clear");
     const mobileOperationRow = ruleBlockIn(mobileCss, ".schedule-operation-row");
+    const mobileEfficiencyRow = ruleBlockIn(mobileCss, ".schedule-efficiency-row");
     const mobileWeekControls = ruleBlockIn(mobileCss, ".schedule-week-controls");
     const mobileWeekFields = ruleBlockIn(mobileCss, ".schedule-week-fields");
     const mobileWeekRange = ruleBlockIn(mobileCss, ".schedule-week-range");
@@ -322,6 +327,7 @@ describe("main.css layout rules", () => {
     expect(mobileClear).toContain("width: 100%");
     expect(mobileOperationRow).toContain("align-items: stretch");
     expect(mobileOperationRow).toContain("flex-direction: column");
+    expect(mobileEfficiencyRow).toContain("align-items: stretch");
     expect(mobileWeekControls).toContain("width: 100%");
     expect(mobileWeekFields).toContain("flex-wrap: wrap");
     expect(mobileWeekRange).toContain("flex: 0 1 auto");
@@ -347,7 +353,7 @@ describe("main.css layout rules", () => {
     const printMedia = mediaBlock("print");
     const hiddenControls = ruleBlockIn(
       printMedia,
-      ".app-header,\n  .app-header-actions,\n  .state-message,\n  .schedule-operation-row,\n  .workbench,\n  .el-overlay,\n  .el-drawer"
+      ".app-header,\n  .app-header-actions,\n  .state-message,\n  .schedule-operation-row,\n  .schedule-efficiency-row,\n  .workbench,\n  .el-overlay,\n  .el-drawer"
     );
 
     expect(hiddenControls).toContain("display: none !important");
