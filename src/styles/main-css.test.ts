@@ -476,6 +476,7 @@ describe("main.css layout rules", () => {
 
   it("keeps only sort id and staff columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
+    const stickyTableHeader = ruleBlocks(".schedule-grid thead")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";
     const gridRules = ruleBlocks(".schedule-grid")[0] ?? "";
     const sortColumnRules = ruleBlocks(".schedule-grid .sort-col");
@@ -486,6 +487,9 @@ describe("main.css layout rules", () => {
 
     expect(stickyColumn).toContain("position: sticky");
     expect(stickyColumn).toContain("left: 0");
+    expect(stickyTableHeader).toContain("position: sticky");
+    expect(stickyTableHeader).toContain("top: var(--schedule-grid-header-top, 0px)");
+    expect(stickyTableHeader).toContain("z-index: 5");
     expect(stickyHeader).toContain("z-index: 6");
     expect(gridRules).toContain("table-layout: fixed");
     expect(gridRules).toContain("width: max-content");
@@ -548,6 +552,7 @@ describe("main.css layout rules", () => {
     const shiftChip = ruleBlocks(".shift-chip")[0] ?? "";
 
     expect(gridWrap).toContain("overflow-x: auto");
+    expect(gridWrap).toContain("overflow-y: visible");
     expect(gridWrap).toContain("max-height: none");
     expect(gridWrap).not.toContain("overflow: auto");
     expect(gridCell).toContain("height: 44px");

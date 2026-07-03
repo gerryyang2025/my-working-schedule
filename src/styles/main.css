@@ -805,6 +805,7 @@ body {
 
 .schedule-grid-wrap {
   overflow-x: auto;
+  overflow-y: visible;
   max-height: none;
   border: 1px solid #dbe3ef;
   background: #ffffff;
@@ -849,9 +850,15 @@ body {
   vertical-align: middle;
 }
 
+.schedule-grid thead {
+  position: sticky;
+  top: var(--schedule-grid-header-top, 0px);
+  z-index: 5;
+}
+
 .schedule-grid thead th {
   position: sticky;
-  top: 0;
+  top: var(--schedule-grid-header-top, 0px);
   z-index: 3;
   background: #f8fafc;
 }
