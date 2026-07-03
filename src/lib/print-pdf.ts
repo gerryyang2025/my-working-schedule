@@ -5,6 +5,7 @@ interface CreatePrintPdfFileOptions {
 
 const PDF_MARGIN_MM = 8;
 const PDF_CAPTURE_MIN_WIDTH_PX = 960;
+const PDF_CAPTURE_BOTTOM_GUARD_PX = 24;
 const PDF_PAGE_SELECTOR = ".print-pdf-page";
 
 interface PdfCaptureTarget {
@@ -72,7 +73,8 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
     width: "100%",
     height: "auto",
     maxHeight: "none",
-    overflow: "visible"
+    overflow: "visible",
+    paddingBottom: `${PDF_CAPTURE_BOTTOM_GUARD_PX}px`
   });
 
   host.appendChild(clonedElement);
@@ -82,7 +84,7 @@ function createPdfCaptureTarget(sourceElement: HTMLElement): PdfCaptureTarget {
   host.style.width = `${width}px`;
 
   const height = Math.max(
-    sourceHeight,
+    sourceHeight + PDF_CAPTURE_BOTTOM_GUARD_PX,
     getElementDimension(clonedElement, ["scrollHeight", "offsetHeight", "clientHeight"])
   );
 

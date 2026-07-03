@@ -76,7 +76,7 @@ describe("createPrintPdfFile", () => {
         backgroundColor: "#ffffff",
         scale: 2,
         width: 960,
-        height: 640
+        height: 664
       })
     );
     expect(jsPDF).toHaveBeenCalledWith({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -199,14 +199,38 @@ describe("createPrintPdfFile", () => {
     expect(options).toEqual(
       expect.objectContaining({
         width: 960,
-        height: 620,
+        height: 644,
         windowWidth: 960,
-        windowHeight: 620,
+        windowHeight: 644,
         scrollX: 0,
         scrollY: 0
       })
     );
     expect(document.body.contains(capturedElement as HTMLElement)).toBe(false);
+  });
+
+  it("adds bottom capture padding so the last printed row is not clipped", async () => {
+    const preview = document.createElement("section");
+    Object.defineProperties(preview, {
+      clientWidth: { configurable: true, value: 960 },
+      offsetWidth: { configurable: true, value: 960 },
+      scrollWidth: { configurable: true, value: 960 },
+      clientHeight: { configurable: true, value: 640 },
+      offsetHeight: { configurable: true, value: 640 },
+      scrollHeight: { configurable: true, value: 640 }
+    });
+    vi.mocked(html2canvas).mockResolvedValue(createCanvasMock(1920, 1280));
+
+    await createPrintPdfFile({ element: preview, filename: "week-schedule.pdf" });
+
+    const [capturedElement, captureOptions] = vi.mocked(html2canvas).mock.calls[0];
+    expect((capturedElement as HTMLElement).style.paddingBottom).toBe("24px");
+    expect(captureOptions).toEqual(
+      expect.objectContaining({
+        height: 664,
+        windowHeight: 664
+      })
+    );
   });
 
   it("expands cloned print content before PDF capture", async () => {
