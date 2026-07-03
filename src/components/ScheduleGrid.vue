@@ -3,6 +3,8 @@ import { computed, onBeforeUnmount } from "vue";
 import type { CalendarDay } from "@/lib/date";
 import type { Holiday, ScheduleEntry, Shift, StaffMember, StaffType } from "@/types/domain";
 
+type ScheduleDisplayDensity = "standard" | "compact";
+
 const props = withDefaults(
   defineProps<{
     staff: StaffMember[];
@@ -14,8 +16,10 @@ const props = withDefaults(
     editableStaffIds: string[];
     canReorderStaff?: boolean;
     selectedStaffId?: string;
+    displayDensity?: ScheduleDisplayDensity;
+    showTypeColumn?: boolean;
   }>(),
-  { canReorderStaff: false, selectedStaffId: "" }
+  { canReorderStaff: false, selectedStaffId: "", displayDensity: "standard", showTypeColumn: true }
 );
 
 const emit = defineEmits<{
@@ -36,10 +40,12 @@ const SORT_COLUMN_WIDTH = 52;
 const JOB_COLUMN_WIDTH = 58;
 const TYPE_COLUMN_WIDTH = 48;
 const DAY_COLUMN_WIDTH = 104;
+const DAY_COLUMN_COMPACT_WIDTH = 88;
 const SORT_COLUMN_MOBILE_WIDTH = 48;
 const JOB_COLUMN_MOBILE_WIDTH = 54;
 const TYPE_COLUMN_MOBILE_WIDTH = 44;
 const DAY_COLUMN_MOBILE_WIDTH = 68;
+const DAY_COLUMN_COMPACT_MOBILE_WIDTH = 62;
 
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftMap = computed(() => new Map(props.shifts.map((shift) => [shift.id, shift])));
@@ -55,6 +61,10 @@ const sortedStaff = computed(() =>
     .sort((left, right) => left.sortOrder - right.sortOrder)
 );
 const showStaffReorderControls = computed(() => props.canReorderStaff && sortedStaff.value.length > 1);
+const dayColumnWidth = computed(() => (props.displayDensity === "compact" ? DAY_COLUMN_COMPACT_WIDTH : DAY_COLUMN_WIDTH));
+const dayColumnMobileWidth = computed(() =>
+  props.displayDensity === "compact" ? DAY_COLUMN_COMPACT_MOBILE_WIDTH : DAY_COLUMN_MOBILE_WIDTH
+);
 const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
@@ -63,16 +73,20 @@ const personColumnStyle = computed(() => {
   const typeColumnLeft = jobColumnLeft + JOB_COLUMN_WIDTH;
   const jobColumnMobileLeft = SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth;
   const typeColumnMobileLeft = jobColumnMobileLeft + JOB_COLUMN_MOBILE_WIDTH;
-  const scheduleGridMinWidth = typeColumnLeft + TYPE_COLUMN_WIDTH + props.days.length * DAY_COLUMN_WIDTH;
+  const fixedColumnWidth = props.showTypeColumn ? typeColumnLeft + TYPE_COLUMN_WIDTH : typeColumnLeft;
+  const fixedColumnMobileWidth = props.showTypeColumn
+    ? typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH
+    : typeColumnMobileLeft;
+  const scheduleGridMinWidth = fixedColumnWidth + props.days.length * dayColumnWidth.value;
   const scheduleGridMobileMinWidth =
-    typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH + props.days.length * DAY_COLUMN_MOBILE_WIDTH;
+    fixedColumnMobileWidth + props.days.length * dayColumnMobileWidth.value;
 
   return {
     "--sort-col-width": `${SORT_COLUMN_WIDTH}px`,
     "--person-col-width": `${personColumnWidth}px`,
     "--job-col-width": `${JOB_COLUMN_WIDTH}px`,
     "--type-col-width": `${TYPE_COLUMN_WIDTH}px`,
-    "--day-col-width": `${DAY_COLUMN_WIDTH}px`,
+    "--day-col-width": `${dayColumnWidth.value}px`,
     "--person-col-left": `${SORT_COLUMN_WIDTH}px`,
     "--job-col-left": `${jobColumnLeft}px`,
     "--type-col-left": `${typeColumnLeft}px`,
@@ -81,7 +95,7 @@ const personColumnStyle = computed(() => {
     "--person-col-mobile-width": `${personColumnMobileWidth}px`,
     "--job-col-mobile-width": `${JOB_COLUMN_MOBILE_WIDTH}px`,
     "--type-col-mobile-width": `${TYPE_COLUMN_MOBILE_WIDTH}px`,
-    "--day-col-mobile-width": `${DAY_COLUMN_MOBILE_WIDTH}px`,
+    "--day-col-mobile-width": `${dayColumnMobileWidth.value}px`,
     "--person-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH}px`,
     "--job-col-mobile-left": `${jobColumnMobileLeft}px`,
     "--type-col-mobile-left": `${typeColumnMobileLeft}px`,
@@ -176,12 +190,19 @@ onBeforeUnmount(() => {
 <template>
   <section class="schedule-grid-panel">
     <section class="schedule-grid-wrap">
-      <table class="schedule-grid" :style="personColumnStyle">
+      <table
+        class="schedule-grid"
+        :class="{
+          'schedule-grid-compact': displayDensity === 'compact',
+          'schedule-grid-hide-type': !showTypeColumn
+        }"
+        :style="personColumnStyle"
+      >
         <colgroup>
           <col class="sort-col-layout" />
           <col class="person-col-layout" />
           <col class="job-col-layout" />
-          <col class="type-col-layout" />
+          <col v-if="showTypeColumn" class="type-col-layout" />
           <col v-for="day in days" :key="`layout-${day.key}`" class="day-col-layout" />
         </colgroup>
         <thead>
@@ -189,7 +210,7 @@ onBeforeUnmount(() => {
             <th class="sticky-col sort-col">排序ID</th>
             <th class="sticky-col person-col">人员</th>
             <th class="sticky-col job-col">工号</th>
-            <th class="sticky-col type-col">类型</th>
+            <th v-if="showTypeColumn" class="sticky-col type-col">类型</th>
             <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
               <span>{{ day.dayOfMonth }}</span>
               <small>{{ day.weekdayName }}</small>
@@ -219,7 +240,7 @@ onBeforeUnmount(() => {
               <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
             </th>
             <td class="sticky-col job-col">{{ person.jobId }}</td>
-            <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
+            <td v-if="showTypeColumn" class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
             <td
               v-for="day in days"
               :key="`${person.id}-${day.key}`"

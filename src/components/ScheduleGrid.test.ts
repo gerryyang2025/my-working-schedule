@@ -117,6 +117,25 @@ describe("ScheduleGrid", () => {
     expect(firstRow.get(".type-col").text()).toBe("护士");
   });
 
+  it("can hide the type column to keep the schedule table compact", () => {
+    const wrapper = mountGrid([], {
+      showTypeColumn: false
+    });
+
+    expect(
+      wrapper
+        .findAll("thead th")
+        .slice(0, 4)
+        .map((cell) => cell.text())
+    ).toEqual(["排序ID", "人员", "工号", "19周五"]);
+    expect(wrapper.find(".type-col").exists()).toBe(false);
+    expect(wrapper.find(".type-col-layout").exists()).toBe(false);
+
+    const tableStyle = (wrapper.get(".schedule-grid").element as HTMLElement).style;
+    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("302px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("250px");
+  });
+
   it("emits selected staff row changes and marks the selected row", async () => {
     const wrapper = mountGrid([], {
       staff: reorderableStaff,
@@ -365,6 +384,20 @@ describe("ScheduleGrid", () => {
     expect(tableStyle.getPropertyValue("--job-col-mobile-left")).toBe("128px");
     expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("182px");
     expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("294px");
+  });
+
+  it("uses tighter day widths and row styling in compact density mode", () => {
+    const wrapper = mountGrid([], {
+      displayDensity: "compact"
+    });
+
+    expect(wrapper.get(".schedule-grid").classes()).toContain("schedule-grid-compact");
+
+    const tableStyle = (wrapper.get(".schedule-grid").element as HTMLElement).style;
+    expect(tableStyle.getPropertyValue("--day-col-width")).toBe("88px");
+    expect(tableStyle.getPropertyValue("--day-col-mobile-width")).toBe("62px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("334px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("288px");
   });
 
   it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {

@@ -57,8 +57,53 @@ import { calculateSettlementChecks } from "@/lib/settlement-checks";
 type PrintMode = "month" | "week";
 type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "print" | "config" | "help";
 type ReorderDirection = "up" | "down";
+type ScheduleDisplayDensity = "standard" | "compact";
 
 const today = toDateKey(new Date());
+const SCHEDULE_DENSITY_STORAGE_KEY = "schedule-display-density";
+const SCHEDULE_SHOW_TYPE_STORAGE_KEY = "schedule-show-type-column";
+
+function readScheduleDisplayDensity(): ScheduleDisplayDensity {
+  if (typeof window === "undefined") {
+    return "standard";
+  }
+
+  try {
+    const value = window.localStorage.getItem(SCHEDULE_DENSITY_STORAGE_KEY);
+    return value === "compact" ? "compact" : "standard";
+  } catch {
+    return "standard";
+  }
+}
+
+function readStoredBoolean(key: string, fallback: boolean): boolean {
+  if (typeof window === "undefined") {
+    return fallback;
+  }
+
+  try {
+    const value = window.localStorage.getItem(key);
+    if (value === null) {
+      return fallback;
+    }
+    return value === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeStoredValue(key: string, value: string): void {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // 本地偏好保存失败不影响排班主流程。
+  }
+}
+
 const data = ref<PublicAppData | null>(null);
 const error = ref("");
 const currentUser = ref<AuthUser | null>(null);
@@ -72,6 +117,9 @@ const selectedDate = ref(today);
 const selectedShiftId = ref("");
 const scheduleStaffQuery = ref("");
 const selectedScheduleStaffId = ref("");
+const scheduleDisplayDensity = ref<ScheduleDisplayDensity>(readScheduleDisplayDensity());
+const showScheduleTypeColumn = ref(readStoredBoolean(SCHEDULE_SHOW_TYPE_STORAGE_KEY, true));
+const scheduleFocusMode = ref(false);
 const scheduleQueryStartDate = ref(getWeekRange(today).start);
 const scheduleQueryEndDate = ref(getWeekRange(today).end);
 const scheduleQueryStaffQuery = ref("");
@@ -400,6 +448,14 @@ watch(activeWorkbenchTab, (nextTab, previousTab) => {
 
 watch(activePrintPanelMode, () => {
   cancelPrintPdfRequest();
+});
+
+watch(scheduleDisplayDensity, (value) => {
+  writeStoredValue(SCHEDULE_DENSITY_STORAGE_KEY, value);
+});
+
+watch(showScheduleTypeColumn, (value) => {
+  writeStoredValue(SCHEDULE_SHOW_TYPE_STORAGE_KEY, String(value));
 });
 
 watch(activeWorkbenchTab, (nextTab, previousTab) => {
@@ -1233,6 +1289,18 @@ function clearScheduleStaffSearch(): void {
   scheduleStaffQuery.value = "";
 }
 
+function setScheduleDisplayDensity(density: ScheduleDisplayDensity): void {
+  scheduleDisplayDensity.value = density;
+}
+
+function toggleScheduleTypeColumn(): void {
+  showScheduleTypeColumn.value = !showScheduleTypeColumn.value;
+}
+
+function toggleScheduleFocusMode(): void {
+  scheduleFocusMode.value = !scheduleFocusMode.value;
+}
+
 function handleSelectScheduleStaff(staffId: string): void {
   if (!canReorderScheduleStaff.value) {
     return;
@@ -1721,7 +1789,7 @@ onBeforeUnmount(() => {
 <template>
   <section v-if="authChecking" class="state-message">正在检查登录状态...</section>
   <LoginPage v-else-if="!currentUser" :loading="loginSubmitting" :error="loginError" @login="handleLogin" />
-  <main v-else class="app-shell">
+  <main v-else class="app-shell" :class="{ 'schedule-focus-mode': scheduleFocusMode }">
     <header class="app-header">
       <div class="app-title">
         <p class="eyebrow">国际医学部</p>
@@ -1868,6 +1936,39 @@ onBeforeUnmount(() => {
             <section class="schedule-efficiency-row" aria-label="排班效率工具区域">
               <section class="schedule-efficiency-tools" data-testid="schedule-efficiency-tools" aria-label="排班效率工具">
                 <strong class="schedule-efficiency-title">排班效率工具</strong>
+                <div class="schedule-display-options" data-testid="schedule-display-options" aria-label="排班显示设置">
+                  <span class="schedule-display-label">显示</span>
+                  <button
+                    type="button"
+                    data-testid="schedule-density-standard"
+                    :class="{ active: scheduleDisplayDensity === 'standard' }"
+                    :aria-pressed="scheduleDisplayDensity === 'standard'"
+                    @click="setScheduleDisplayDensity('standard')"
+                  >
+                    标准
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="schedule-density-compact"
+                    :class="{ active: scheduleDisplayDensity === 'compact' }"
+                    :aria-pressed="scheduleDisplayDensity === 'compact'"
+                    @click="setScheduleDisplayDensity('compact')"
+                  >
+                    紧凑
+                  </button>
+                  <button
+                    type="button"
+                    data-testid="toggle-schedule-type-column"
+                    :class="{ active: showScheduleTypeColumn }"
+                    :aria-pressed="showScheduleTypeColumn"
+                    @click="toggleScheduleTypeColumn"
+                  >
+                    {{ showScheduleTypeColumn ? "隐藏类型" : "显示类型" }}
+                  </button>
+                  <button type="button" data-testid="toggle-schedule-focus-mode" @click="toggleScheduleFocusMode">
+                    {{ scheduleFocusMode ? "退出全屏" : "全屏排班" }}
+                  </button>
+                </div>
                 <div
                   v-if="canShowScheduleReorderTools"
                   class="schedule-reorder-toolbar"
@@ -1978,6 +2079,8 @@ onBeforeUnmount(() => {
               :selected-staff-id="selectedScheduleStaffId"
               :editable-staff-ids="editableStaffIds"
               :can-reorder-staff="canReorderScheduleStaff"
+              :display-density="scheduleDisplayDensity"
+              :show-type-column="showScheduleTypeColumn"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
               @reorder-staff="handleReorderStaff"

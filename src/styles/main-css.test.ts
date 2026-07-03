@@ -247,6 +247,9 @@ describe("main.css layout rules", () => {
     const efficiencyTitleRules = ruleBlocks(".schedule-efficiency-title")[0] ?? "";
     const efficiencyToolbarRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-reorder-toolbar");
     const efficiencyActionsRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-actions");
+    const displayOptionsRules = ruleBlocks(".schedule-display-options")[0] ?? "";
+    const displayOptionButtonRules = ruleBlockIn(css, ".schedule-display-options button");
+    const activeDisplayOptionRules = ruleBlockIn(css, ".schedule-display-options button.active");
 
     expect(operationRowRules).toContain("display: flex");
     expect(operationRowRules).toContain("flex-wrap: wrap");
@@ -301,6 +304,34 @@ describe("main.css layout rules", () => {
     expect(efficiencyToolbarRules).toContain("border: 0");
     expect(efficiencyToolbarRules).toContain("padding: 0");
     expect(efficiencyActionsRules).toContain("margin-left: 0");
+    expect(displayOptionsRules).toContain("display: inline-flex");
+    expect(displayOptionsRules).toContain("flex-wrap: wrap");
+    expect(displayOptionsRules).toContain("gap: 6px");
+    expect(displayOptionButtonRules).toContain("min-height: 30px");
+    expect(displayOptionButtonRules).toContain("font-size: 13px");
+    expect(activeDisplayOptionRules).toContain("background: #2563eb");
+    expect(activeDisplayOptionRules).toContain("color: #ffffff");
+  });
+
+  it("supports compact schedule density and app-level schedule focus mode", () => {
+    const compactGridRules = ruleBlocks(".schedule-grid.schedule-grid-compact")[0] ?? "";
+    const compactCellsRules = ruleBlockIn(css, ".schedule-grid.schedule-grid-compact th,\n.schedule-grid.schedule-grid-compact td");
+    const compactShiftRules = ruleBlockIn(css, ".schedule-grid-compact .cell-shifts > span");
+    const focusShellRules = ruleBlocks(".app-shell.schedule-focus-mode")[0] ?? "";
+    const hiddenFocusChromeRules = ruleBlockIn(
+      css,
+      ".schedule-focus-mode .app-header,\n.schedule-focus-mode .workbench-tabs"
+    );
+    const focusWorkbenchRules = ruleBlockIn(css, ".schedule-focus-mode .workbench");
+    const focusPanelRules = ruleBlockIn(css, ".schedule-focus-mode .workbench-panel");
+
+    expect(compactGridRules).toContain("font-size: 12px");
+    expect(compactCellsRules).toContain("height: 30px");
+    expect(compactShiftRules).toContain("font-size: 12px");
+    expect(focusShellRules).toContain("padding: 6px");
+    expect(hiddenFocusChromeRules).toContain("display: none");
+    expect(focusWorkbenchRules).toContain("grid-template-columns: 1fr");
+    expect(focusPanelRules).toContain("border: 0");
   });
 
   it("stacks the schedule staff search controls on mobile", () => {
@@ -319,6 +350,7 @@ describe("main.css layout rules", () => {
     const mobileEfficiency = ruleBlockIn(mobileCss, ".schedule-efficiency-tools");
     const mobileEfficiencyTitle = ruleBlockIn(mobileCss, ".schedule-efficiency-title");
     const mobileEfficiencyToolbar = ruleBlockIn(mobileCss, ".schedule-efficiency-tools .schedule-reorder-toolbar");
+    const mobileDisplayOptions = ruleBlockIn(mobileCss, ".schedule-display-options");
 
     expect(mobileSearch).toContain("display: grid");
     expect(mobileSearch).toContain("grid-template-columns: 1fr");
@@ -347,6 +379,8 @@ describe("main.css layout rules", () => {
     expect(mobileEfficiency).toContain("justify-content: stretch");
     expect(mobileEfficiencyTitle).toContain("width: 100%");
     expect(mobileEfficiencyToolbar).toContain("width: 100%");
+    expect(mobileDisplayOptions).toContain("display: grid");
+    expect(mobileDisplayOptions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
   });
 
   it("hides compact app controls for print", () => {
