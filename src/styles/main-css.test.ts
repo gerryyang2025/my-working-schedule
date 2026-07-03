@@ -466,6 +466,23 @@ describe("main.css layout rules", () => {
     expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 130px)");
   });
 
+  it("lets the desktop schedule table show all staff with page-level vertical scrolling", () => {
+    const gridWrap = ruleBlocks(".schedule-grid-wrap")[0] ?? "";
+    const gridCell = ruleBlockIn(
+      css,
+      ".schedule-grid th,\n.schedule-grid td"
+    );
+    const cellShifts = ruleBlocks(".cell-shifts")[0] ?? "";
+    const shiftChip = ruleBlocks(".shift-chip")[0] ?? "";
+
+    expect(gridWrap).toContain("overflow-x: auto");
+    expect(gridWrap).toContain("max-height: none");
+    expect(gridWrap).not.toContain("overflow: auto");
+    expect(gridCell).toContain("height: 46px");
+    expect(cellShifts).toContain("gap: 2px");
+    expect(shiftChip).toContain("font-size: 14px");
+  });
+
   it("styles the shared staff reorder toolbar and selected row highlight", () => {
     const gridPanel = ruleBlocks(".schedule-grid-panel")[0] ?? "";
     const toolbar = ruleBlocks(".schedule-reorder-toolbar")[0] ?? "";
@@ -535,7 +552,7 @@ describe("main.css layout rules", () => {
     expect(shiftChipRules[0]).toContain("justify-content: center");
     expect(shiftChipRules[0]).toContain("border: 0");
     expect(shiftChipRules[0]).toContain("padding: 0");
-    expect(shiftChipRules[0]).toContain("font-size: 15px");
+    expect(shiftChipRules[0]).toContain("font-size: 14px");
     expect(shiftChipRules[0]).toContain("font-weight: 800");
     expect(shiftChipRules[0]).toContain("line-height: 1.2");
     expect(shiftChipRules[0]).toContain("background: transparent");
