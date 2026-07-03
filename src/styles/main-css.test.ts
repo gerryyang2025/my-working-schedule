@@ -560,6 +560,16 @@ describe("main.css layout rules", () => {
     expect(shiftChip).toContain("font-size: 13px");
   });
 
+  it("uses a mobile table scroll container so the schedule date header can stay fixed", () => {
+    const mobileCss = mediaBlock("(max-width: 768px)");
+    const mobileGridWrap = ruleBlockIn(mobileCss, ".schedule-grid-wrap");
+
+    expect(mobileGridWrap).toContain("max-height: min(72dvh, 640px)");
+    expect(mobileGridWrap).toContain("overflow: auto");
+    expect(mobileGridWrap).toContain("-webkit-overflow-scrolling: touch");
+    expect(mobileGridWrap).toContain("overscroll-behavior: contain");
+  });
+
   it("styles the shared staff reorder toolbar and selected row highlight", () => {
     const gridPanel = ruleBlocks(".schedule-grid-panel")[0] ?? "";
     const toolbar = ruleBlocks(".schedule-reorder-toolbar")[0] ?? "";

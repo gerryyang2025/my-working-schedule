@@ -1790,9 +1790,11 @@ body {
   }
 
   .schedule-grid-wrap {
-    max-height: none;
+    max-height: min(72dvh, 640px);
     width: 100%;
+    overflow: auto;
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
 
   .schedule-grid {
