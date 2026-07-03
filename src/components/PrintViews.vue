@@ -158,6 +158,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
           <tr>
             <th class="print-sort-col">排序ID</th>
             <th class="print-person-col">人员</th>
+            <th class="print-job-col">工号</th>
             <th class="print-type-col">类型</th>
             <th v-for="day in days" :key="day.key" class="print-day-col">
               <span class="print-day-heading">
@@ -174,10 +175,10 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <th class="print-person-col">
               <span class="print-person">
                 <strong>{{ staff.name }}</strong>
-                <small>{{ staff.jobId }}</small>
               </span>
               <span v-if="!staff.enabled" class="historical-staff-label">停用历史</span>
             </th>
+            <td class="print-job-col">{{ staff.jobId }}</td>
             <td class="print-type-col">{{ getStaffTypeLabel(staff.type) }}</td>
             <td v-for="day in days" :key="`${staff.id}-${day.key}`" class="print-day-col">
               <span class="print-cell-shifts">
@@ -202,6 +203,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         <thead>
           <tr>
             <th>人员</th>
+            <th>工号</th>
             <th>人员类型</th>
             <th>月出勤班次</th>
             <th>满勤标准</th>
@@ -216,10 +218,10 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <td>
               <span class="print-person">
                 <strong>{{ row.staffName }}</strong>
-                <small>{{ row.staffJobId }}</small>
               </span>
               <span v-if="isDisabledMonthlyStaff(row)" class="historical-staff-label">停用历史</span>
             </td>
+            <td>{{ row.staffJobId }}</td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
             <td>{{ row.requiredShifts }}</td>
@@ -243,6 +245,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         <thead>
           <tr>
             <th>人员</th>
+            <th>工号</th>
             <th>人员类型</th>
             <th>月出勤班次</th>
             <th>满勤标准</th>
@@ -258,9 +261,9 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <td>
               <span class="print-person">
                 <strong>{{ row.staffName }}</strong>
-                <small>{{ row.staffJobId }}</small>
               </span>
             </td>
+            <td>{{ row.staffJobId }}</td>
             <td>{{ getStaffTypeLabel(row.staffType) }}</td>
             <td>{{ row.attendanceShifts }}</td>
             <td>{{ row.requiredShifts }}</td>
@@ -291,6 +294,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <tr>
               <th class="print-sort-col">排序ID</th>
               <th class="print-person-col">人员</th>
+              <th class="print-job-col">工号</th>
               <th class="print-type-col">类型</th>
               <th v-for="day in weekDays" :key="day.key" class="print-day-col">
                 <span class="print-day-heading">
@@ -307,9 +311,9 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
               <th class="print-person-col">
                 <span class="print-person">
                   <strong>{{ row.staffName }}</strong>
-                  <small>{{ row.staffJobId }}</small>
                 </span>
               </th>
+              <td class="print-job-col">{{ row.staffJobId }}</td>
               <td class="print-type-col">{{ getStaffTypeLabel(row.staffType) }}</td>
               <td v-for="day in weekDays" :key="`${row.staffId}-${day.key}`" class="print-day-col">
                 <span class="print-cell-shifts">
@@ -335,6 +339,7 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
         <thead>
           <tr>
             <th>人员</th>
+            <th>工号</th>
             <th>出勤班次</th>
             <th>满勤标准</th>
             <th>出勤盈亏</th>
@@ -347,9 +352,9 @@ function isDisabledMonthlyStaff(row: PrintedMonthlyRow): boolean {
             <td>
               <span class="print-person">
                 <strong>{{ row.staffName }}</strong>
-                <small>{{ row.staffJobId }}</small>
               </span>
             </td>
+            <td>{{ row.staffJobId }}</td>
             <td>{{ row.attendanceShifts }}</td>
             <td>{{ row.requiredShifts }}</td>
             <td>{{ formatSignedBalance(row.attendanceBalance) }}</td>

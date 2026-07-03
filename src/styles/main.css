@@ -955,6 +955,16 @@ body {
   max-width: var(--summary-person-col-width, 88px);
 }
 
+.summary-table th:nth-child(2),
+.summary-table td[data-label="工号"] {
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  color: #475569;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 .summary-table th {
   background: #f8fafc;
 }
@@ -1254,15 +1264,21 @@ body {
 }
 
 .print-preview-content .print-month .print-month-detail-table .print-person-col {
-  width: 86px;
-  min-width: 86px;
-  max-width: 86px;
+  width: 62px;
+  min-width: 62px;
+  max-width: 62px;
+}
+
+.print-preview-content .print-month .print-month-detail-table .print-job-col {
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
 }
 
 .print-preview-content .print-month .print-month-detail-table .print-type-col {
-  width: 52px;
-  min-width: 52px;
-  max-width: 52px;
+  width: 46px;
+  min-width: 46px;
+  max-width: 46px;
 }
 
 .print-preview-content .print-month .print-month-detail-table .print-day-col {
@@ -1981,12 +1997,17 @@ body {
 
   .print-month-detail-table .print-person-col,
   .print-week-detail-table .print-person-col {
-    width: 68px;
+    width: 54px;
+  }
+
+  .print-month-detail-table .print-job-col,
+  .print-week-detail-table .print-job-col {
+    width: 38px;
   }
 
   .print-month-detail-table .print-type-col,
   .print-week-detail-table .print-type-col {
-    width: 42px;
+    width: 38px;
   }
 
   .print-table .historical-staff-label {

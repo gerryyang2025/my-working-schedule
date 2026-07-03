@@ -193,17 +193,18 @@ describe("BonusSettlementPanel", () => {
     expect(wrapper.text()).toContain("护士长绩效单独核算");
   });
 
-  it("renders staff job IDs in the bonus person column", async () => {
+  it("renders staff job IDs in a separate bonus table column", async () => {
     const wrapper = mountPanel();
 
     await wrapper.get('[data-testid="bonus-pool-input"]').setValue("1000");
 
-    const personCells = wrapper.findAll('tbody td[data-label="人员"]');
+    expect(wrapper.findAll("thead th").slice(0, 3).map((cell) => cell.text())).toEqual(["人员", "工号", "类型"]);
 
-    expect(personCells[0].text()).toContain("段护士长");
-    expect(personCells[0].text()).toContain("000228");
-    expect(personCells[1].text()).toContain("李护士");
-    expect(personCells[1].text()).toContain("100001");
+    const personCells = wrapper.findAll('tbody td[data-label="人员"]');
+    const jobIdCells = wrapper.findAll('tbody td[data-label="工号"]');
+
+    expect(personCells.map((cell) => cell.text())).toEqual(["段护士长", "李护士"]);
+    expect(jobIdCells.map((cell) => cell.text())).toEqual(["000228", "100001"]);
   });
 
   it("shows required shifts and signed attendance balance in bonus rows", async () => {
@@ -216,7 +217,8 @@ describe("BonusSettlementPanel", () => {
 
     const firstRowCells = wrapper.findAll("tbody tr")[0].findAll("td");
     expect(firstRowCells.map((cell) => cell.text())).toEqual([
-      "段护士长000228",
+      "段护士长",
+      "000228",
       "护士长",
       "10",
       "20",

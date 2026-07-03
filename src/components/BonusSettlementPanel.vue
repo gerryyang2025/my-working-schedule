@@ -343,6 +343,7 @@ function rowNote(row: MonthlySettlementRow): string {
         <thead>
           <tr>
             <th>人员</th>
+            <th>工号</th>
             <th>类型</th>
             <th>出勤班次</th>
             <th>满勤标准</th>
@@ -358,9 +359,9 @@ function rowNote(row: MonthlySettlementRow): string {
             <td data-label="人员">
               <span class="bonus-person">
                 <strong>{{ row.staffName }}</strong>
-                <small>{{ row.staffJobId }}</small>
               </span>
             </td>
+            <td data-label="工号">{{ row.staffJobId }}</td>
             <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
             <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
             <td data-label="满勤标准">{{ row.requiredShifts }}</td>
@@ -561,7 +562,7 @@ function rowNote(row: MonthlySettlementRow): string {
 
 .bonus-table {
   width: 100%;
-  min-width: 840px;
+  min-width: 880px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -579,6 +580,16 @@ function rowNote(row: MonthlySettlementRow): string {
   width: var(--bonus-person-col-width, 88px);
   min-width: var(--bonus-person-col-width, 88px);
   max-width: var(--bonus-person-col-width, 88px);
+}
+
+.bonus-table th:nth-child(2),
+.bonus-table td[data-label="工号"] {
+  width: 64px;
+  min-width: 64px;
+  max-width: 64px;
+  color: #475569;
+  font-weight: 700;
+  white-space: nowrap;
 }
 
 .bonus-table th {

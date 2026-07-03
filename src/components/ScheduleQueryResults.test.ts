@@ -119,24 +119,32 @@ describe("ScheduleQueryResults", () => {
       "2026-06-18 至 2026-06-21",
       "2026-06-22 至 2026-06-24"
     ]);
-    expect(blocks[0].findAll("thead th").slice(3).map((item) => item.text())).toEqual([
+    expect(blocks[0].findAll("thead th").slice(4).map((item) => item.text())).toEqual([
       "18周四",
       "19周五端午节",
       "20周六",
       "21周日"
     ]);
-    expect(blocks[1].findAll("thead th").slice(3).map((item) => item.text())).toEqual(["22周一", "23周二", "24周三"]);
+    expect(blocks[1].findAll("thead th").slice(4).map((item) => item.text())).toEqual(["22周一", "23周二", "24周三"]);
   });
 
   it("uses schedule columns, staff ordering, staff type labels, and disabled historical labels", () => {
     const wrapper = mountResults();
 
+    expect(
+      wrapper
+        .findAll('[data-testid="schedule-query-week-block"]')[0]
+        .findAll("thead th")
+        .slice(0, 4)
+        .map((cell) => cell.text())
+    ).toEqual(["排序ID", "人员", "工号", "类型"]);
+
     const firstBlockRows = wrapper.findAll('[data-testid="schedule-query-week-block"]')[0].findAll("tbody tr");
 
     expect(firstBlockRows.map((row) => row.get(".sort-col").text())).toEqual(["1", "2", "3"]);
+    expect(firstBlockRows.map((row) => row.get(".job-col").text())).toEqual(["H001", "N001", "D001"]);
     expect(firstBlockRows.map((row) => row.get(".type-col").text())).toEqual(["护士长", "护士", "护士"]);
-    expect(firstBlockRows[0].get(".person-col").text()).toContain("段护士长");
-    expect(firstBlockRows[0].get(".person-col").text()).toContain("H001");
+    expect(firstBlockRows[0].get(".person-col").text()).toBe("段护士长");
     expect(firstBlockRows[2].text()).toContain("停用历史");
   });
 

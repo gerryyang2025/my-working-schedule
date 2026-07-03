@@ -68,17 +68,18 @@ describe("WeeklySummary", () => {
     expect(rows[1].text()).toContain("系数 4.90");
   });
 
-  it("renders staff job IDs in the table person column", () => {
+  it("renders staff job IDs in a separate table column", () => {
     const wrapper = mount(WeeklySummary, {
       props: { summary }
     });
 
-    const personCells = wrapper.findAll('tbody td[data-label="人员"]');
+    expect(wrapper.findAll("thead th").slice(0, 3).map((cell) => cell.text())).toEqual(["人员", "工号", "类型"]);
 
-    expect(personCells[0].text()).toContain("段鸿露");
-    expect(personCells[0].text()).toContain("000228");
-    expect(personCells[1].text()).toContain("李护士");
-    expect(personCells[1].text()).toContain("100001");
+    const personCells = wrapper.findAll('tbody td[data-label="人员"]');
+    const jobIdCells = wrapper.findAll('tbody td[data-label="工号"]');
+
+    expect(personCells.map((cell) => cell.text())).toEqual(["段鸿露", "李护士"]);
+    expect(jobIdCells.map((cell) => cell.text())).toEqual(["000228", "100001"]);
   });
 
   it("shows signed attendance balance in table and compact summaries", () => {

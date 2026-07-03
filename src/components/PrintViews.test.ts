@@ -340,7 +340,7 @@ describe("PrintViews", () => {
     expect(wrapper.get(".print-month tbody").text()).toContain("白");
   });
 
-  it("prints staff job IDs in month schedule detail personnel cells", () => {
+  it("prints staff job IDs in a separate month schedule detail column", () => {
     const wrapper = mount(PrintViews, {
       props: {
         data: createData([]),
@@ -349,9 +349,16 @@ describe("PrintViews", () => {
       }
     });
 
-    const personnelHeader = wrapper.get(".print-month-detail-table tbody .print-person-col");
+    const firstRow = wrapper.get(".print-month-detail-table tbody tr");
 
-    expectPersonCellText(personnelHeader.text(), "王护士", "N001");
+    expect(wrapper.findAll(".print-month-detail-table thead th").slice(0, 4).map((cell) => cell.text())).toEqual([
+      "排序ID",
+      "人员",
+      "工号",
+      "类型"
+    ]);
+    expect(firstRow.get(".print-person-col").text()).toBe("王护士");
+    expect(firstRow.get(".print-job-col").text()).toBe("N001");
   });
 
   it("prints sort id and staff type in month schedule detail rows", () => {
@@ -364,11 +371,12 @@ describe("PrintViews", () => {
     });
 
     const monthDetailHeaders = wrapper.findAll(".print-month-detail-table thead th").map((cell) => cell.text());
-    expect(monthDetailHeaders.slice(0, 3)).toEqual(["排序ID", "人员", "类型"]);
+    expect(monthDetailHeaders.slice(0, 4)).toEqual(["排序ID", "人员", "工号", "类型"]);
 
     const firstMonthDetailRow = wrapper.get(".print-month-detail-table tbody tr");
     expect(firstMonthDetailRow.get(".print-sort-col").text()).toBe("1");
-    expectPersonCellText(firstMonthDetailRow.get(".print-person-col").text(), "王护士", "N001");
+    expect(firstMonthDetailRow.get(".print-person-col").text()).toBe("王护士");
+    expect(firstMonthDetailRow.get(".print-job-col").text()).toBe("N001");
     expect(firstMonthDetailRow.get(".print-type-col").text()).toBe("护士");
   });
 
@@ -385,6 +393,7 @@ describe("PrintViews", () => {
     const monthSummary = wrapper.get(".print-month-summary");
     expect(monthSummary.findAll("thead th").map((cell) => cell.text())).toEqual([
       "人员",
+      "工号",
       "人员类型",
       "月出勤班次",
       "满勤标准",
@@ -395,8 +404,9 @@ describe("PrintViews", () => {
     ]);
     const monthSummaryRows = monthSummary.findAll("tbody tr");
     const firstMonthSummaryRowCells = monthSummaryRows[0].findAll("td");
-    expectPersonCellText(firstMonthSummaryRowCells[0].text(), "王护士", "N001");
-    expect(firstMonthSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
+    expect(firstMonthSummaryRowCells[0].text()).toBe("王护士");
+    expect(firstMonthSummaryRowCells[1].text()).toBe("N001");
+    expect(firstMonthSummaryRowCells.slice(2).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
       "20",
@@ -405,8 +415,10 @@ describe("PrintViews", () => {
       "5.50",
       ""
     ]);
-    expectPersonCellText(monthSummaryRows[1].findAll("td")[0].text(), "李文员", "C001");
-    expectPersonCellText(monthSummaryRows[2].findAll("td")[0].text(), "段护士长", "H001");
+    expect(monthSummaryRows[1].findAll("td")[0].text()).toBe("李文员");
+    expect(monthSummaryRows[1].findAll("td")[1].text()).toBe("C001");
+    expect(monthSummaryRows[2].findAll("td")[0].text()).toBe("段护士长");
+    expect(monthSummaryRows[2].findAll("td")[1].text()).toBe("H001");
     expect(monthSummary.text()).toContain("月度汇总");
     expect(monthSummary.text()).toContain("王护士");
     expect(monthSummary.text()).toContain("护士");
@@ -436,6 +448,7 @@ describe("PrintViews", () => {
     const bonusSummary = wrapper.get(".print-bonus-summary");
     expect(bonusSummary.findAll("thead th").map((cell) => cell.text())).toEqual([
       "人员",
+      "工号",
       "人员类型",
       "月出勤班次",
       "满勤标准",
@@ -447,8 +460,9 @@ describe("PrintViews", () => {
     ]);
     const bonusSummaryRows = bonusSummary.findAll("tbody tr");
     const firstBonusSummaryRowCells = bonusSummaryRows[0].findAll("td");
-    expectPersonCellText(firstBonusSummaryRowCells[0].text(), "王护士", "N001");
-    expect(firstBonusSummaryRowCells.slice(1).map((cell) => cell.text())).toEqual([
+    expect(firstBonusSummaryRowCells[0].text()).toBe("王护士");
+    expect(firstBonusSummaryRowCells[1].text()).toBe("N001");
+    expect(firstBonusSummaryRowCells.slice(2).map((cell) => cell.text())).toEqual([
       "护士",
       "5",
       "20",
@@ -458,7 +472,8 @@ describe("PrintViews", () => {
       "1392.41",
       ""
     ]);
-    expectPersonCellText(bonusSummaryRows[1].findAll("td")[0].text(), "李文员", "C001");
+    expect(bonusSummaryRows[1].findAll("td")[0].text()).toBe("李文员");
+    expect(bonusSummaryRows[1].findAll("td")[1].text()).toBe("C001");
     expect(bonusSummary.text()).toContain("奖金分配");
     expect(bonusSummary.text()).toContain("奖金总额 2000.00");
     expect(bonusSummary.text()).toContain("护士与文员总系数 7.90");
@@ -621,15 +636,17 @@ describe("PrintViews", () => {
     expect(detailTable.text()).toContain("白");
     expect(detailTable.text()).toContain("夜");
     const personnelHeader = detailTable.get("tbody .print-person-col");
-    expectPersonCellText(personnelHeader.text(), "王护士", "N001");
-    expect(detailTable.findAll("thead th").slice(0, 3).map((cell) => cell.text())).toEqual(["排序ID", "人员", "类型"]);
+    expect(personnelHeader.text()).toBe("王护士");
+    expect(detailTable.get("tbody .print-job-col").text()).toBe("N001");
+    expect(detailTable.findAll("thead th").slice(0, 4).map((cell) => cell.text())).toEqual(["排序ID", "人员", "工号", "类型"]);
     const firstDetailRow = detailTable.get("tbody tr");
     expect(firstDetailRow.get(".print-sort-col").text()).toBe("1");
-    expectPersonCellText(firstDetailRow.get(".print-person-col").text(), "王护士", "N001");
+    expect(firstDetailRow.get(".print-person-col").text()).toBe("王护士");
+    expect(firstDetailRow.get(".print-job-col").text()).toBe("N001");
     expect(firstDetailRow.get(".print-type-col").text()).toBe("护士");
   });
 
-  it("prints staff job IDs in weekly summary rows", () => {
+  it("prints staff job IDs in separate weekly summary cells", () => {
     const wrapper = mount(PrintViews, {
       props: {
         data: createData([]),
@@ -639,8 +656,14 @@ describe("PrintViews", () => {
     });
 
     const weeklySummaryRow = wrapper.get(".print-week-summary .print-table tbody tr");
+    const weeklySummaryCells = weeklySummaryRow.findAll("td");
 
-    expectPersonCellText(weeklySummaryRow.findAll("td")[0].text(), "王护士", "N001");
+    expect(wrapper.findAll(".print-week-summary .print-table thead th").slice(0, 2).map((cell) => cell.text())).toEqual([
+      "人员",
+      "工号"
+    ]);
+    expect(weeklySummaryCells[0].text()).toBe("王护士");
+    expect(weeklySummaryCells[1].text()).toBe("N001");
   });
 
   it("prints shift markers as plain text elements", () => {

@@ -66,6 +66,7 @@ function formatSignedBalance(value: number): string {
       <thead>
         <tr>
           <th>人员</th>
+          <th>工号</th>
           <th>类型</th>
           <th>出勤班次</th>
           <th>满勤标准</th>
@@ -79,9 +80,9 @@ function formatSignedBalance(value: number): string {
           <td data-label="人员">
             <span class="summary-person">
               <strong>{{ row.staffName }}</strong>
-              <small>{{ row.staffJobId }}</small>
             </span>
           </td>
+          <td data-label="工号">{{ row.staffJobId }}</td>
           <td data-label="类型">{{ staffTypeLabel(row.staffType) }}</td>
           <td data-label="出勤班次">{{ row.attendanceShifts }}</td>
           <td data-label="满勤标准">{{ row.requiredShifts }}</td>

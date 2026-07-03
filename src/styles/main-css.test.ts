@@ -662,17 +662,19 @@ describe("main.css print month layout rules", () => {
     expect(printMedia.indexOf(printPersonFallbackSelector)).toBeLessThan(printMedia.indexOf(printSortSelector));
   });
 
-  it("sets explicit preview widths for month detail sort, person, type and day columns", () => {
+  it("sets explicit preview widths for month detail sort, person, job, type and day columns", () => {
     const sortColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-sort-col");
     const personColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-person-col");
+    const jobColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-job-col");
     const typeColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-type-col");
     const dayColumn = ruleBlockIn(css, ".print-preview-content .print-month .print-month-detail-table .print-day-col");
 
     expect(sortColumn).toContain("width: 42px");
     expect(sortColumn).toContain("min-width: 42px");
     expect(sortColumn).toContain("max-width: 42px");
-    expect(personColumn).toContain("width: 86px");
-    expect(typeColumn).toContain("width: 52px");
+    expect(personColumn).toContain("width: 62px");
+    expect(jobColumn).toContain("width: 44px");
+    expect(typeColumn).toContain("width: 46px");
     expect(dayColumn).toContain("width: 34px");
   });
 
@@ -680,8 +682,9 @@ describe("main.css print month layout rules", () => {
     const printMedia = mediaBlock("print");
 
     expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-sort-col,\n  .print-week-detail-table .print-sort-col")).toContain("width: 34px");
-    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-person-col,\n  .print-week-detail-table .print-person-col")).toContain("width: 68px");
-    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-type-col,\n  .print-week-detail-table .print-type-col")).toContain("width: 42px");
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-person-col,\n  .print-week-detail-table .print-person-col")).toContain("width: 54px");
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-job-col,\n  .print-week-detail-table .print-job-col")).toContain("width: 38px");
+    expect(ruleBlockIn(printMedia, ".print-month-detail-table .print-type-col,\n  .print-week-detail-table .print-type-col")).toContain("width: 38px");
   });
 
   it("renders preview and print shift marks without chip boxes", () => {
