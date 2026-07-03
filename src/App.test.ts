@@ -359,8 +359,7 @@ const ScheduleGridStub = defineComponent({
     "editableStaffIds",
     "canReorderStaff",
     "selectedStaffId",
-    "displayDensity",
-    "showTypeColumn"
+    "displayDensity"
   ],
   emits: ["quickFill", "editCell", "reorderStaff", "selectStaff", "swapSchedule"],
   template: `
@@ -371,7 +370,6 @@ const ScheduleGridStub = defineComponent({
       <span data-testid="schedule-can-reorder-staff">{{ String(canReorderStaff) }}</span>
       <span data-testid="schedule-selected-staff-id">{{ selectedStaffId }}</span>
       <span data-testid="schedule-display-density">{{ displayDensity }}</span>
-      <span data-testid="schedule-show-type-column">{{ String(showTypeColumn) }}</span>
       <button
         data-testid="emit-select-staff-b"
         type="button"
@@ -2459,13 +2457,15 @@ describe("App", () => {
     expect(efficiencyElement.compareDocumentPosition(shiftPalette) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("switches schedule display density, type column visibility, and focus mode from the schedule tools", async () => {
+  it("switches schedule display density and focus mode from the schedule tools", async () => {
     const wrapper = mountApp(twoStaffData);
 
     await flushPromises();
 
     expect(wrapper.get('[data-testid="schedule-display-density"]').text()).toBe("standard");
-    expect(wrapper.get('[data-testid="schedule-show-type-column"]').text()).toBe("true");
+    expect(wrapper.get('[data-testid="schedule-density-standard"]').text()).toBe("舒适");
+    expect(wrapper.find('[data-testid="toggle-schedule-type-column"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="schedule-show-type-column"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="schedule-density-standard"]').classes()).toContain("active");
     expect(wrapper.get('[data-testid="schedule-density-compact"]').classes()).not.toContain("active");
 
@@ -2475,13 +2475,6 @@ describe("App", () => {
     expect(wrapper.get('[data-testid="schedule-display-density"]').text()).toBe("compact");
     expect(wrapper.get('[data-testid="schedule-density-compact"]').classes()).toContain("active");
     expect(wrapper.get('[data-testid="schedule-density-compact"]').attributes("aria-pressed")).toBe("true");
-
-    await wrapper.get('[data-testid="toggle-schedule-type-column"]').trigger("click");
-    await nextTick();
-
-    expect(wrapper.get('[data-testid="schedule-show-type-column"]').text()).toBe("false");
-    expect(wrapper.get('[data-testid="toggle-schedule-type-column"]').text()).toBe("显示类型");
-    expect(wrapper.get('[data-testid="toggle-schedule-type-column"]').attributes("aria-pressed")).toBe("false");
 
     await wrapper.get('[data-testid="toggle-schedule-focus-mode"]').trigger("click");
     await nextTick();

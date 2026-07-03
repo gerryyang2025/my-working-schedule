@@ -398,7 +398,7 @@ describe("main.css layout rules", () => {
     expect(mobileToolGroup).toContain("grid-template-columns: 1fr");
     expect(mobileEfficiencyToolbar).toContain("width: 100%");
     expect(mobileDisplayOptions).toContain("display: grid");
-    expect(mobileDisplayOptions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");
+    expect(mobileDisplayOptions).toContain("grid-template-columns: repeat(3, minmax(0, 1fr))");
   });
 
   it("hides compact app controls for print", () => {
@@ -534,8 +534,8 @@ describe("main.css layout rules", () => {
     expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 166px)");
 
     expect(dayColumnLayoutRules).toHaveLength(2);
-    expect(dayColumnLayoutRules[0]).toContain("width: var(--day-col-width, 104px)");
-    expect(dayColumnLayoutRules[1]).toContain("width: var(--day-col-mobile-width, 68px)");
+    expect(dayColumnLayoutRules[0]).toContain("width: var(--day-col-width, 128px)");
+    expect(dayColumnLayoutRules[1]).toContain("width: var(--day-col-mobile-width, 76px)");
   });
 
   it("lets the desktop schedule table show all staff with page-level vertical scrolling", () => {
@@ -550,7 +550,7 @@ describe("main.css layout rules", () => {
     expect(gridWrap).toContain("overflow-x: auto");
     expect(gridWrap).toContain("max-height: none");
     expect(gridWrap).not.toContain("overflow: auto");
-    expect(gridCell).toContain("height: 38px");
+    expect(gridCell).toContain("height: 44px");
     expect(cellShifts).toContain("gap: 2px");
     expect(shiftChip).toContain("font-size: 13px");
   });

@@ -117,23 +117,18 @@ describe("ScheduleGrid", () => {
     expect(firstRow.get(".type-col").text()).toBe("护士");
   });
 
-  it("can hide the type column to keep the schedule table compact", () => {
-    const wrapper = mountGrid([], {
-      showTypeColumn: false
-    });
+  it("keeps the type column visible so schedule tables stay structurally stable", () => {
+    const wrapper = mountGrid([]);
 
     expect(
       wrapper
         .findAll("thead th")
         .slice(0, 4)
         .map((cell) => cell.text())
-    ).toEqual(["排序ID", "人员", "工号", "19周五"]);
-    expect(wrapper.find(".type-col").exists()).toBe(false);
-    expect(wrapper.find(".type-col-layout").exists()).toBe(false);
-
-    const tableStyle = (wrapper.get(".schedule-grid").element as HTMLElement).style;
-    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("302px");
-    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("250px");
+    ).toEqual(["排序ID", "人员", "工号", "类型"]);
+    expect(wrapper.find(".type-col").exists()).toBe(true);
+    expect(wrapper.find(".type-col-layout").exists()).toBe(true);
+    expect(wrapper.find(".schedule-grid-hide-type").exists()).toBe(false);
   });
 
   it("emits selected staff row changes and marks the selected row", async () => {
@@ -371,19 +366,19 @@ describe("ScheduleGrid", () => {
     expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("52px");
     expect(tableStyle.getPropertyValue("--job-col-width")).toBe("58px");
     expect(tableStyle.getPropertyValue("--type-col-width")).toBe("48px");
-    expect(tableStyle.getPropertyValue("--day-col-width")).toBe("104px");
+    expect(tableStyle.getPropertyValue("--day-col-width")).toBe("128px");
     expect(tableStyle.getPropertyValue("--person-col-left")).toBe("52px");
     expect(tableStyle.getPropertyValue("--job-col-left")).toBe("140px");
     expect(tableStyle.getPropertyValue("--type-col-left")).toBe("198px");
-    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("350px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("374px");
     expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("48px");
     expect(tableStyle.getPropertyValue("--job-col-mobile-width")).toBe("54px");
     expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("44px");
-    expect(tableStyle.getPropertyValue("--day-col-mobile-width")).toBe("68px");
+    expect(tableStyle.getPropertyValue("--day-col-mobile-width")).toBe("76px");
     expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("48px");
     expect(tableStyle.getPropertyValue("--job-col-mobile-left")).toBe("128px");
     expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("182px");
-    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("294px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("302px");
   });
 
   it("uses tighter day widths and row styling in compact density mode", () => {

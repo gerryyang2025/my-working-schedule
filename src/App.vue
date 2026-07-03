@@ -61,7 +61,6 @@ type ScheduleDisplayDensity = "standard" | "compact";
 
 const today = toDateKey(new Date());
 const SCHEDULE_DENSITY_STORAGE_KEY = "schedule-display-density";
-const SCHEDULE_SHOW_TYPE_STORAGE_KEY = "schedule-show-type-column";
 
 function readScheduleDisplayDensity(): ScheduleDisplayDensity {
   if (typeof window === "undefined") {
@@ -73,22 +72,6 @@ function readScheduleDisplayDensity(): ScheduleDisplayDensity {
     return value === "compact" ? "compact" : "standard";
   } catch {
     return "standard";
-  }
-}
-
-function readStoredBoolean(key: string, fallback: boolean): boolean {
-  if (typeof window === "undefined") {
-    return fallback;
-  }
-
-  try {
-    const value = window.localStorage.getItem(key);
-    if (value === null) {
-      return fallback;
-    }
-    return value === "true";
-  } catch {
-    return fallback;
   }
 }
 
@@ -118,7 +101,6 @@ const selectedShiftId = ref("");
 const scheduleStaffQuery = ref("");
 const selectedScheduleStaffId = ref("");
 const scheduleDisplayDensity = ref<ScheduleDisplayDensity>(readScheduleDisplayDensity());
-const showScheduleTypeColumn = ref(readStoredBoolean(SCHEDULE_SHOW_TYPE_STORAGE_KEY, true));
 const scheduleFocusMode = ref(false);
 const scheduleQueryStartDate = ref(getWeekRange(today).start);
 const scheduleQueryEndDate = ref(getWeekRange(today).end);
@@ -452,10 +434,6 @@ watch(activePrintPanelMode, () => {
 
 watch(scheduleDisplayDensity, (value) => {
   writeStoredValue(SCHEDULE_DENSITY_STORAGE_KEY, value);
-});
-
-watch(showScheduleTypeColumn, (value) => {
-  writeStoredValue(SCHEDULE_SHOW_TYPE_STORAGE_KEY, String(value));
 });
 
 watch(activeWorkbenchTab, (nextTab, previousTab) => {
@@ -1293,10 +1271,6 @@ function setScheduleDisplayDensity(density: ScheduleDisplayDensity): void {
   scheduleDisplayDensity.value = density;
 }
 
-function toggleScheduleTypeColumn(): void {
-  showScheduleTypeColumn.value = !showScheduleTypeColumn.value;
-}
-
 function toggleScheduleFocusMode(): void {
   scheduleFocusMode.value = !scheduleFocusMode.value;
 }
@@ -1951,7 +1925,7 @@ onBeforeUnmount(() => {
                         :aria-pressed="scheduleDisplayDensity === 'standard'"
                         @click="setScheduleDisplayDensity('standard')"
                       >
-                        标准
+                        舒适
                       </button>
                       <button
                         type="button"
@@ -1961,15 +1935,6 @@ onBeforeUnmount(() => {
                         @click="setScheduleDisplayDensity('compact')"
                       >
                         紧凑
-                      </button>
-                      <button
-                        type="button"
-                        data-testid="toggle-schedule-type-column"
-                        :class="{ active: showScheduleTypeColumn }"
-                        :aria-pressed="showScheduleTypeColumn"
-                        @click="toggleScheduleTypeColumn"
-                      >
-                        {{ showScheduleTypeColumn ? "隐藏类型" : "显示类型" }}
                       </button>
                       <button type="button" data-testid="toggle-schedule-focus-mode" @click="toggleScheduleFocusMode">
                         {{ scheduleFocusMode ? "退出全屏" : "全屏排班" }}
@@ -2099,7 +2064,6 @@ onBeforeUnmount(() => {
               :editable-staff-ids="editableStaffIds"
               :can-reorder-staff="canReorderScheduleStaff"
               :display-density="scheduleDisplayDensity"
-              :show-type-column="showScheduleTypeColumn"
               @quick-fill="handleQuickFill"
               @edit-cell="handleEditCell"
               @reorder-staff="handleReorderStaff"

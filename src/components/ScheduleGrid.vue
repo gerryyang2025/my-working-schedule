@@ -17,9 +17,8 @@ const props = withDefaults(
     canReorderStaff?: boolean;
     selectedStaffId?: string;
     displayDensity?: ScheduleDisplayDensity;
-    showTypeColumn?: boolean;
   }>(),
-  { canReorderStaff: false, selectedStaffId: "", displayDensity: "standard", showTypeColumn: true }
+  { canReorderStaff: false, selectedStaffId: "", displayDensity: "standard" }
 );
 
 const emit = defineEmits<{
@@ -39,12 +38,12 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
 const SORT_COLUMN_WIDTH = 52;
 const JOB_COLUMN_WIDTH = 58;
 const TYPE_COLUMN_WIDTH = 48;
-const DAY_COLUMN_WIDTH = 104;
+const DAY_COLUMN_WIDTH = 128;
 const DAY_COLUMN_COMPACT_WIDTH = 88;
 const SORT_COLUMN_MOBILE_WIDTH = 48;
 const JOB_COLUMN_MOBILE_WIDTH = 54;
 const TYPE_COLUMN_MOBILE_WIDTH = 44;
-const DAY_COLUMN_MOBILE_WIDTH = 68;
+const DAY_COLUMN_MOBILE_WIDTH = 76;
 const DAY_COLUMN_COMPACT_MOBILE_WIDTH = 62;
 
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
@@ -73,10 +72,8 @@ const personColumnStyle = computed(() => {
   const typeColumnLeft = jobColumnLeft + JOB_COLUMN_WIDTH;
   const jobColumnMobileLeft = SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth;
   const typeColumnMobileLeft = jobColumnMobileLeft + JOB_COLUMN_MOBILE_WIDTH;
-  const fixedColumnWidth = props.showTypeColumn ? typeColumnLeft + TYPE_COLUMN_WIDTH : typeColumnLeft;
-  const fixedColumnMobileWidth = props.showTypeColumn
-    ? typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH
-    : typeColumnMobileLeft;
+  const fixedColumnWidth = typeColumnLeft + TYPE_COLUMN_WIDTH;
+  const fixedColumnMobileWidth = typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH;
   const scheduleGridMinWidth = fixedColumnWidth + props.days.length * dayColumnWidth.value;
   const scheduleGridMobileMinWidth =
     fixedColumnMobileWidth + props.days.length * dayColumnMobileWidth.value;
@@ -193,8 +190,7 @@ onBeforeUnmount(() => {
       <table
         class="schedule-grid"
         :class="{
-          'schedule-grid-compact': displayDensity === 'compact',
-          'schedule-grid-hide-type': !showTypeColumn
+          'schedule-grid-compact': displayDensity === 'compact'
         }"
         :style="personColumnStyle"
       >
@@ -202,7 +198,7 @@ onBeforeUnmount(() => {
           <col class="sort-col-layout" />
           <col class="person-col-layout" />
           <col class="job-col-layout" />
-          <col v-if="showTypeColumn" class="type-col-layout" />
+          <col class="type-col-layout" />
           <col v-for="day in days" :key="`layout-${day.key}`" class="day-col-layout" />
         </colgroup>
         <thead>
@@ -210,7 +206,7 @@ onBeforeUnmount(() => {
             <th class="sticky-col sort-col">排序ID</th>
             <th class="sticky-col person-col">人员</th>
             <th class="sticky-col job-col">工号</th>
-            <th v-if="showTypeColumn" class="sticky-col type-col">类型</th>
+            <th class="sticky-col type-col">类型</th>
             <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
               <span>{{ day.dayOfMonth }}</span>
               <small>{{ day.weekdayName }}</small>
@@ -240,7 +236,7 @@ onBeforeUnmount(() => {
               <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
             </th>
             <td class="sticky-col job-col">{{ person.jobId }}</td>
-            <td v-if="showTypeColumn" class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
+            <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
             <td
               v-for="day in days"
               :key="`${person.id}-${day.key}`"

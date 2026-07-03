@@ -836,13 +836,13 @@ body {
 }
 
 .schedule-grid .day-col-layout {
-  width: var(--day-col-width, 104px);
+  width: var(--day-col-width, 128px);
 }
 
 .schedule-grid th,
 .schedule-grid td {
   min-width: 0;
-  height: 38px;
+  height: 44px;
   border-right: 1px solid #e2e8f0;
   border-bottom: 1px solid #e2e8f0;
   text-align: center;
@@ -1714,7 +1714,7 @@ body {
 
   .schedule-display-options {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     width: 100%;
   }
 
@@ -1812,7 +1812,7 @@ body {
   }
 
   .schedule-grid .day-col-layout {
-    width: var(--day-col-mobile-width, 68px);
+    width: var(--day-col-mobile-width, 76px);
   }
 
   .schedule-grid th,
