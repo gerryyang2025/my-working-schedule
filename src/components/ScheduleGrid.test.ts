@@ -100,20 +100,20 @@ afterEach(() => {
 });
 
 describe("ScheduleGrid", () => {
-  it("shows sort id, person and type as the fixed schedule columns", () => {
+  it("shows sort id, person, job id and type as the fixed schedule columns", () => {
     const wrapper = mountGrid([]);
 
     expect(
       wrapper
         .findAll("thead th")
-        .slice(0, 3)
+        .slice(0, 4)
         .map((cell) => cell.text())
-    ).toEqual(["排序ID", "人员", "类型"]);
+    ).toEqual(["排序ID", "人员", "工号", "类型"]);
 
     const firstRow = wrapper.get("tbody tr");
     expect(firstRow.get(".sort-col").text()).toBe("1");
-    expect(firstRow.get(".person-col").text()).toContain("在职护士");
-    expect(firstRow.get(".person-col").text()).toContain("N001");
+    expect(firstRow.get(".person-col").text()).toBe("在职护士");
+    expect(firstRow.get(".job-col").text()).toBe("N001");
     expect(firstRow.get(".type-col").text()).toBe("护士");
   });
 
@@ -274,6 +274,7 @@ describe("ScheduleGrid", () => {
     const rows = wrapper.findAll("tbody tr");
 
     expect(rows.map((row) => row.get(".sort-col").text())).toEqual(["1", "2", "3"]);
+    expect(rows.map((row) => row.get(".job-col").text())).toEqual(["C001", "N001", "H001"]);
     expect(rows.map((row) => row.get(".type-col").text())).toEqual(["文员", "护士", "护士长"]);
     expect(rows[0].get(".person-col").text()).toContain("王文员");
     expect(rows[1].get(".person-col").text()).toContain("李护士");
@@ -348,14 +349,22 @@ describe("ScheduleGrid", () => {
 
     expect(tableStyle.getPropertyValue("--person-col-width")).toBe("88px");
     expect(tableStyle.getPropertyValue("--person-col-mobile-width")).toBe("80px");
-    expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("68px");
-    expect(tableStyle.getPropertyValue("--type-col-width")).toBe("58px");
-    expect(tableStyle.getPropertyValue("--person-col-left")).toBe("68px");
-    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("156px");
-    expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("58px");
-    expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("46px");
-    expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("58px");
-    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("138px");
+    expect(tableStyle.getPropertyValue("--sort-col-width")).toBe("52px");
+    expect(tableStyle.getPropertyValue("--job-col-width")).toBe("58px");
+    expect(tableStyle.getPropertyValue("--type-col-width")).toBe("48px");
+    expect(tableStyle.getPropertyValue("--day-col-width")).toBe("104px");
+    expect(tableStyle.getPropertyValue("--person-col-left")).toBe("52px");
+    expect(tableStyle.getPropertyValue("--job-col-left")).toBe("140px");
+    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("198px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("350px");
+    expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("48px");
+    expect(tableStyle.getPropertyValue("--job-col-mobile-width")).toBe("54px");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("44px");
+    expect(tableStyle.getPropertyValue("--day-col-mobile-width")).toBe("68px");
+    expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("48px");
+    expect(tableStyle.getPropertyValue("--job-col-mobile-left")).toBe("128px");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("182px");
+    expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("294px");
   });
 
   it("emits quick fill when an enabled cell is clicked with a selected shift", async () => {

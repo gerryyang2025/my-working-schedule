@@ -422,48 +422,68 @@ describe("main.css layout rules", () => {
     expect(mobileMeta).toContain("white-space: normal");
   });
 
-  it("keeps sort id, staff and type columns fixed above scrolling day headers", () => {
+  it("keeps sort id, staff, job id and type columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";
+    const gridRules = ruleBlocks(".schedule-grid")[0] ?? "";
     const sortColumnRules = ruleBlocks(".schedule-grid .sort-col");
     const personColumnRules = ruleBlocks(".schedule-grid .person-col");
+    const jobColumnRules = ruleBlocks(".schedule-grid .job-col");
     const typeColumnRules = ruleBlocks(".schedule-grid .type-col");
+    const dayColumnLayoutRules = ruleBlocks(".schedule-grid .day-col-layout");
 
     expect(stickyColumn).toContain("position: sticky");
     expect(stickyColumn).toContain("left: 0");
     expect(stickyHeader).toContain("z-index: 6");
+    expect(gridRules).toContain("table-layout: fixed");
+    expect(gridRules).toContain("width: max-content");
+    expect(gridRules).toContain("min-width: min(100%, var(--schedule-grid-min-width, 960px))");
 
     expect(sortColumnRules).toHaveLength(2);
-    expect(sortColumnRules[0]).toContain("width: var(--sort-col-width, 68px)");
-    expect(sortColumnRules[0]).toContain("min-width: var(--sort-col-width, 68px)");
-    expect(sortColumnRules[0]).toContain("max-width: var(--sort-col-width, 68px)");
+    expect(sortColumnRules[0]).toContain("width: var(--sort-col-width, 52px)");
+    expect(sortColumnRules[0]).toContain("min-width: var(--sort-col-width, 52px)");
+    expect(sortColumnRules[0]).toContain("max-width: var(--sort-col-width, 52px)");
     expect(sortColumnRules[0]).toContain("left: 0");
-    expect(sortColumnRules[1]).toContain("width: var(--sort-col-mobile-width, 58px)");
-    expect(sortColumnRules[1]).toContain("min-width: var(--sort-col-mobile-width, 58px)");
-    expect(sortColumnRules[1]).toContain("max-width: var(--sort-col-mobile-width, 58px)");
+    expect(sortColumnRules[1]).toContain("width: var(--sort-col-mobile-width, 48px)");
+    expect(sortColumnRules[1]).toContain("min-width: var(--sort-col-mobile-width, 48px)");
+    expect(sortColumnRules[1]).toContain("max-width: var(--sort-col-mobile-width, 48px)");
 
     expect(personColumnRules).toHaveLength(2);
-    expect(personColumnRules[0]).toContain("width: var(--person-col-width, 88px)");
-    expect(personColumnRules[0]).toContain("min-width: var(--person-col-width, 88px)");
-    expect(personColumnRules[0]).toContain("max-width: var(--person-col-width, 88px)");
-    expect(personColumnRules[0]).toContain("left: var(--person-col-left, 68px)");
+    expect(personColumnRules[0]).toContain("width: var(--person-col-width, 76px)");
+    expect(personColumnRules[0]).toContain("min-width: var(--person-col-width, 76px)");
+    expect(personColumnRules[0]).toContain("max-width: var(--person-col-width, 76px)");
+    expect(personColumnRules[0]).toContain("left: var(--person-col-left, 52px)");
     expect(personColumnRules[0]).toContain("text-align: left");
-    expect(personColumnRules[0]).toContain("padding: 0 6px");
-    expect(personColumnRules[1]).toContain("width: var(--person-col-mobile-width, 72px)");
-    expect(personColumnRules[1]).toContain("min-width: var(--person-col-mobile-width, 72px)");
-    expect(personColumnRules[1]).toContain("max-width: var(--person-col-mobile-width, 72px)");
-    expect(personColumnRules[1]).toContain("left: var(--person-col-mobile-left, 58px)");
+    expect(personColumnRules[0]).toContain("padding: 0 5px");
+    expect(personColumnRules[1]).toContain("width: var(--person-col-mobile-width, 64px)");
+    expect(personColumnRules[1]).toContain("min-width: var(--person-col-mobile-width, 64px)");
+    expect(personColumnRules[1]).toContain("max-width: var(--person-col-mobile-width, 64px)");
+    expect(personColumnRules[1]).toContain("left: var(--person-col-mobile-left, 48px)");
     expect(personColumnRules[1]).toContain("padding: 0 5px");
 
+    expect(jobColumnRules).toHaveLength(2);
+    expect(jobColumnRules[0]).toContain("width: var(--job-col-width, 58px)");
+    expect(jobColumnRules[0]).toContain("min-width: var(--job-col-width, 58px)");
+    expect(jobColumnRules[0]).toContain("max-width: var(--job-col-width, 58px)");
+    expect(jobColumnRules[0]).toContain("left: var(--job-col-left, 128px)");
+    expect(jobColumnRules[1]).toContain("width: var(--job-col-mobile-width, 54px)");
+    expect(jobColumnRules[1]).toContain("min-width: var(--job-col-mobile-width, 54px)");
+    expect(jobColumnRules[1]).toContain("max-width: var(--job-col-mobile-width, 54px)");
+    expect(jobColumnRules[1]).toContain("left: var(--job-col-mobile-left, 112px)");
+
     expect(typeColumnRules).toHaveLength(2);
-    expect(typeColumnRules[0]).toContain("width: var(--type-col-width, 58px)");
-    expect(typeColumnRules[0]).toContain("min-width: var(--type-col-width, 58px)");
-    expect(typeColumnRules[0]).toContain("max-width: var(--type-col-width, 58px)");
-    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 156px)");
-    expect(typeColumnRules[1]).toContain("width: var(--type-col-mobile-width, 46px)");
-    expect(typeColumnRules[1]).toContain("min-width: var(--type-col-mobile-width, 46px)");
-    expect(typeColumnRules[1]).toContain("max-width: var(--type-col-mobile-width, 46px)");
-    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 130px)");
+    expect(typeColumnRules[0]).toContain("width: var(--type-col-width, 48px)");
+    expect(typeColumnRules[0]).toContain("min-width: var(--type-col-width, 48px)");
+    expect(typeColumnRules[0]).toContain("max-width: var(--type-col-width, 48px)");
+    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 186px)");
+    expect(typeColumnRules[1]).toContain("width: var(--type-col-mobile-width, 44px)");
+    expect(typeColumnRules[1]).toContain("min-width: var(--type-col-mobile-width, 44px)");
+    expect(typeColumnRules[1]).toContain("max-width: var(--type-col-mobile-width, 44px)");
+    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 166px)");
+
+    expect(dayColumnLayoutRules).toHaveLength(2);
+    expect(dayColumnLayoutRules[0]).toContain("width: var(--day-col-width, 104px)");
+    expect(dayColumnLayoutRules[1]).toContain("width: var(--day-col-mobile-width, 68px)");
   });
 
   it("lets the desktop schedule table show all staff with page-level vertical scrolling", () => {
@@ -478,9 +498,9 @@ describe("main.css layout rules", () => {
     expect(gridWrap).toContain("overflow-x: auto");
     expect(gridWrap).toContain("max-height: none");
     expect(gridWrap).not.toContain("overflow: auto");
-    expect(gridCell).toContain("height: 46px");
+    expect(gridCell).toContain("height: 38px");
     expect(cellShifts).toContain("gap: 2px");
-    expect(shiftChip).toContain("font-size: 14px");
+    expect(shiftChip).toContain("font-size: 13px");
   });
 
   it("styles the shared staff reorder toolbar and selected row highlight", () => {
@@ -552,11 +572,11 @@ describe("main.css layout rules", () => {
     expect(shiftChipRules[0]).toContain("justify-content: center");
     expect(shiftChipRules[0]).toContain("border: 0");
     expect(shiftChipRules[0]).toContain("padding: 0");
-    expect(shiftChipRules[0]).toContain("font-size: 14px");
+    expect(shiftChipRules[0]).toContain("font-size: 13px");
     expect(shiftChipRules[0]).toContain("font-weight: 800");
     expect(shiftChipRules[0]).toContain("line-height: 1.2");
     expect(shiftChipRules[0]).toContain("background: transparent");
-    expect(shiftChipRules[1]).toContain("font-size: 14px");
+    expect(shiftChipRules[1]).toContain("font-size: 13px");
   });
 });
 

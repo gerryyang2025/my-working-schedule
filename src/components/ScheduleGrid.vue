@@ -32,10 +32,14 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
   clerk: "文员"
 };
 
-const SORT_COLUMN_WIDTH = 68;
-const TYPE_COLUMN_WIDTH = 58;
-const SORT_COLUMN_MOBILE_WIDTH = 58;
-const TYPE_COLUMN_MOBILE_WIDTH = 46;
+const SORT_COLUMN_WIDTH = 52;
+const JOB_COLUMN_WIDTH = 58;
+const TYPE_COLUMN_WIDTH = 48;
+const DAY_COLUMN_WIDTH = 104;
+const SORT_COLUMN_MOBILE_WIDTH = 48;
+const JOB_COLUMN_MOBILE_WIDTH = 54;
+const TYPE_COLUMN_MOBILE_WIDTH = 44;
+const DAY_COLUMN_MOBILE_WIDTH = 68;
 
 const holidayMap = computed(() => new Map(props.holidays.map((holiday) => [holiday.date, holiday])));
 const shiftMap = computed(() => new Map(props.shifts.map((shift) => [shift.id, shift])));
@@ -55,18 +59,33 @@ const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
   const personColumnMobileWidth = clamp(Math.ceil(longestNameUnits * 12 + 32), 56, 88);
+  const jobColumnLeft = SORT_COLUMN_WIDTH + personColumnWidth;
+  const typeColumnLeft = jobColumnLeft + JOB_COLUMN_WIDTH;
+  const jobColumnMobileLeft = SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth;
+  const typeColumnMobileLeft = jobColumnMobileLeft + JOB_COLUMN_MOBILE_WIDTH;
+  const scheduleGridMinWidth = typeColumnLeft + TYPE_COLUMN_WIDTH + props.days.length * DAY_COLUMN_WIDTH;
+  const scheduleGridMobileMinWidth =
+    typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH + props.days.length * DAY_COLUMN_MOBILE_WIDTH;
 
   return {
     "--sort-col-width": `${SORT_COLUMN_WIDTH}px`,
     "--person-col-width": `${personColumnWidth}px`,
+    "--job-col-width": `${JOB_COLUMN_WIDTH}px`,
     "--type-col-width": `${TYPE_COLUMN_WIDTH}px`,
+    "--day-col-width": `${DAY_COLUMN_WIDTH}px`,
     "--person-col-left": `${SORT_COLUMN_WIDTH}px`,
-    "--type-col-left": `${SORT_COLUMN_WIDTH + personColumnWidth}px`,
+    "--job-col-left": `${jobColumnLeft}px`,
+    "--type-col-left": `${typeColumnLeft}px`,
+    "--schedule-grid-min-width": `${scheduleGridMinWidth}px`,
     "--sort-col-mobile-width": `${SORT_COLUMN_MOBILE_WIDTH}px`,
     "--person-col-mobile-width": `${personColumnMobileWidth}px`,
+    "--job-col-mobile-width": `${JOB_COLUMN_MOBILE_WIDTH}px`,
     "--type-col-mobile-width": `${TYPE_COLUMN_MOBILE_WIDTH}px`,
+    "--day-col-mobile-width": `${DAY_COLUMN_MOBILE_WIDTH}px`,
     "--person-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH}px`,
-    "--type-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth}px`
+    "--job-col-mobile-left": `${jobColumnMobileLeft}px`,
+    "--type-col-mobile-left": `${typeColumnMobileLeft}px`,
+    "--schedule-grid-mobile-min-width": `${scheduleGridMobileMinWidth}px`
   };
 });
 const clickTimers = new Map<string, number>();
@@ -158,10 +177,18 @@ onBeforeUnmount(() => {
   <section class="schedule-grid-panel">
     <section class="schedule-grid-wrap">
       <table class="schedule-grid" :style="personColumnStyle">
+        <colgroup>
+          <col class="sort-col-layout" />
+          <col class="person-col-layout" />
+          <col class="job-col-layout" />
+          <col class="type-col-layout" />
+          <col v-for="day in days" :key="`layout-${day.key}`" class="day-col-layout" />
+        </colgroup>
         <thead>
           <tr>
             <th class="sticky-col sort-col">排序ID</th>
             <th class="sticky-col person-col">人员</th>
+            <th class="sticky-col job-col">工号</th>
             <th class="sticky-col type-col">类型</th>
             <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
               <span>{{ day.dayOfMonth }}</span>
@@ -189,9 +216,9 @@ onBeforeUnmount(() => {
             </th>
             <th class="sticky-col person-col">
               <strong>{{ person.name }}</strong>
-              <small>{{ person.jobId }}</small>
               <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
             </th>
+            <td class="sticky-col job-col">{{ person.jobId }}</td>
             <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
             <td
               v-for="day in days"
