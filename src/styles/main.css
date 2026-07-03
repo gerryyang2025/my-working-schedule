@@ -465,6 +465,42 @@ body {
   white-space: nowrap;
 }
 
+.schedule-efficiency-groups {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.schedule-tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #dbe3ef;
+  padding: 5px 6px;
+  background: #ffffff;
+}
+
+.schedule-sort-group {
+  flex: 0 1 auto;
+}
+
+.schedule-batch-group {
+  flex: 0 1 auto;
+}
+
+.schedule-tool-group-title {
+  flex: 0 0 auto;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
 .schedule-display-options {
   display: inline-flex;
   flex: 0 1 auto;
@@ -1661,6 +1697,19 @@ body {
 
   .schedule-efficiency-title {
     width: 100%;
+  }
+
+  .schedule-efficiency-groups {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .schedule-tool-group {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+    min-height: 0;
   }
 
   .schedule-display-options {

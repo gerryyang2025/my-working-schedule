@@ -247,6 +247,9 @@ describe("main.css layout rules", () => {
     const efficiencyTitleRules = ruleBlocks(".schedule-efficiency-title")[0] ?? "";
     const efficiencyToolbarRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-reorder-toolbar");
     const efficiencyActionsRules = ruleBlockIn(css, ".schedule-efficiency-tools .schedule-actions");
+    const efficiencyGroupsRules = ruleBlocks(".schedule-efficiency-groups")[0] ?? "";
+    const toolGroupRules = ruleBlocks(".schedule-tool-group")[0] ?? "";
+    const groupTitleRules = ruleBlocks(".schedule-tool-group-title")[0] ?? "";
     const displayOptionsRules = ruleBlocks(".schedule-display-options")[0] ?? "";
     const displayOptionButtonRules = ruleBlockIn(css, ".schedule-display-options button");
     const activeDisplayOptionRules = ruleBlockIn(css, ".schedule-display-options button.active");
@@ -298,6 +301,15 @@ describe("main.css layout rules", () => {
     expect(efficiencyRules).toContain("justify-content: flex-start");
     expect(efficiencyRules).toContain("gap: 8px");
     expect(efficiencyRules).toContain("margin-left: 0");
+    expect(efficiencyGroupsRules).toContain("display: flex");
+    expect(efficiencyGroupsRules).toContain("flex-wrap: wrap");
+    expect(efficiencyGroupsRules).toContain("gap: 8px");
+    expect(toolGroupRules).toContain("display: inline-flex");
+    expect(toolGroupRules).toContain("border: 1px solid #dbe3ef");
+    expect(toolGroupRules).toContain("background: #ffffff");
+    expect(toolGroupRules).toContain("padding: 5px 6px");
+    expect(groupTitleRules).toContain("font-size: 12px");
+    expect(groupTitleRules).toContain("font-weight: 800");
     expect(efficiencyTitleRules).toContain("font-size: 13px");
     expect(efficiencyTitleRules).toContain("font-weight: 800");
     expect(efficiencyTitleRules).toContain("white-space: nowrap");
@@ -350,6 +362,8 @@ describe("main.css layout rules", () => {
     const mobileEfficiency = ruleBlockIn(mobileCss, ".schedule-efficiency-tools");
     const mobileEfficiencyTitle = ruleBlockIn(mobileCss, ".schedule-efficiency-title");
     const mobileEfficiencyToolbar = ruleBlockIn(mobileCss, ".schedule-efficiency-tools .schedule-reorder-toolbar");
+    const mobileEfficiencyGroups = ruleBlockIn(mobileCss, ".schedule-efficiency-groups");
+    const mobileToolGroup = ruleBlockIn(mobileCss, ".schedule-tool-group");
     const mobileDisplayOptions = ruleBlockIn(mobileCss, ".schedule-display-options");
 
     expect(mobileSearch).toContain("display: grid");
@@ -378,6 +392,10 @@ describe("main.css layout rules", () => {
     expect(mobileEfficiency).toContain("margin-left: 0");
     expect(mobileEfficiency).toContain("justify-content: stretch");
     expect(mobileEfficiencyTitle).toContain("width: 100%");
+    expect(mobileEfficiencyGroups).toContain("display: grid");
+    expect(mobileEfficiencyGroups).toContain("grid-template-columns: 1fr");
+    expect(mobileToolGroup).toContain("display: grid");
+    expect(mobileToolGroup).toContain("grid-template-columns: 1fr");
     expect(mobileEfficiencyToolbar).toContain("width: 100%");
     expect(mobileDisplayOptions).toContain("display: grid");
     expect(mobileDisplayOptions).toContain("grid-template-columns: repeat(2, minmax(0, 1fr))");

@@ -1936,134 +1936,153 @@ onBeforeUnmount(() => {
             <section class="schedule-efficiency-row" aria-label="排班效率工具区域">
               <section class="schedule-efficiency-tools" data-testid="schedule-efficiency-tools" aria-label="排班效率工具">
                 <strong class="schedule-efficiency-title">排班效率工具</strong>
-                <div class="schedule-display-options" data-testid="schedule-display-options" aria-label="排班显示设置">
-                  <span class="schedule-display-label">显示</span>
-                  <button
-                    type="button"
-                    data-testid="schedule-density-standard"
-                    :class="{ active: scheduleDisplayDensity === 'standard' }"
-                    :aria-pressed="scheduleDisplayDensity === 'standard'"
-                    @click="setScheduleDisplayDensity('standard')"
+                <div class="schedule-efficiency-groups">
+                  <div
+                    class="schedule-tool-group schedule-display-group"
+                    data-testid="schedule-display-group"
+                    aria-label="排班显示设置"
                   >
-                    标准
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="schedule-density-compact"
-                    :class="{ active: scheduleDisplayDensity === 'compact' }"
-                    :aria-pressed="scheduleDisplayDensity === 'compact'"
-                    @click="setScheduleDisplayDensity('compact')"
-                  >
-                    紧凑
-                  </button>
-                  <button
-                    type="button"
-                    data-testid="toggle-schedule-type-column"
-                    :class="{ active: showScheduleTypeColumn }"
-                    :aria-pressed="showScheduleTypeColumn"
-                    @click="toggleScheduleTypeColumn"
-                  >
-                    {{ showScheduleTypeColumn ? "隐藏类型" : "显示类型" }}
-                  </button>
-                  <button type="button" data-testid="toggle-schedule-focus-mode" @click="toggleScheduleFocusMode">
-                    {{ scheduleFocusMode ? "退出全屏" : "全屏排班" }}
-                  </button>
-                </div>
-                <div
-                  v-if="canShowScheduleReorderTools"
-                  class="schedule-reorder-toolbar"
-                  data-testid="schedule-reorder-toolbar"
-                >
-                  <div class="schedule-reorder-controls">
-                    <div class="schedule-reorder-control-group">
-                      <span class="schedule-reorder-label" data-testid="schedule-reorder-label">人员和排班排序</span>
-                      <div class="schedule-reorder-actions" aria-label="调整人员和排班顺序">
-                        <button
-                          type="button"
-                          class="schedule-reorder-action"
-                          data-testid="schedule-reorder-up"
-                          aria-label="上移所选人员和排班"
-                          :disabled="!canMoveSelectedScheduleStaff('up')"
-                          @click="moveSelectedScheduleStaff('up')"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          class="schedule-reorder-action"
-                          data-testid="schedule-reorder-down"
-                          aria-label="下移所选人员和排班"
-                          :disabled="!canMoveSelectedScheduleStaff('down')"
-                          @click="moveSelectedScheduleStaff('down')"
-                        >
-                          ↓
-                        </button>
-                      </div>
-                    </div>
-                    <div class="schedule-reorder-control-group">
-                      <span class="schedule-reorder-label" data-testid="schedule-only-reorder-label">仅排班排序</span>
-                      <div class="schedule-reorder-actions" aria-label="仅调整排班顺序">
-                        <button
-                          type="button"
-                          class="schedule-reorder-action"
-                          data-testid="schedule-only-reorder-up"
-                          aria-label="上移所选人员的当前周排班"
-                          :disabled="!canMoveSelectedScheduleStaff('up')"
-                          @click="handleSwapSchedule('up')"
-                        >
-                          ↑
-                        </button>
-                        <button
-                          type="button"
-                          class="schedule-reorder-action"
-                          data-testid="schedule-only-reorder-down"
-                          aria-label="下移所选人员的当前周排班"
-                          :disabled="!canMoveSelectedScheduleStaff('down')"
-                          @click="handleSwapSchedule('down')"
-                        >
-                          ↓
-                        </button>
-                      </div>
+                    <span class="schedule-tool-group-title">显示设置</span>
+                    <div class="schedule-display-options" data-testid="schedule-display-options">
+                      <button
+                        type="button"
+                        data-testid="schedule-density-standard"
+                        :class="{ active: scheduleDisplayDensity === 'standard' }"
+                        :aria-pressed="scheduleDisplayDensity === 'standard'"
+                        @click="setScheduleDisplayDensity('standard')"
+                      >
+                        标准
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="schedule-density-compact"
+                        :class="{ active: scheduleDisplayDensity === 'compact' }"
+                        :aria-pressed="scheduleDisplayDensity === 'compact'"
+                        @click="setScheduleDisplayDensity('compact')"
+                      >
+                        紧凑
+                      </button>
+                      <button
+                        type="button"
+                        data-testid="toggle-schedule-type-column"
+                        :class="{ active: showScheduleTypeColumn }"
+                        :aria-pressed="showScheduleTypeColumn"
+                        @click="toggleScheduleTypeColumn"
+                      >
+                        {{ showScheduleTypeColumn ? "隐藏类型" : "显示类型" }}
+                      </button>
+                      <button type="button" data-testid="toggle-schedule-focus-mode" @click="toggleScheduleFocusMode">
+                        {{ scheduleFocusMode ? "退出全屏" : "全屏排班" }}
+                      </button>
                     </div>
                   </div>
-                  <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
-                    {{ selectedScheduleStaffLabel }}
-                  </span>
-                </div>
-                <div class="schedule-actions" aria-label="批量排班工具">
-                  <button
-                    data-testid="copy-previous-week-button"
-                    type="button"
-                    :disabled="!canEditSchedule || scheduleActionBusy"
-                    @click="handleCopyPreviousWeek"
+                  <div
+                    v-if="canShowScheduleReorderTools"
+                    class="schedule-tool-group schedule-sort-group"
+                    data-testid="schedule-sort-group"
+                    aria-label="排班排序操作"
                   >
-                    {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
-                  </button>
-                  <button
-                    data-testid="batch-rest-week-button"
-                    type="button"
-                    :disabled="!canEditSchedule || scheduleActionBusy"
-                    @click="handleBatchSetWeekShift('rest')"
+                    <span class="schedule-tool-group-title">排序操作</span>
+                    <div class="schedule-reorder-toolbar" data-testid="schedule-reorder-toolbar">
+                      <div class="schedule-reorder-controls">
+                        <div class="schedule-reorder-control-group">
+                          <span class="schedule-reorder-label" data-testid="schedule-reorder-label">人员和排班排序</span>
+                          <div class="schedule-reorder-actions" aria-label="调整人员和排班顺序">
+                            <button
+                              type="button"
+                              class="schedule-reorder-action"
+                              data-testid="schedule-reorder-up"
+                              aria-label="上移所选人员和排班"
+                              :disabled="!canMoveSelectedScheduleStaff('up')"
+                              @click="moveSelectedScheduleStaff('up')"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              class="schedule-reorder-action"
+                              data-testid="schedule-reorder-down"
+                              aria-label="下移所选人员和排班"
+                              :disabled="!canMoveSelectedScheduleStaff('down')"
+                              @click="moveSelectedScheduleStaff('down')"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </div>
+                        <div class="schedule-reorder-control-group">
+                          <span class="schedule-reorder-label" data-testid="schedule-only-reorder-label">仅排班排序</span>
+                          <div class="schedule-reorder-actions" aria-label="仅调整排班顺序">
+                            <button
+                              type="button"
+                              class="schedule-reorder-action"
+                              data-testid="schedule-only-reorder-up"
+                              aria-label="上移所选人员的当前周排班"
+                              :disabled="!canMoveSelectedScheduleStaff('up')"
+                              @click="handleSwapSchedule('up')"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              type="button"
+                              class="schedule-reorder-action"
+                              data-testid="schedule-only-reorder-down"
+                              aria-label="下移所选人员的当前周排班"
+                              :disabled="!canMoveSelectedScheduleStaff('down')"
+                              @click="handleSwapSchedule('down')"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                      <span class="schedule-reorder-selected" data-testid="schedule-reorder-selected">
+                        {{ selectedScheduleStaffLabel }}
+                      </span>
+                    </div>
+                  </div>
+                  <div
+                    class="schedule-tool-group schedule-batch-group"
+                    data-testid="schedule-batch-group"
+                    aria-label="批量排班操作"
                   >
-                    批量休息
-                  </button>
-                  <button
-                    data-testid="batch-office-week-button"
-                    type="button"
-                    :disabled="!canEditSchedule || scheduleActionBusy"
-                    @click="handleBatchSetWeekShift('office')"
-                  >
-                    批量办公
-                  </button>
-                  <button
-                    class="danger-action"
-                    data-testid="clear-week-button"
-                    type="button"
-                    :disabled="!canEditSchedule || scheduleActionBusy"
-                    @click="handleClearWeek"
-                  >
-                    批量清空
-                  </button>
+                    <span class="schedule-tool-group-title">批量操作</span>
+                    <div class="schedule-actions" aria-label="批量排班工具">
+                      <button
+                        data-testid="copy-previous-week-button"
+                        type="button"
+                        :disabled="!canEditSchedule || scheduleActionBusy"
+                        @click="handleCopyPreviousWeek"
+                      >
+                        {{ copyingPreviousWeek ? "复制中..." : "复制上一周" }}
+                      </button>
+                      <button
+                        data-testid="batch-rest-week-button"
+                        type="button"
+                        :disabled="!canEditSchedule || scheduleActionBusy"
+                        @click="handleBatchSetWeekShift('rest')"
+                      >
+                        批量休息
+                      </button>
+                      <button
+                        data-testid="batch-office-week-button"
+                        type="button"
+                        :disabled="!canEditSchedule || scheduleActionBusy"
+                        @click="handleBatchSetWeekShift('office')"
+                      >
+                        批量办公
+                      </button>
+                      <button
+                        class="danger-action"
+                        data-testid="clear-week-button"
+                        type="button"
+                        :disabled="!canEditSchedule || scheduleActionBusy"
+                        @click="handleClearWeek"
+                      >
+                        批量清空
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </section>
             </section>

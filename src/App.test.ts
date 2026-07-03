@@ -2430,6 +2430,9 @@ describe("App", () => {
     expect(operationRow.find('[data-testid="schedule-efficiency-tools"]').exists()).toBe(false);
     expect(efficiencyRow.find('[data-testid="schedule-efficiency-tools"]').exists()).toBe(true);
     expect(efficiencyRow.get(".schedule-efficiency-title").text()).toBe("排班效率工具");
+    expect(efficiencyRow.get('[data-testid="schedule-display-group"] .schedule-tool-group-title').text()).toBe("显示设置");
+    expect(efficiencyRow.get('[data-testid="schedule-sort-group"] .schedule-tool-group-title').text()).toBe("排序操作");
+    expect(efficiencyRow.get('[data-testid="schedule-batch-group"] .schedule-tool-group-title').text()).toBe("批量操作");
     expect(efficiencyRow.get('[data-testid="schedule-reorder-label"]').text()).toBe("人员和排班排序");
     expect(efficiencyRow.get('[data-testid="schedule-only-reorder-label"]').text()).toBe("仅排班排序");
     expect(efficiencyRow.get('[data-testid="schedule-reorder-selected"]').text()).toBe("请选择人员");
@@ -2444,10 +2447,15 @@ describe("App", () => {
     const efficiencyElement = efficiencyRow.element;
     const weekControls = operationRow.get('[data-testid="schedule-week-controls"]').element;
     const search = operationRow.get(".schedule-search").element;
+    const displayGroup = efficiencyRow.get('[data-testid="schedule-display-group"]').element;
+    const sortGroup = efficiencyRow.get('[data-testid="schedule-sort-group"]').element;
+    const batchGroup = efficiencyRow.get('[data-testid="schedule-batch-group"]').element;
     const shiftPalette = wrapper.get('[data-testid="select-shift-a1"]').element;
     expect(rowElement.compareDocumentPosition(weekControls) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(weekControls.compareDocumentPosition(search) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(rowElement.compareDocumentPosition(efficiencyElement) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(displayGroup.compareDocumentPosition(sortGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(sortGroup.compareDocumentPosition(batchGroup) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(efficiencyElement.compareDocumentPosition(shiftPalette) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
