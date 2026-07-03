@@ -907,7 +907,6 @@ body {
   width: var(--job-col-width, 58px);
   min-width: var(--job-col-width, 58px);
   max-width: var(--job-col-width, 58px);
-  left: var(--job-col-left, 128px);
   text-align: center;
   padding: 0 4px;
   color: #475569;
@@ -918,7 +917,6 @@ body {
   width: var(--type-col-width, 48px);
   min-width: var(--type-col-width, 48px);
   max-width: var(--type-col-width, 48px);
-  left: var(--type-col-left, 186px);
   text-align: center;
   padding: 0 4px;
   font-weight: 700;
@@ -1840,7 +1838,6 @@ body {
     width: var(--job-col-mobile-width, 54px);
     min-width: var(--job-col-mobile-width, 54px);
     max-width: var(--job-col-mobile-width, 54px);
-    left: var(--job-col-mobile-left, 112px);
     padding: 0 3px;
   }
 
@@ -1848,7 +1845,6 @@ body {
     width: var(--type-col-mobile-width, 44px);
     min-width: var(--type-col-mobile-width, 44px);
     max-width: var(--type-col-mobile-width, 44px);
-    left: var(--type-col-mobile-left, 166px);
     padding: 0 3px;
   }
 

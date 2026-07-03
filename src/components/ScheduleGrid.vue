@@ -68,15 +68,12 @@ const personColumnStyle = computed(() => {
   const longestNameUnits = Math.max(2, ...sortedStaff.value.map((person) => measureDisplayUnits(person.name)));
   const personColumnWidth = clamp(Math.ceil(longestNameUnits * 12 + 40), 64, 104);
   const personColumnMobileWidth = clamp(Math.ceil(longestNameUnits * 12 + 32), 56, 88);
-  const jobColumnLeft = SORT_COLUMN_WIDTH + personColumnWidth;
-  const typeColumnLeft = jobColumnLeft + JOB_COLUMN_WIDTH;
-  const jobColumnMobileLeft = SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth;
-  const typeColumnMobileLeft = jobColumnMobileLeft + JOB_COLUMN_MOBILE_WIDTH;
-  const fixedColumnWidth = typeColumnLeft + TYPE_COLUMN_WIDTH;
-  const fixedColumnMobileWidth = typeColumnMobileLeft + TYPE_COLUMN_MOBILE_WIDTH;
-  const scheduleGridMinWidth = fixedColumnWidth + props.days.length * dayColumnWidth.value;
+  const identityColumnWidth = SORT_COLUMN_WIDTH + personColumnWidth + JOB_COLUMN_WIDTH + TYPE_COLUMN_WIDTH;
+  const identityColumnMobileWidth =
+    SORT_COLUMN_MOBILE_WIDTH + personColumnMobileWidth + JOB_COLUMN_MOBILE_WIDTH + TYPE_COLUMN_MOBILE_WIDTH;
+  const scheduleGridMinWidth = identityColumnWidth + props.days.length * dayColumnWidth.value;
   const scheduleGridMobileMinWidth =
-    fixedColumnMobileWidth + props.days.length * dayColumnMobileWidth.value;
+    identityColumnMobileWidth + props.days.length * dayColumnMobileWidth.value;
 
   return {
     "--sort-col-width": `${SORT_COLUMN_WIDTH}px`,
@@ -85,8 +82,6 @@ const personColumnStyle = computed(() => {
     "--type-col-width": `${TYPE_COLUMN_WIDTH}px`,
     "--day-col-width": `${dayColumnWidth.value}px`,
     "--person-col-left": `${SORT_COLUMN_WIDTH}px`,
-    "--job-col-left": `${jobColumnLeft}px`,
-    "--type-col-left": `${typeColumnLeft}px`,
     "--schedule-grid-min-width": `${scheduleGridMinWidth}px`,
     "--sort-col-mobile-width": `${SORT_COLUMN_MOBILE_WIDTH}px`,
     "--person-col-mobile-width": `${personColumnMobileWidth}px`,
@@ -94,8 +89,6 @@ const personColumnStyle = computed(() => {
     "--type-col-mobile-width": `${TYPE_COLUMN_MOBILE_WIDTH}px`,
     "--day-col-mobile-width": `${dayColumnMobileWidth.value}px`,
     "--person-col-mobile-left": `${SORT_COLUMN_MOBILE_WIDTH}px`,
-    "--job-col-mobile-left": `${jobColumnMobileLeft}px`,
-    "--type-col-mobile-left": `${typeColumnMobileLeft}px`,
     "--schedule-grid-mobile-min-width": `${scheduleGridMobileMinWidth}px`
   };
 });
@@ -205,8 +198,8 @@ onBeforeUnmount(() => {
           <tr>
             <th class="sticky-col sort-col">排序ID</th>
             <th class="sticky-col person-col">人员</th>
-            <th class="sticky-col job-col">工号</th>
-            <th class="sticky-col type-col">类型</th>
+            <th class="job-col">工号</th>
+            <th class="type-col">类型</th>
             <th v-for="day in days" :key="day.key" :class="{ weekend: day.isWeekend, holiday: holidayMap.has(day.key) }">
               <span>{{ day.dayOfMonth }}</span>
               <small>{{ day.weekdayName }}</small>
@@ -235,8 +228,8 @@ onBeforeUnmount(() => {
               <strong>{{ person.name }}</strong>
               <small v-if="!person.enabled" class="historical-staff-label">停用历史</small>
             </th>
-            <td class="sticky-col job-col">{{ person.jobId }}</td>
-            <td class="sticky-col type-col">{{ staffTypeLabel(person) }}</td>
+            <td class="job-col">{{ person.jobId }}</td>
+            <td class="type-col">{{ staffTypeLabel(person) }}</td>
             <td
               v-for="day in days"
               :key="`${person.id}-${day.key}`"

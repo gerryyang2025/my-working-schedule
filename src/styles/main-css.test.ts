@@ -474,7 +474,7 @@ describe("main.css layout rules", () => {
     expect(mobileMeta).toContain("white-space: normal");
   });
 
-  it("keeps sort id, staff, job id and type columns fixed above scrolling day headers", () => {
+  it("keeps only sort id and staff columns fixed above scrolling day headers", () => {
     const stickyColumn = ruleBlocks(".sticky-col")[0] ?? "";
     const stickyHeader = ruleBlocks(".schedule-grid thead .sticky-col")[0] ?? "";
     const gridRules = ruleBlocks(".schedule-grid")[0] ?? "";
@@ -517,21 +517,21 @@ describe("main.css layout rules", () => {
     expect(jobColumnRules[0]).toContain("width: var(--job-col-width, 58px)");
     expect(jobColumnRules[0]).toContain("min-width: var(--job-col-width, 58px)");
     expect(jobColumnRules[0]).toContain("max-width: var(--job-col-width, 58px)");
-    expect(jobColumnRules[0]).toContain("left: var(--job-col-left, 128px)");
+    expect(jobColumnRules[0]).not.toContain("left:");
     expect(jobColumnRules[1]).toContain("width: var(--job-col-mobile-width, 54px)");
     expect(jobColumnRules[1]).toContain("min-width: var(--job-col-mobile-width, 54px)");
     expect(jobColumnRules[1]).toContain("max-width: var(--job-col-mobile-width, 54px)");
-    expect(jobColumnRules[1]).toContain("left: var(--job-col-mobile-left, 112px)");
+    expect(jobColumnRules[1]).not.toContain("left:");
 
     expect(typeColumnRules).toHaveLength(2);
     expect(typeColumnRules[0]).toContain("width: var(--type-col-width, 48px)");
     expect(typeColumnRules[0]).toContain("min-width: var(--type-col-width, 48px)");
     expect(typeColumnRules[0]).toContain("max-width: var(--type-col-width, 48px)");
-    expect(typeColumnRules[0]).toContain("left: var(--type-col-left, 186px)");
+    expect(typeColumnRules[0]).not.toContain("left:");
     expect(typeColumnRules[1]).toContain("width: var(--type-col-mobile-width, 44px)");
     expect(typeColumnRules[1]).toContain("min-width: var(--type-col-mobile-width, 44px)");
     expect(typeColumnRules[1]).toContain("max-width: var(--type-col-mobile-width, 44px)");
-    expect(typeColumnRules[1]).toContain("left: var(--type-col-mobile-left, 166px)");
+    expect(typeColumnRules[1]).not.toContain("left:");
 
     expect(dayColumnLayoutRules).toHaveLength(2);
     expect(dayColumnLayoutRules[0]).toContain("width: var(--day-col-width, 128px)");

@@ -100,21 +100,25 @@ afterEach(() => {
 });
 
 describe("ScheduleGrid", () => {
-  it("shows sort id, person, job id and type as the fixed schedule columns", () => {
+  it("keeps only sort id and person as fixed schedule columns", () => {
     const wrapper = mountGrid([]);
 
-    expect(
-      wrapper
-        .findAll("thead th")
-        .slice(0, 4)
-        .map((cell) => cell.text())
-    ).toEqual(["排序ID", "人员", "工号", "类型"]);
+    const headerCells = wrapper.findAll("thead th");
+    expect(headerCells.slice(0, 4).map((cell) => cell.text())).toEqual(["排序ID", "人员", "工号", "类型"]);
+    expect(headerCells[0].classes()).toContain("sticky-col");
+    expect(headerCells[1].classes()).toContain("sticky-col");
+    expect(headerCells[2].classes()).not.toContain("sticky-col");
+    expect(headerCells[3].classes()).not.toContain("sticky-col");
 
     const firstRow = wrapper.get("tbody tr");
     expect(firstRow.get(".sort-col").text()).toBe("1");
     expect(firstRow.get(".person-col").text()).toBe("在职护士");
     expect(firstRow.get(".job-col").text()).toBe("N001");
     expect(firstRow.get(".type-col").text()).toBe("护士");
+    expect(firstRow.get(".sort-col").classes()).toContain("sticky-col");
+    expect(firstRow.get(".person-col").classes()).toContain("sticky-col");
+    expect(firstRow.get(".job-col").classes()).not.toContain("sticky-col");
+    expect(firstRow.get(".type-col").classes()).not.toContain("sticky-col");
   });
 
   it("keeps the type column visible so schedule tables stay structurally stable", () => {
@@ -368,16 +372,16 @@ describe("ScheduleGrid", () => {
     expect(tableStyle.getPropertyValue("--type-col-width")).toBe("48px");
     expect(tableStyle.getPropertyValue("--day-col-width")).toBe("128px");
     expect(tableStyle.getPropertyValue("--person-col-left")).toBe("52px");
-    expect(tableStyle.getPropertyValue("--job-col-left")).toBe("140px");
-    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("198px");
+    expect(tableStyle.getPropertyValue("--job-col-left")).toBe("");
+    expect(tableStyle.getPropertyValue("--type-col-left")).toBe("");
     expect(tableStyle.getPropertyValue("--schedule-grid-min-width")).toBe("374px");
     expect(tableStyle.getPropertyValue("--sort-col-mobile-width")).toBe("48px");
     expect(tableStyle.getPropertyValue("--job-col-mobile-width")).toBe("54px");
     expect(tableStyle.getPropertyValue("--type-col-mobile-width")).toBe("44px");
     expect(tableStyle.getPropertyValue("--day-col-mobile-width")).toBe("76px");
     expect(tableStyle.getPropertyValue("--person-col-mobile-left")).toBe("48px");
-    expect(tableStyle.getPropertyValue("--job-col-mobile-left")).toBe("128px");
-    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("182px");
+    expect(tableStyle.getPropertyValue("--job-col-mobile-left")).toBe("");
+    expect(tableStyle.getPropertyValue("--type-col-mobile-left")).toBe("");
     expect(tableStyle.getPropertyValue("--schedule-grid-mobile-min-width")).toBe("302px");
   });
 
