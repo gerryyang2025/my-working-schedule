@@ -1,4 +1,5 @@
 import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "@/types/domain";
+import type { ScheduleImportApplyResult, ScheduleImportPreview, ScheduleImportValidationError } from "@/lib/schedule-import";
 
 export type PublicAppData = AppData;
 export type UserRole = "admin" | "scheduler" | "viewer";
@@ -58,6 +59,23 @@ export interface ScheduleSwapWeekResult {
   swappedDays: number;
 }
 
+export interface ScheduleImportRequest {
+  rawText: string;
+}
+
+export type ScheduleImportPreviewResult = ScheduleImportPreview;
+
+export interface ScheduleImportPreviewResponse {
+  preview: ScheduleImportPreviewResult;
+}
+
+export type ScheduleImportConfirmResult = Omit<ScheduleImportApplyResult, "data">;
+
+export interface ScheduleImportConfirmResponse {
+  data: PublicAppData;
+  result: ScheduleImportConfirmResult;
+}
+
 export type BulkWeekSchedulePayload =
   | {
       weekStart: string;
@@ -107,6 +125,7 @@ let currentUser: AuthUser | null = null;
 
 interface ApiErrorResponse {
   message?: string;
+  errors?: ScheduleImportValidationError[];
 }
 
 export async function requestJson<T>(path: string, options: RequestInit = {}): Promise<T> {
@@ -131,7 +150,9 @@ export async function requestJson<T>(path: string, options: RequestInit = {}): P
       errorBody = null;
     }
 
-    throw new Error(errorBody?.message || response.statusText || `HTTP ${response.status}`);
+    throw Object.assign(new Error(errorBody?.message || response.statusText || `HTTP ${response.status}`), {
+      errors: errorBody?.errors
+    });
   }
 
   return (await response.json()) as T;
@@ -339,6 +360,20 @@ export function saveScheduleEntry(entry: Omit<ScheduleEntry, "id">): Promise<Pub
   return requestJson<PublicAppData>("/api/data/schedule-entry", {
     method: "PUT",
     body: JSON.stringify(entry)
+  });
+}
+
+export function previewScheduleImport(rawText: string): Promise<ScheduleImportPreviewResponse> {
+  return requestJson<ScheduleImportPreviewResponse>("/api/data/schedule-import/preview", {
+    method: "POST",
+    body: JSON.stringify({ rawText } satisfies ScheduleImportRequest)
+  });
+}
+
+export function confirmScheduleImport(rawText: string): Promise<ScheduleImportConfirmResponse> {
+  return requestJson<ScheduleImportConfirmResponse>("/api/data/schedule-import", {
+    method: "POST",
+    body: JSON.stringify({ rawText } satisfies ScheduleImportRequest)
   });
 }
 

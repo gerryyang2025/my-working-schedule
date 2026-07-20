@@ -8,6 +8,7 @@ import LoginPage from "@/components/LoginPage.vue";
 import ManagementDrawer from "@/components/ManagementDrawer.vue";
 import PasswordChangeDialog from "@/components/PasswordChangeDialog.vue";
 import PrintViews from "@/components/PrintViews.vue";
+import ScheduleImportPanel from "@/components/ScheduleImportPanel.vue";
 import ScheduleGrid from "@/components/ScheduleGrid.vue";
 import ScheduleQueryResults from "@/components/ScheduleQueryResults.vue";
 import ShiftPalette from "@/components/ShiftPalette.vue";
@@ -21,6 +22,7 @@ import {
   deleteHoliday,
   deleteMonthlySettlement,
   getCurrentUser,
+  confirmScheduleImport,
   listAuditLogs,
   listUsers,
   loadData,
@@ -47,6 +49,7 @@ import type {
   SaveAuthUserInput
 } from "@/api/client";
 import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/domain";
+import type { ScheduleImportValidationError } from "@/lib/schedule-import";
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
@@ -55,7 +58,7 @@ import { validateScheduleQueryRange } from "@/lib/schedule-query";
 import { calculateSettlementChecks } from "@/lib/settlement-checks";
 
 type PrintMode = "month" | "week";
-type WorkbenchTab = "schedule" | "query" | "weekly" | "bonus" | "print" | "config" | "help";
+type WorkbenchTab = "schedule" | "query" | "import" | "weekly" | "bonus" | "print" | "config" | "help";
 type ReorderDirection = "up" | "down";
 type ScheduleDisplayDensity = "standard" | "compact";
 
@@ -147,19 +150,26 @@ const bulkUpdatingWeek = ref(false);
 const scheduleEntrySaving = ref(false);
 const staffOrderSaving = ref(false);
 const scheduleSwapSaving = ref(false);
+const scheduleImportSaving = ref(false);
+const scheduleImportErrors = ref<ScheduleImportValidationError[]>([]);
 const userMenuOpen = ref(false);
 const userMenuRef = ref<HTMLElement | null>(null);
 const userMenuButtonRef = ref<HTMLButtonElement | null>(null);
 
-const workbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
+const baseWorkbenchTabs: Array<{ key: WorkbenchTab; label: string }> = [
   { key: "schedule", label: "排班" },
   { key: "query", label: "查询" },
+  { key: "import", label: "导入" },
   { key: "weekly", label: "周统计" },
   { key: "bonus", label: "月结与奖金" },
   { key: "print", label: "打印" },
   { key: "config", label: "配置" },
   { key: "help", label: "使用说明" }
 ];
+
+const workbenchTabs = computed(() =>
+  baseWorkbenchTabs.filter((tab) => tab.key !== "import" || canEditSchedule.value)
+);
 
 interface ConfigMutationContext {
   requestId: number;
@@ -467,6 +477,12 @@ watch(selectedWeek, (nextWeek) => {
 
 watch(filteredScheduleStaffIds, () => {
   clearInvisibleSelectedScheduleStaff();
+});
+
+watch(canEditSchedule, (canEdit) => {
+  if (!canEdit && activeWorkbenchTab.value === "import") {
+    activeWorkbenchTab.value = "schedule";
+  }
 });
 
 async function refreshData(): Promise<void> {
@@ -988,6 +1004,37 @@ async function handleClearWeek(): Promise<void> {
   );
 }
 
+async function handleConfirmScheduleImport(rawText: string): Promise<void> {
+  if (!canEditSchedule.value || scheduleImportSaving.value) {
+    return;
+  }
+
+  scheduleImportSaving.value = true;
+  scheduleImportErrors.value = [];
+  try {
+    const response = await confirmScheduleImport(rawText);
+    data.value = response.data;
+    const skippedText = response.result.skipped > 0 ? `，跳过 ${response.result.skipped} 个已有排班` : "";
+    ElMessage.success(`已导入 ${response.result.imported} 个排班${skippedText}`);
+  } catch (caughtError) {
+    scheduleImportErrors.value = scheduleImportErrorsFromError(caughtError);
+    ElMessage.error(caughtError instanceof Error ? caughtError.message : "导入排班失败");
+  } finally {
+    scheduleImportSaving.value = false;
+  }
+}
+
+function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportValidationError[] {
+  if (typeof caughtError === "object" && caughtError !== null && "errors" in caughtError) {
+    const errors = (caughtError as { errors?: unknown }).errors;
+    if (Array.isArray(errors)) {
+      return errors as ScheduleImportValidationError[];
+    }
+  }
+
+  return [];
+}
+
 function isMobileViewport(): boolean {
   if (typeof window === "undefined") {
     return false;
@@ -1043,6 +1090,10 @@ function printWithMode(mode: PrintMode): void {
 }
 
 function selectWorkbenchTab(tab: WorkbenchTab): void {
+  if (tab === "import" && !canEditSchedule.value) {
+    return;
+  }
+
   if (tab === "print") {
     activeWorkbenchTab.value = tab;
     return;
@@ -2141,6 +2192,15 @@ onBeforeUnmount(() => {
                 :entries="scheduleQueryEntries"
               />
             </section>
+          </section>
+          <section v-show="activeWorkbenchTab === 'import'" class="workbench-tab-panel" data-testid="workbench-panel-import">
+            <ScheduleImportPanel
+              v-if="data && canEditSchedule"
+              :data="data"
+              :saving="scheduleImportSaving"
+              :server-errors="scheduleImportErrors"
+              @confirm-import="handleConfirmScheduleImport"
+            />
           </section>
           <section v-show="activeWorkbenchTab === 'weekly'" class="workbench-tab-panel" data-testid="workbench-panel-weekly">
             <WeeklySummary v-if="weeklySummary" :summary="weeklySummary" />

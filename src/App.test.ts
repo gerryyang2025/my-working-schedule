@@ -13,6 +13,8 @@ const apiMocks = vi.hoisted(() => ({
   deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
   getCurrentUser: vi.fn(),
+  previewScheduleImport: vi.fn(),
+  confirmScheduleImport: vi.fn(),
   listAuditLogs: vi.fn(),
   listUsers: vi.fn(),
   loadData: vi.fn(),
@@ -466,6 +468,29 @@ const ScheduleQueryResultsStub = defineComponent({
   `
 });
 
+const ScheduleImportPanelStub = defineComponent({
+  name: "ScheduleImportPanel",
+  props: ["data", "saving", "serverErrors"],
+  emits: ["confirmImport"],
+  template: `
+    <section data-testid="schedule-import-panel">
+      <textarea data-testid="schedule-import-input" />
+      <span data-testid="schedule-import-saving">{{ saving ? "saving" : "idle" }}</span>
+      <span data-testid="schedule-import-entry-count">{{ data.scheduleEntries.length }}</span>
+      <span data-testid="schedule-import-server-errors">{{ (serverErrors || []).map((error) => error.message).join("；") }}</span>
+      <button data-testid="schedule-import-validate" type="button">validate</button>
+      <button
+        data-testid="schedule-import-confirm"
+        type="button"
+        :disabled="saving"
+        @click="$emit('confirmImport', '当前排班周期为2026年7月20日')"
+      >
+        confirm
+      </button>
+    </section>
+  `
+});
+
 const WeeklySummaryStub = defineComponent({
   name: "WeeklySummary",
   props: ["summary"],
@@ -770,6 +795,7 @@ function mountApp(
         PasswordChangeDialog: PasswordChangeDialogStub,
         PrintViews: PrintViewsStub,
         ScheduleGrid: ScheduleGridStub,
+        ScheduleImportPanel: ScheduleImportPanelStub,
         ScheduleQueryResults: ScheduleQueryResultsStub,
         ShiftPalette: ShiftPaletteStub,
         WeeklySummary: WeeklySummaryStub
@@ -2535,6 +2561,7 @@ describe("App", () => {
     expect(wrapper.findAll(".workbench-tabs button").map((button) => button.text())).toEqual([
       "排班",
       "查询",
+      "导入",
       "周统计",
       "月结与奖金",
       "打印",
@@ -2549,6 +2576,126 @@ describe("App", () => {
     expectPanelHidden(wrapper, "workbench-panel-weekly");
     expect(wrapper.get('[data-testid="schedule-query-summary"]').text()).toBe("已显示 2 / 2 人；日期 7 天；共 1 周");
     expect(wrapper.find('[data-testid="schedule-query-results"]').exists()).toBe(true);
+  });
+
+  it("shows the import tab to users who can edit schedules", async () => {
+    const wrapper = mountApp(testData, {
+      id: "admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+
+    expect(wrapper.get('[data-testid="workbench-tab-import"]').text()).toBe("导入");
+  });
+
+  it("hides the import tab from viewers", async () => {
+    const wrapper = mountApp(testData, {
+      id: "viewer",
+      username: "viewer",
+      displayName: "只读",
+      role: "viewer",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+
+    expect(wrapper.find('[data-testid="workbench-tab-import"]').exists()).toBe(false);
+  });
+
+  it("imports pasted schedule text from the import tab and refreshes data", async () => {
+    const importableData: PublicAppData = {
+      ...testData,
+      shifts: [
+        ...testData.shifts,
+        {
+          id: "shift-normal",
+          name: "常",
+          shortName: "常",
+          color: "#16a34a",
+          countsAttendance: true,
+          coefficient: 1,
+          enabled: true,
+          sortOrder: 3
+        }
+      ]
+    };
+    const importedData: PublicAppData = {
+      ...importableData,
+      scheduleEntries: [
+        {
+          id: "2026-07-20__staff-nurse-001",
+          date: "2026-07-20",
+          staffId: "staff-nurse-001",
+          shiftIds: ["shift-normal"],
+          note: ""
+        }
+      ]
+    };
+    apiMocks.confirmScheduleImport.mockResolvedValue({
+      data: importedData,
+      result: {
+        imported: 7,
+        skipped: 0,
+        aliasMapped: 5,
+        staffCount: 1,
+        periodStart: "2026-07-20",
+        periodEnd: "2026-07-26"
+      }
+    });
+    const wrapper = mountApp(importableData, {
+      id: "admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-import"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-import-input"]').setValue(`当前排班周期为2026年7月20日（周一）至 7月26日（周日）：
+
+姓名\t周一(7/20)\t周二(7/21)\t周三(7/22)\t周四(7/23)\t周五(7/24)\t周六(7/25)\t周日(7/26)
+李护士\t常\t常\t常\t常\t常\t休\t休`);
+    await wrapper.get('[data-testid="schedule-import-validate"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-import-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(apiMocks.confirmScheduleImport).toHaveBeenCalledWith(expect.stringContaining("当前排班周期为2026年7月20日"));
+    expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("已导入 7 个排班");
+    expect(wrapper.get('[data-testid="schedule-import-entry-count"]').text()).toBe("1");
+  });
+
+  it("passes schedule import errors from confirm back into the import panel", async () => {
+    apiMocks.confirmScheduleImport.mockRejectedValue(
+      Object.assign(new Error("导入数据校验失败"), {
+        errors: [{ scope: "cell", rowNumber: 3, columnLabel: "周一(7/20)", message: "第3行 周一(7/20) 班次不存在或未启用：夜班" }]
+      })
+    );
+    const wrapper = mountApp(testData, {
+      id: "admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-import"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-import-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessage.error).toHaveBeenCalledWith("导入数据校验失败");
+    expect(wrapper.get('[data-testid="schedule-import-server-errors"]').text()).toContain(
+      "第3行 周一(7/20) 班次不存在或未启用：夜班"
+    );
   });
 
   it("groups week and month print previews under a single print tab", async () => {
@@ -3159,6 +3306,8 @@ describe("App", () => {
   });
 
   it("allows canceling a settled month when saved snapshot rows are managed even if live summary has unmanaged staff", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp(
       {
         ...twoStaffData,
@@ -3172,9 +3321,12 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
     expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("true");
+    vi.useRealTimers();
   });
 
   it("blocks canceling a settled month when saved snapshot rows include unmanaged staff", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp(
       {
         ...testData,
@@ -3188,9 +3340,12 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
     expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("false");
+    vi.useRealTimers();
   });
 
   it("passes a custom range trial summary into the bonus panel", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp({
       ...testData,
       scheduleEntries: [
@@ -3204,6 +3359,7 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+    vi.useRealTimers();
   });
 
   it("uses single-month settlement mode for the same non-selected start and end month", async () => {
@@ -3267,6 +3423,8 @@ describe("App", () => {
   });
 
   it("keeps the bonus range when the selected date changes within the same month", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp();
 
     await flushPromises();
@@ -3279,9 +3437,12 @@ describe("App", () => {
     await nextTick();
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
+    vi.useRealTimers();
   });
 
   it("passes selected monthly settlement into print views", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp({
       ...testData,
       monthlySettlements: [
@@ -3302,9 +3463,12 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="print-monthly-settlement"]').text()).toBe("月结 2026-06 1000.00");
+    vi.useRealTimers();
   });
 
   it("confirms before saving monthly settlement and refreshes app data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
@@ -3338,9 +3502,12 @@ describe("App", () => {
     expect(String(message)).toContain("确认后该月排班会被锁定");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
+    vi.useRealTimers();
   });
 
   it("shows settlement pre-check warnings before final confirmation and saves after continuing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
@@ -3376,6 +3543,7 @@ describe("App", () => {
     });
     expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[1][1]).toBe("确认月结");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+    vi.useRealTimers();
   });
 
   it("does not save monthly settlement when pre-check warning is canceled", async () => {
@@ -3394,6 +3562,8 @@ describe("App", () => {
   });
 
   it("skips settlement pre-check warning when no check items exist", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
     const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
@@ -3407,6 +3577,7 @@ describe("App", () => {
     expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
     expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][1]).toBe("确认月结");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+    vi.useRealTimers();
   });
 
   it("does not save or show an error when monthly settlement confirmation is canceled", async () => {
@@ -3426,6 +3597,8 @@ describe("App", () => {
   });
 
   it("suppresses duplicate settlement saves while a request is in flight", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     const deferred = createDeferred<PublicAppData>();
     apiMocks.saveMonthlySettlement.mockReturnValue(deferred.promise);
@@ -3444,9 +3617,12 @@ describe("App", () => {
 
     deferred.resolve({ ...testData, monthlySettlements: [] });
     await flushPromises();
+    vi.useRealTimers();
   });
 
   it("cancels monthly settlement and refreshes app data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     apiMocks.deleteMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
     const wrapper = mountApp({
       ...testData,
@@ -3473,6 +3649,7 @@ describe("App", () => {
 
     expect(apiMocks.deleteMonthlySettlement).toHaveBeenCalledWith("2026-06");
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
+    vi.useRealTimers();
   });
 
   it("shares a generated PDF file from the print preview when file sharing is supported", async () => {
