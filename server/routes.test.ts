@@ -125,6 +125,33 @@ function createHolidayPayload(overrides: Partial<Holiday> = {}) {
   };
 }
 
+function createImportData(): AppData {
+  const data = createSeedData();
+  data.staff = [
+    { id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 },
+    { id: "staff-nurse", jobId: "001351", name: "张曼曼", type: "nurse", isAdmin: false, enabled: true, sortOrder: 2 }
+  ];
+  data.shifts = [
+    { id: "shift-normal", name: "常", shortName: "常", color: "#16a34a", countsAttendance: true, coefficient: 1, enabled: true, sortOrder: 1 },
+    { id: "shift-rest", name: "休息", shortName: "休", color: "#64748b", countsAttendance: false, coefficient: 0, enabled: true, sortOrder: 2 },
+    { id: "shift-n1", name: "N1", shortName: "N1", color: "#dc2626", countsAttendance: true, coefficient: 1.3, enabled: true, sortOrder: 3 },
+    { id: "shift-p3", name: "P3", shortName: "P3", color: "#0f766e", countsAttendance: true, coefficient: 1.2, enabled: true, sortOrder: 4 },
+    { id: "shift-a4", name: "A4", shortName: "A4", color: "#2563eb", countsAttendance: true, coefficient: 1.2, enabled: true, sortOrder: 5 },
+    { id: "shift-slash", name: "/", shortName: "/", color: "#6b7280", countsAttendance: false, coefficient: 0, enabled: true, sortOrder: 6 }
+  ];
+  data.scheduleEntries = [
+    { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: ["shift-rest"], note: "" }
+  ];
+  data.monthlySettlements = [];
+  return data;
+}
+
+const importText = `当前排班周期为2026年7月20日（周一）至 7月26日（周日）：
+
+姓名\t周一(7/20)\t周二(7/21)\t周三(7/22)\t周四(7/23)\t周五(7/24)\t周六(7/25)\t周日(7/26)
+段鸿露\t常班\t常班\t常班\t常班\t常班\t休\t休
+张曼曼\tN1\t/\t休\tP3\tA4\tA4\tN1`;
+
 describe.sequential("API routes", () => {
   it("returns health", async () => {
     await request(createTestApp()).get("/api/health").expect(200, { ok: true });
@@ -937,6 +964,151 @@ describe.sequential("API routes", () => {
       .set(headers)
       .send({ date: "2026-06-15", staffId: "staff-head-001", shiftIds: ["shift-a1"], note: "" })
       .expect(403);
+  });
+
+  it("previews schedule import text for schedulers and admins", async () => {
+    const app = createTestApp(createImportData());
+    const response = await request(app)
+      .post("/api/data/schedule-import/preview")
+      .set(await adminHeaders(app))
+      .send({ rawText: importText })
+      .expect(200);
+
+    expect(response.body.preview.summary).toEqual({
+      staffCount: 2,
+      importableCells: 13,
+      skippedExistingCells: 1,
+      aliasMappedCells: 5
+    });
+    expect(response.body.preview.period).toEqual(expect.objectContaining({ start: "2026-07-20", end: "2026-07-26" }));
+    expect(response.body.preview.rows).toHaveLength(2);
+  });
+
+  it("blocks viewers and unauthenticated users from schedule import preview", async () => {
+    const app = createTestApp(createImportData());
+    const viewerHeaders = await createUserAndLogin(app, {
+      id: "user-viewer-import",
+      username: "viewer-import",
+      displayName: "只读导入账号",
+      role: "viewer"
+    });
+
+    await request(app).post("/api/data/schedule-import/preview").send({ rawText: importText }).expect(401, { message: "请先登录" });
+    await request(app)
+      .post("/api/data/schedule-import/preview")
+      .set(viewerHeaders)
+      .send({ rawText: importText })
+      .expect(403, { message: "当前账号没有操作权限" });
+  });
+
+  it("imports schedule text without overwriting existing entries and records an audit log", async () => {
+    const app = createTestApp(createImportData());
+    const headers = await adminHeaders(app);
+
+    const response = await request(app).post("/api/data/schedule-import").set(headers).send({ rawText: importText }).expect(200);
+
+    expect(response.body.result).toEqual({
+      imported: 13,
+      skipped: 1,
+      aliasMapped: 5,
+      staffCount: 2,
+      periodStart: "2026-07-20",
+      periodEnd: "2026-07-26"
+    });
+    expect(response.body.data.scheduleEntries).toEqual(
+      expect.arrayContaining([
+        { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: ["shift-rest"], note: "" },
+        { id: "2026-07-21__staff-head", date: "2026-07-21", staffId: "staff-head", shiftIds: ["shift-normal"], note: "" },
+        { id: "2026-07-21__staff-nurse", date: "2026-07-21", staffId: "staff-nurse", shiftIds: ["shift-slash"], note: "" }
+      ])
+    );
+
+    const auditResponse = await request(app).get("/api/audit-logs").set(headers).expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "data.schedule_import",
+          targetType: "schedule_import",
+          targetId: "2026-07-20__2026-07-26",
+          summary: "导入排班：2026-07-20 至 2026-07-26，2 人，写入 13 个，跳过 1 个，别名 5 个"
+        })
+      ])
+    );
+  });
+
+  it("rejects invalid schedule import text without writing data", async () => {
+    const app = createTestApp(createImportData());
+    const headers = await adminHeaders(app);
+
+    const response = await request(app)
+      .post("/api/data/schedule-import")
+      .set(headers)
+      .send({ rawText: importText.replace("张曼曼", "不存在") })
+      .expect(400);
+
+    expect(response.body.message).toBe("导入数据校验失败");
+    expect(response.body.errors).toEqual(
+      expect.arrayContaining([expect.objectContaining({ message: "第4行人员不存在或未启用：不存在" })])
+    );
+
+    const dataResponse = await request(app).get("/api/data").set(headers).expect(200);
+    expect(dataResponse.body.scheduleEntries).toHaveLength(1);
+  });
+
+  it("rejects schedule import when no cells are importable", async () => {
+    const data = createImportData();
+    data.scheduleEntries = [];
+    const app = createTestApp(data);
+    const headers = await adminHeaders(app);
+
+    await request(app).post("/api/data/schedule-import").set(headers).send({ rawText: importText }).expect(200);
+    const secondResponse = await request(app).post("/api/data/schedule-import").set(headers).send({ rawText: importText }).expect(400);
+
+    expect(secondResponse.body.message).toBe("没有可导入内容");
+  });
+
+  it("enforces managed staff permissions for schedule import", async () => {
+    const app = createTestApp(createImportData());
+    const schedulerHeaders = await createUserAndLogin(app, {
+      id: "user-limited-importer",
+      username: "limited-importer",
+      displayName: "部分导入员",
+      role: "scheduler",
+      managedStaffIds: ["staff-head"]
+    });
+
+    await request(app)
+      .post("/api/data/schedule-import")
+      .set(schedulerHeaders)
+      .send({ rawText: importText })
+      .expect(403, { message: "当前账号没有该人员操作权限" });
+  });
+
+  it("rejects schedule import into a settled month without writing data", async () => {
+    const data = createImportData();
+    data.monthlySettlements = [
+      {
+        id: "settlement-2026-07",
+        month: "2026-07",
+        monthStart: "2026-07-01",
+        monthEnd: "2026-07-31",
+        totalDays: 31,
+        bonusPool: 0,
+        coefficientTotal: 0,
+        settledAt: "2026-07-31T00:00:00.000Z",
+        rows: []
+      }
+    ];
+    const app = createTestApp(data);
+    const headers = await adminHeaders(app);
+
+    const response = await request(app).post("/api/data/schedule-import").set(headers).send({ rawText: importText }).expect(400);
+
+    expect(response.body.message).toBe("导入数据校验失败");
+    expect(response.body.errors).toEqual(expect.arrayContaining([expect.objectContaining({ message: "2026-07 已月结，不能导入排班" })]));
+
+    const dataResponse = await request(app).get("/api/data").set(headers).expect(200);
+    expect(dataResponse.body.scheduleEntries).toHaveLength(1);
   });
 
   it("requires schedulers to cover every settlement row before creating or deleting month settlements", async () => {

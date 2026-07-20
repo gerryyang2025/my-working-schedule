@@ -2,6 +2,11 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { createMonthlySettlement } from "../src/lib/bonus";
 import { calculateMonthlySummary } from "../src/lib/calculation";
 import { addDays, getMonthDays, getWeekRange, listDateKeys } from "../src/lib/date";
+import {
+  applyScheduleImportPreview,
+  validateScheduleImportText,
+  type ScheduleImportApplyResult
+} from "../src/lib/schedule-import";
 import { validateScheduleShiftIds } from "../src/lib/validation";
 import type { AppData, Holiday, ScheduleEntry, Shift, StaffMember } from "./types";
 import type { StorageAdapter } from "./storage";
@@ -48,6 +53,12 @@ interface ScheduleSwapWeekResult {
   swappedDays: number;
 }
 
+interface ScheduleImportPayload {
+  rawText: string;
+}
+
+type ScheduleImportResponseResult = Omit<ScheduleImportApplyResult, "data">;
+
 type BulkWeekOperation = "set-shift" | "clear";
 
 type BulkWeekPayload =
@@ -77,7 +88,8 @@ const MONTH_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 class HttpResponseError extends Error {
   constructor(
     readonly status: number,
-    message: string
+    message: string,
+    readonly details?: Record<string, unknown>
   ) {
     super(message);
   }
@@ -85,7 +97,7 @@ class HttpResponseError extends Error {
 
 function handleRouteError(error: unknown, response: Response, next: NextFunction): void {
   if (error instanceof HttpResponseError) {
-    response.status(error.status).json({ message: error.message });
+    response.status(error.status).json({ message: error.message, ...error.details });
     return;
   }
   if (error instanceof AuthStoreError) {
@@ -554,6 +566,14 @@ function parseScheduleEntryPayload(body: unknown): PayloadResult<ScheduleEntryPa
   }
 
   return { ok: true, value: { date, staffId, shiftIds, note: parsedNote } };
+}
+
+function parseScheduleImportPayload(body: unknown): ScheduleImportPayload {
+  if (!isRecord(body) || !isNonEmptyString(body.rawText)) {
+    throw new HttpResponseError(400, "导入内容不能为空");
+  }
+
+  return { rawText: body.rawText };
 }
 
 function parseCopyPreviousWeekPayload(body: unknown): PayloadResult<CopyPreviousWeekPayload> {
@@ -1367,6 +1387,97 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         `保存排班：${date} ${staffId}`
       );
       response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/data/schedule-import/preview", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const payload = parseScheduleImportPayload(request.body);
+      const data = await storage.load();
+      const preview = validateScheduleImportText({ rawText: payload.rawText, data });
+
+      if (preview.ok === false) {
+        response.status(400).json({ message: "导入数据校验失败", errors: preview.errors });
+        return;
+      }
+
+      const deniedStaff = preview.rows.find((row) => !canManageStaff(request.authUser, row.staffId));
+      if (deniedStaff) {
+        await denyStaffScope(request, response, deniedStaff.staffId);
+        return;
+      }
+
+      response.json({ preview });
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.post("/data/schedule-import", requireScheduler, async (request: AuthenticatedRequest, response, next) => {
+    try {
+      const payload = parseScheduleImportPayload(request.body);
+      const initialData = await storage.load();
+      const initialPreview = validateScheduleImportText({ rawText: payload.rawText, data: initialData });
+
+      if (initialPreview.ok === false) {
+        response.status(400).json({ message: "导入数据校验失败", errors: initialPreview.errors });
+        return;
+      }
+
+      const deniedStaff = initialPreview.rows.find((row) => !canManageStaff(request.authUser, row.staffId));
+      if (deniedStaff) {
+        await denyStaffScope(request, response, deniedStaff.staffId);
+        return;
+      }
+
+      if (initialPreview.noImportableCells) {
+        response.status(400).json({ message: "没有可导入内容" });
+        return;
+      }
+
+      const responseResultHolder: { value?: ScheduleImportResponseResult } = {};
+      const nextData = await storage.update((data) => {
+        const preview = validateScheduleImportText({ rawText: payload.rawText, data });
+        if (preview.ok === false) {
+          throw new HttpResponseError(400, "导入数据校验失败", { errors: preview.errors });
+        }
+
+        const scopedDeniedStaff = preview.rows.find((row) => !canManageStaff(request.authUser, row.staffId));
+        if (scopedDeniedStaff) {
+          throw new HttpResponseError(403, "当前账号没有该人员操作权限");
+        }
+
+        if (preview.noImportableCells) {
+          throw new HttpResponseError(400, "没有可导入内容");
+        }
+
+        const applied = applyScheduleImportPreview(data, preview);
+        responseResultHolder.value = {
+          imported: applied.imported,
+          skipped: applied.skipped,
+          aliasMapped: applied.aliasMapped,
+          staffCount: applied.staffCount,
+          periodStart: applied.periodStart,
+          periodEnd: applied.periodEnd
+        };
+        return applied.data;
+      });
+
+      const responseResult = responseResultHolder.value;
+      if (!responseResult) {
+        throw new HttpResponseError(400, "没有可导入内容");
+      }
+
+      await recordAudit(
+        request,
+        "data.schedule_import",
+        "schedule_import",
+        `${responseResult.periodStart}__${responseResult.periodEnd}`,
+        `导入排班：${responseResult.periodStart} 至 ${responseResult.periodEnd}，${responseResult.staffCount} 人，写入 ${responseResult.imported} 个，跳过 ${responseResult.skipped} 个，别名 ${responseResult.aliasMapped} 个`
+      );
+      response.json({ data: toPublicData(nextData), result: responseResult });
     } catch (error) {
       handleRouteError(error, response, next);
     }
