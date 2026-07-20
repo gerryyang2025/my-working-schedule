@@ -200,6 +200,26 @@ describe("validateScheduleImportText", () => {
     expect(noOp.noImportableCells).toBe(true);
   });
 
+  it("marks empty existing entries as skipped", () => {
+    const result = validateScheduleImportText({
+      rawText: validText,
+      data: baseData({
+        scheduleEntries: [
+          { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: [], note: "" }
+        ]
+      })
+    });
+
+    const preview = expectPreview(result);
+    expect(preview.rows[0].cells[0]).toMatchObject({
+      status: "skip-existing",
+      existingShiftIds: [],
+      existingShiftLabels: []
+    });
+    expect(preview.summary.importableCells).toBe(13);
+    expect(preview.summary.skippedExistingCells).toBe(1);
+  });
+
   it("rejects imports into settled months", () => {
     const result = validateScheduleImportText({
       rawText: validText,
@@ -244,5 +264,28 @@ describe("applyScheduleImportPreview", () => {
         { id: "2026-07-21__staff-nurse", date: "2026-07-21", staffId: "staff-nurse", shiftIds: ["shift-slash"], note: "" }
       ])
     );
+  });
+
+  it("counts apply-time existing entries as skipped", () => {
+    const preview = expectPreview(validateScheduleImportText({ rawText: validText, data: baseData() }));
+    const result = applyScheduleImportPreview(
+      baseData({
+        scheduleEntries: [
+          { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: [], note: "" }
+        ]
+      }),
+      preview
+    );
+
+    expect(result.imported).toBe(13);
+    expect(result.skipped).toBe(1);
+    expect(result.data.scheduleEntries.filter((entry) => entry.id === "2026-07-20__staff-head")).toHaveLength(1);
+    expect(result.data.scheduleEntries).toContainEqual({
+      id: "2026-07-20__staff-head",
+      date: "2026-07-20",
+      staffId: "staff-head",
+      shiftIds: [],
+      note: ""
+    });
   });
 });

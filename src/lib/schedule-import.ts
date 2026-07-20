@@ -177,7 +177,6 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
       }
 
       const existing = entryByKey.get(`${day.key}__${staff.id}`);
-      const hasExistingContent = Boolean(existing && (existing.shiftIds.length > 0 || existing.note.trim().length > 0));
       return {
         date: day.key,
         columnLabel: day.columnLabel,
@@ -188,7 +187,7 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
         shiftColor: resolved.shift.color,
         resolvedBy: resolved.mode,
         aliasTarget: resolved.aliasTarget,
-        status: hasExistingContent ? "skip-existing" : "import",
+        status: existing ? "skip-existing" : "import",
         existingShiftIds: existing?.shiftIds ?? [],
         existingShiftLabels: existing?.shiftIds.map((shiftId) => shiftLabel(input.data.shifts, shiftId)) ?? []
       } satisfies ScheduleImportCellPreview;
@@ -230,11 +229,17 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
 export function applyScheduleImportPreview(data: AppData, preview: ScheduleImportPreview): ScheduleImportApplyResult {
   const existingIds = new Set(data.scheduleEntries.map((entry) => `${entry.date}__${entry.staffId}`));
   const additions: ScheduleEntry[] = [];
+  let skipped = 0;
 
   for (const row of preview.rows) {
     for (const cell of row.cells) {
       const id = `${cell.date}__${row.staffId}`;
-      if (cell.status !== "import" || existingIds.has(id)) {
+      if (cell.status !== "import") {
+        skipped += 1;
+        continue;
+      }
+      if (existingIds.has(id)) {
+        skipped += 1;
         continue;
       }
       additions.push({ id, date: cell.date, staffId: row.staffId, shiftIds: [cell.shiftId], note: "" });
@@ -245,7 +250,7 @@ export function applyScheduleImportPreview(data: AppData, preview: ScheduleImpor
   return {
     data: { ...data, scheduleEntries: [...data.scheduleEntries, ...additions] },
     imported: additions.length,
-    skipped: preview.summary.skippedExistingCells,
+    skipped,
     aliasMapped: preview.summary.aliasMappedCells,
     staffCount: preview.summary.staffCount,
     periodStart: preview.period.start,
