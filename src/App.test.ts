@@ -2698,6 +2698,29 @@ describe("App", () => {
     );
   });
 
+  it("explains when imported schedule data already exists", async () => {
+    apiMocks.confirmScheduleImport.mockRejectedValue(new Error("没有可导入内容"));
+    const wrapper = mountApp(testData, {
+      id: "admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-import"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-import-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessage.info).toHaveBeenCalledWith(
+      "本次导入内容已全部存在，没有写入新的排班。可重新校验查看哪些格子已跳过。"
+    );
+    expect(elementPlusMocks.ElMessage.error).not.toHaveBeenCalled();
+    expect(wrapper.get('[data-testid="schedule-import-server-errors"]').text()).toBe("");
+  });
+
   it("groups week and month print previews under a single print tab", async () => {
     const wrapper = mountApp();
 

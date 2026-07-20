@@ -1017,6 +1017,12 @@ async function handleConfirmScheduleImport(rawText: string): Promise<void> {
     const skippedText = response.result.skipped > 0 ? `，跳过 ${response.result.skipped} 个已有排班` : "";
     ElMessage.success(`已导入 ${response.result.imported} 个排班${skippedText}`);
   } catch (caughtError) {
+    if (caughtError instanceof Error && caughtError.message === "没有可导入内容") {
+      scheduleImportErrors.value = [];
+      ElMessage.info("本次导入内容已全部存在，没有写入新的排班。可重新校验查看哪些格子已跳过。");
+      return;
+    }
+
     scheduleImportErrors.value = scheduleImportErrorsFromError(caughtError);
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "导入排班失败");
   } finally {
