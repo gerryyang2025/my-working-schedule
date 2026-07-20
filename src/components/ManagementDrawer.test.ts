@@ -37,7 +37,15 @@ const ElTableStub = defineComponent({
 
 const ElTableColumnStub = defineComponent({
   name: "ElTableColumn",
-  template: "<span />"
+  props: {
+    prop: String,
+    label: String,
+    width: [String, Number],
+    minWidth: [String, Number],
+    showOverflowTooltip: Boolean
+  },
+  template:
+    '<span class="el-table-column" :data-prop="prop" :data-label="label" :data-width="width" :data-min-width="minWidth" :data-tooltip="showOverflowTooltip ? \'true\' : \'false\'" />'
 });
 
 const InputStub = defineComponent({
@@ -313,6 +321,39 @@ describe("ManagementDrawer", () => {
         })
       ]
     ]);
+  });
+
+  it("preserves hyphenated shift names when saving a new shift", async () => {
+    const wrapper = mountDrawer();
+
+    await wrapper.get('input[placeholder="班次名称"]').setValue("跟班-办公");
+    await wrapper.get('input[placeholder="简称"]').setValue("跟班-办公");
+    await wrapper
+      .findAll("button")
+      .find((button) => button.text() === "保存班次")!
+      .trigger("click");
+
+    expect(wrapper.emitted("saveShift")).toEqual([
+      [
+        expect.objectContaining({
+          name: "跟班-办公",
+          shortName: "跟班-办公"
+        })
+      ]
+    ]);
+  });
+
+  it("uses readable columns for long shift names", () => {
+    const wrapper = mountDrawer();
+    const columns = wrapper.findAll(".el-table-column");
+    const shiftShortNameIndex = columns.findIndex((column) => column.attributes("data-prop") === "shortName");
+    const shiftShortNameColumn = columns[shiftShortNameIndex];
+    const shiftNameColumn = columns[shiftShortNameIndex + 1];
+
+    expect(shiftShortNameColumn.attributes("data-min-width")).toBe("120");
+    expect(shiftShortNameColumn.attributes("data-tooltip")).toBe("true");
+    expect(shiftNameColumn.attributes("data-min-width")).toBe("140");
+    expect(shiftNameColumn.attributes("data-tooltip")).toBe("true");
   });
 
   it("emits deleteUser for existing account deletion", async () => {

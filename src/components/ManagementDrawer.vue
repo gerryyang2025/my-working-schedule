@@ -434,8 +434,8 @@ watch(
 
       <el-tab-pane label="班次" name="shift">
         <el-table :data="data.shifts" size="small" @row-click="loadShiftDraft">
-          <el-table-column prop="shortName" label="简称" width="80" />
-          <el-table-column prop="name" label="名称" />
+          <el-table-column prop="shortName" label="简称" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="name" label="名称" min-width="140" show-overflow-tooltip />
           <el-table-column prop="coefficient" label="系数" width="80" />
           <el-table-column prop="countsAttendance" label="计出勤" width="90" />
           <el-table-column prop="enabled" label="启用" width="80" />
