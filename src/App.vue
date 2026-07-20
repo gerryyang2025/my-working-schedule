@@ -49,6 +49,7 @@ import type {
   SaveAuthUserInput
 } from "@/api/client";
 import type { Holiday, MonthlySettlement, Shift, StaffMember } from "@/types/domain";
+import type { ScheduleImportValidationError } from "@/lib/schedule-import";
 import { calculateMonthlySummary, calculateWeeklySummary } from "@/lib/calculation";
 import { getMonthDays, getWeekDays, getWeekRange, parseDateKey, toDateKey } from "@/lib/date";
 import { createPrintPdfFile } from "@/lib/print-pdf";
@@ -150,6 +151,7 @@ const scheduleEntrySaving = ref(false);
 const staffOrderSaving = ref(false);
 const scheduleSwapSaving = ref(false);
 const scheduleImportSaving = ref(false);
+const scheduleImportErrors = ref<ScheduleImportValidationError[]>([]);
 const userMenuOpen = ref(false);
 const userMenuRef = ref<HTMLElement | null>(null);
 const userMenuButtonRef = ref<HTMLButtonElement | null>(null);
@@ -1008,16 +1010,29 @@ async function handleConfirmScheduleImport(rawText: string): Promise<void> {
   }
 
   scheduleImportSaving.value = true;
+  scheduleImportErrors.value = [];
   try {
     const response = await confirmScheduleImport(rawText);
     data.value = response.data;
     const skippedText = response.result.skipped > 0 ? `，跳过 ${response.result.skipped} 个已有排班` : "";
     ElMessage.success(`已导入 ${response.result.imported} 个排班${skippedText}`);
   } catch (caughtError) {
+    scheduleImportErrors.value = scheduleImportErrorsFromError(caughtError);
     ElMessage.error(caughtError instanceof Error ? caughtError.message : "导入排班失败");
   } finally {
     scheduleImportSaving.value = false;
   }
+}
+
+function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportValidationError[] {
+  if (typeof caughtError === "object" && caughtError !== null && "errors" in caughtError) {
+    const errors = (caughtError as { errors?: unknown }).errors;
+    if (Array.isArray(errors)) {
+      return errors as ScheduleImportValidationError[];
+    }
+  }
+
+  return [];
 }
 
 function isMobileViewport(): boolean {
@@ -2183,6 +2198,7 @@ onBeforeUnmount(() => {
               v-if="data && canEditSchedule"
               :data="data"
               :saving="scheduleImportSaving"
+              :server-errors="scheduleImportErrors"
               @confirm-import="handleConfirmScheduleImport"
             />
           </section>

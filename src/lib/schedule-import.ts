@@ -187,7 +187,7 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
         shiftColor: resolved.shift.color,
         resolvedBy: resolved.mode,
         aliasTarget: resolved.aliasTarget,
-        status: existing ? "skip-existing" : "import",
+        status: existing && isOccupiedScheduleEntry(existing) ? "skip-existing" : "import",
         existingShiftIds: existing?.shiftIds ?? [],
         existingShiftLabels: existing?.shiftIds.map((shiftId) => shiftLabel(input.data.shifts, shiftId)) ?? []
       } satisfies ScheduleImportCellPreview;
@@ -227,9 +227,11 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
 }
 
 export function applyScheduleImportPreview(data: AppData, preview: ScheduleImportPreview): ScheduleImportApplyResult {
-  const existingIds = new Set(data.scheduleEntries.map((entry) => `${entry.date}__${entry.staffId}`));
+  const existingById = new Map(data.scheduleEntries.map((entry) => [`${entry.date}__${entry.staffId}`, entry]));
+  const replacements = new Map<string, ScheduleEntry>();
   const additions: ScheduleEntry[] = [];
   let skipped = 0;
+  let imported = 0;
 
   for (const row of preview.rows) {
     for (const cell of row.cells) {
@@ -238,24 +240,41 @@ export function applyScheduleImportPreview(data: AppData, preview: ScheduleImpor
         skipped += 1;
         continue;
       }
-      if (existingIds.has(id)) {
+      const nextEntry = { id, date: cell.date, staffId: row.staffId, shiftIds: [cell.shiftId], note: "" };
+      const existing = existingById.get(id);
+      if (existing && isOccupiedScheduleEntry(existing)) {
         skipped += 1;
         continue;
       }
-      additions.push({ id, date: cell.date, staffId: row.staffId, shiftIds: [cell.shiftId], note: "" });
-      existingIds.add(id);
+      if (existing) {
+        replacements.set(id, nextEntry);
+      } else {
+        additions.push(nextEntry);
+      }
+      existingById.set(id, nextEntry);
+      imported += 1;
     }
   }
 
   return {
-    data: { ...data, scheduleEntries: [...data.scheduleEntries, ...additions] },
-    imported: additions.length,
+    data: {
+      ...data,
+      scheduleEntries: [
+        ...data.scheduleEntries.map((entry) => replacements.get(`${entry.date}__${entry.staffId}`) ?? entry),
+        ...additions
+      ]
+    },
+    imported,
     skipped,
     aliasMapped: preview.summary.aliasMappedCells,
     staffCount: preview.summary.staffCount,
     periodStart: preview.period.start,
     periodEnd: preview.period.end
   };
+}
+
+function isOccupiedScheduleEntry(entry: ScheduleEntry): boolean {
+  return entry.shiftIds.length > 0 || entry.note.trim().length > 0;
 }
 
 function failure(errors: ScheduleImportValidationError[]): ScheduleImportFailure {

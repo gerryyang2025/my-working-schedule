@@ -470,13 +470,14 @@ const ScheduleQueryResultsStub = defineComponent({
 
 const ScheduleImportPanelStub = defineComponent({
   name: "ScheduleImportPanel",
-  props: ["data", "saving"],
+  props: ["data", "saving", "serverErrors"],
   emits: ["confirmImport"],
   template: `
     <section data-testid="schedule-import-panel">
       <textarea data-testid="schedule-import-input" />
       <span data-testid="schedule-import-saving">{{ saving ? "saving" : "idle" }}</span>
       <span data-testid="schedule-import-entry-count">{{ data.scheduleEntries.length }}</span>
+      <span data-testid="schedule-import-server-errors">{{ (serverErrors || []).map((error) => error.message).join("；") }}</span>
       <button data-testid="schedule-import-validate" type="button">validate</button>
       <button
         data-testid="schedule-import-confirm"
@@ -2669,6 +2670,32 @@ describe("App", () => {
     expect(apiMocks.confirmScheduleImport).toHaveBeenCalledWith(expect.stringContaining("当前排班周期为2026年7月20日"));
     expect(elementPlusMocks.ElMessage.success).toHaveBeenCalledWith("已导入 7 个排班");
     expect(wrapper.get('[data-testid="schedule-import-entry-count"]').text()).toBe("1");
+  });
+
+  it("passes schedule import errors from confirm back into the import panel", async () => {
+    apiMocks.confirmScheduleImport.mockRejectedValue(
+      Object.assign(new Error("导入数据校验失败"), {
+        errors: [{ scope: "cell", rowNumber: 3, columnLabel: "周一(7/20)", message: "第3行 周一(7/20) 班次不存在或未启用：夜班" }]
+      })
+    );
+    const wrapper = mountApp(testData, {
+      id: "admin",
+      username: "admin",
+      displayName: "系统管理员",
+      role: "admin",
+      staffId: null,
+      managedStaffIds: []
+    });
+
+    await flushPromises();
+    await wrapper.get('[data-testid="workbench-tab-import"]').trigger("click");
+    await wrapper.get('[data-testid="schedule-import-confirm"]').trigger("click");
+    await flushPromises();
+
+    expect(elementPlusMocks.ElMessage.error).toHaveBeenCalledWith("导入数据校验失败");
+    expect(wrapper.get('[data-testid="schedule-import-server-errors"]').text()).toContain(
+      "第3行 周一(7/20) 班次不存在或未启用：夜班"
+    );
   });
 
   it("groups week and month print previews under a single print tab", async () => {

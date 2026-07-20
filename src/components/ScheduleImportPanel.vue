@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
-import type { PublicAppData } from "@/api/client";
-import { validateScheduleImportText, type ScheduleImportValidationResult } from "@/lib/schedule-import";
+import { computed, ref, watch } from "vue";
+import { previewScheduleImport, type PublicAppData } from "@/api/client";
+import type { ScheduleImportValidationError, ScheduleImportValidationResult } from "@/lib/schedule-import";
 import type { StaffType } from "@/types/domain";
 
 const STAFF_TYPE_LABELS: Record<StaffType, string> = {
@@ -10,10 +10,13 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
   head_nurse: "护士长"
 };
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   data: PublicAppData;
   saving: boolean;
-}>();
+  serverErrors?: ScheduleImportValidationError[];
+}>(), {
+  serverErrors: () => []
+});
 
 const emit = defineEmits<{
   confirmImport: [rawText: string];
@@ -22,18 +25,45 @@ const emit = defineEmits<{
 const rawText = ref("");
 const validation = ref<ScheduleImportValidationResult | null>(null);
 const validatedRawText = ref("");
+const previewing = ref(false);
 
 const canConfirm = computed(
   () =>
     validation.value?.ok === true &&
     !validation.value.noImportableCells &&
     validatedRawText.value === rawText.value &&
+    !previewing.value &&
     !props.saving
 );
 
-function validateInput(): void {
-  validation.value = validateScheduleImportText({ rawText: rawText.value, data: props.data });
-  validatedRawText.value = rawText.value;
+watch(
+  () => props.serverErrors,
+  (errors) => {
+    if (errors.length === 0) {
+      return;
+    }
+
+    validation.value = { ok: false, errors };
+    validatedRawText.value = rawText.value;
+  },
+  { deep: true }
+);
+
+async function validateInput(): Promise<void> {
+  const currentRawText = rawText.value;
+  previewing.value = true;
+  try {
+    const response = await previewScheduleImport(currentRawText);
+    validation.value = response.preview;
+  } catch (caughtError) {
+    validation.value = {
+      ok: false,
+      errors: scheduleImportErrorsFromError(caughtError)
+    };
+  } finally {
+    validatedRawText.value = currentRawText;
+    previewing.value = false;
+  }
 }
 
 function clearInput(): void {
@@ -52,6 +82,17 @@ function confirmImport(): void {
 
 function staffTypeLabel(type: StaffType): string {
   return STAFF_TYPE_LABELS[type] ?? type;
+}
+
+function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportValidationError[] {
+  if (typeof caughtError === "object" && caughtError !== null && "errors" in caughtError) {
+    const errors = (caughtError as { errors?: unknown }).errors;
+    if (Array.isArray(errors)) {
+      return errors as ScheduleImportValidationError[];
+    }
+  }
+
+  return [{ scope: "period", message: caughtError instanceof Error ? caughtError.message : "导入数据校验失败" }];
 }
 </script>
 

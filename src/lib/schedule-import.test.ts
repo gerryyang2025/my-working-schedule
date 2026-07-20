@@ -200,12 +200,32 @@ describe("validateScheduleImportText", () => {
     expect(noOp.noImportableCells).toBe(true);
   });
 
-  it("marks empty existing entries as skipped", () => {
+  it("treats empty existing entries as importable placeholders", () => {
     const result = validateScheduleImportText({
       rawText: validText,
       data: baseData({
         scheduleEntries: [
           { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: [], note: "" }
+        ]
+      })
+    });
+
+    const preview = expectPreview(result);
+    expect(preview.rows[0].cells[0]).toMatchObject({
+      status: "import",
+      existingShiftIds: [],
+      existingShiftLabels: []
+    });
+    expect(preview.summary.importableCells).toBe(14);
+    expect(preview.summary.skippedExistingCells).toBe(0);
+  });
+
+  it("treats note-only existing entries as occupied", () => {
+    const result = validateScheduleImportText({
+      rawText: validText,
+      data: baseData({
+        scheduleEntries: [
+          { id: "2026-07-20__staff-head", date: "2026-07-20", staffId: "staff-head", shiftIds: [], note: "已手动备注" }
         ]
       })
     });
@@ -266,7 +286,7 @@ describe("applyScheduleImportPreview", () => {
     );
   });
 
-  it("counts apply-time existing entries as skipped", () => {
+  it("replaces apply-time empty placeholders with imported entries", () => {
     const preview = expectPreview(validateScheduleImportText({ rawText: validText, data: baseData() }));
     const result = applyScheduleImportPreview(
       baseData({
@@ -277,14 +297,14 @@ describe("applyScheduleImportPreview", () => {
       preview
     );
 
-    expect(result.imported).toBe(13);
-    expect(result.skipped).toBe(1);
+    expect(result.imported).toBe(14);
+    expect(result.skipped).toBe(0);
     expect(result.data.scheduleEntries.filter((entry) => entry.id === "2026-07-20__staff-head")).toHaveLength(1);
     expect(result.data.scheduleEntries).toContainEqual({
       id: "2026-07-20__staff-head",
       date: "2026-07-20",
       staffId: "staff-head",
-      shiftIds: [],
+      shiftIds: ["shift-normal"],
       note: ""
     });
   });
