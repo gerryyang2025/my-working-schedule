@@ -3279,6 +3279,8 @@ describe("App", () => {
   });
 
   it("allows canceling a settled month when saved snapshot rows are managed even if live summary has unmanaged staff", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp(
       {
         ...twoStaffData,
@@ -3292,9 +3294,12 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
     expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("true");
+    vi.useRealTimers();
   });
 
   it("blocks canceling a settled month when saved snapshot rows include unmanaged staff", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp(
       {
         ...testData,
@@ -3308,9 +3313,12 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
     expect(wrapper.get('[data-testid="bonus-can-operate"]').text()).toBe("false");
+    vi.useRealTimers();
   });
 
   it("passes a custom range trial summary into the bonus panel", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp({
       ...testData,
       scheduleEntries: [
@@ -3324,6 +3332,7 @@ describe("App", () => {
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
     expect(wrapper.get('[data-testid="bonus-summary"]').text()).toContain("李护士:1:1.50");
+    vi.useRealTimers();
   });
 
   it("uses single-month settlement mode for the same non-selected start and end month", async () => {
@@ -3387,6 +3396,8 @@ describe("App", () => {
   });
 
   it("keeps the bonus range when the selected date changes within the same month", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp();
 
     await flushPromises();
@@ -3399,9 +3410,12 @@ describe("App", () => {
     await nextTick();
 
     expect(wrapper.get('[data-testid="bonus-range"]').text()).toContain("2026-06-2026-07 range");
+    vi.useRealTimers();
   });
 
   it("passes selected monthly settlement into print views", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     const wrapper = mountApp({
       ...testData,
       monthlySettlements: [
@@ -3422,9 +3436,12 @@ describe("App", () => {
     await flushPromises();
 
     expect(wrapper.get('[data-testid="print-monthly-settlement"]').text()).toBe("月结 2026-06 1000.00");
+    vi.useRealTimers();
   });
 
   it("confirms before saving monthly settlement and refreshes app data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
@@ -3458,9 +3475,12 @@ describe("App", () => {
     expect(String(message)).toContain("确认后该月排班会被锁定");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("已月结");
+    vi.useRealTimers();
   });
 
   it("shows settlement pre-check warnings before final confirmation and saves after continuing", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({
       ...testData,
@@ -3496,6 +3516,7 @@ describe("App", () => {
     });
     expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[1][1]).toBe("确认月结");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+    vi.useRealTimers();
   });
 
   it("does not save monthly settlement when pre-check warning is canceled", async () => {
@@ -3514,6 +3535,8 @@ describe("App", () => {
   });
 
   it("skips settlement pre-check warning when no check items exist", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     apiMocks.saveMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
     const wrapper = mountApp({ ...testData, scheduleEntries: juneWeekdayAttendanceEntries() });
@@ -3527,6 +3550,7 @@ describe("App", () => {
     expect(elementPlusMocks.ElMessageBox.confirm).toHaveBeenCalledTimes(1);
     expect(elementPlusMocks.ElMessageBox.confirm.mock.calls[0][1]).toBe("确认月结");
     expect(apiMocks.saveMonthlySettlement).toHaveBeenCalledWith("2026-06", 1000);
+    vi.useRealTimers();
   });
 
   it("does not save or show an error when monthly settlement confirmation is canceled", async () => {
@@ -3546,6 +3570,8 @@ describe("App", () => {
   });
 
   it("suppresses duplicate settlement saves while a request is in flight", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     elementPlusMocks.ElMessageBox.confirm.mockResolvedValue("confirm");
     const deferred = createDeferred<PublicAppData>();
     apiMocks.saveMonthlySettlement.mockReturnValue(deferred.promise);
@@ -3564,9 +3590,12 @@ describe("App", () => {
 
     deferred.resolve({ ...testData, monthlySettlements: [] });
     await flushPromises();
+    vi.useRealTimers();
   });
 
   it("cancels monthly settlement and refreshes app data", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
     apiMocks.deleteMonthlySettlement.mockResolvedValue({ ...testData, monthlySettlements: [] });
     const wrapper = mountApp({
       ...testData,
@@ -3593,6 +3622,7 @@ describe("App", () => {
 
     expect(apiMocks.deleteMonthlySettlement).toHaveBeenCalledWith("2026-06");
     expect(wrapper.get('[data-testid="bonus-status"]').text()).toBe("未月结");
+    vi.useRealTimers();
   });
 
   it("shares a generated PDF file from the print preview when file sharing is supported", async () => {
