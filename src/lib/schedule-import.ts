@@ -120,7 +120,7 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
   }
 
   const period = parsePeriodLine(lines[0], errors);
-  const tableRows = lines.slice(1).map((line) => line.split("\t").map((cell) => cell.trim()));
+  const tableRows = parseImportTableRows(lines.slice(1));
   const header = tableRows[0] ?? [];
   const days = period ? parseHeader(header, period, errors) : [];
   const bodyRows = tableRows.slice(1);
@@ -279,6 +279,41 @@ function isOccupiedScheduleEntry(entry: ScheduleEntry): boolean {
 
 function failure(errors: ScheduleImportValidationError[]): ScheduleImportFailure {
   return { ok: false, errors };
+}
+
+function parseImportTableRows(lines: string[]): string[][] {
+  return lines
+    .filter((line) => !isMarkdownSeparatorRow(line))
+    .map((line) => {
+      if (line.includes("\t")) {
+        return line.split("\t").map((cell) => cell.trim());
+      }
+
+      if (line.includes("|")) {
+        const cells = line.split("|").map((cell) => cell.trim());
+        if (cells[0] === "") {
+          cells.shift();
+        }
+        if (cells[cells.length - 1] === "") {
+          cells.pop();
+        }
+        return cells;
+      }
+
+      return [line.trim()];
+    });
+}
+
+function isMarkdownSeparatorRow(line: string): boolean {
+  if (!line.includes("|")) {
+    return false;
+  }
+
+  const cells = line
+    .split("|")
+    .map((cell) => cell.trim())
+    .filter((cell) => cell.length > 0);
+  return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
 function parsePeriodLine(line: string, errors: ScheduleImportValidationError[]): ParsedPeriod | null {

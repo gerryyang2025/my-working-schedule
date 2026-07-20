@@ -100,6 +100,16 @@ describe("ScheduleImportPanel", () => {
     expect(wrapper.text()).toContain("周一(7/20)");
   });
 
+  it("shows an AI prompt for generating import data from a schedule image", () => {
+    const wrapper = mount(ScheduleImportPanel, { props: { data: data(), saving: false } });
+
+    expect(wrapper.get('[data-testid="schedule-import-ai-prompt"]').text()).toContain("DeepSeek");
+    expect(wrapper.get('[data-testid="schedule-import-ai-prompt"]').text()).toContain("上传排班图片");
+    expect(wrapper.get('[data-testid="schedule-import-ai-prompt-text"]').text()).toContain("请提取上传图片中的排班表信息");
+    expect(wrapper.get('[data-testid="schedule-import-ai-prompt-text"]').text()).toContain("忽略工号列");
+    expect(wrapper.get('[data-testid="schedule-import-ai-prompt-copy"]').text()).toContain("复制提示词");
+  });
+
   it("validates pasted text and renders preview with derived job ID", async () => {
     apiMocks.previewScheduleImport.mockResolvedValue({ preview: serverPreview() });
     const wrapper = mount(ScheduleImportPanel, { props: { data: data(), saving: false } });

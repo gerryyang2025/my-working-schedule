@@ -10,6 +10,42 @@ const STAFF_TYPE_LABELS: Record<StaffType, string> = {
   head_nurse: "护士长"
 };
 
+const AI_IMPORT_PROMPT = `请提取上传图片中的排班表信息，按以下要求输出：
+
+1. 当前排班周期为{年份}年{月份}月{起始日}日（周{起始星期}）至 {结束日}日（周{结束星期}）。
+
+2. 输出格式为表格，包含以下列：
+   - 姓名
+   - 周一（月/日）
+   - 周二（月/日）
+   - 周三（月/日）
+   - 周四（月/日）
+   - 周五（月/日）
+   - 周六（月/日）
+   - 周日（月/日）
+
+3. 提取规则：
+   - 忽略图片中的序号列（第一列）
+   - 忽略工号列
+   - 忽略"周标准工时"列
+   - 只提取"姓名"及其对应的七天排班内容
+   - 排班内容按原样提取，不做修改或翻译
+
+4. 输出示例格式：
+
+当前排班周期为2026年7月20日（周一）至 7月26日（周日）：
+
+| 姓名 | 周一(7/20) | 周二(7/21) | 周三(7/22) | 周四(7/23) | 周五(7/24) | 周六(7/25) | 周日(7/26) |
+|------|------------|------------|------------|------------|------------|------------|------------|
+| 段鸿露 | 常班 | 常班 | 常班 | 常班 | 常班 | 休 | 休 |
+| 张曼曼 | N1 | / | 休 | P3 | A4 | A4 | N1 |
+| ……（其余人员依次列出） |
+
+5. 注意事项：
+   - 日期和星期需根据图片中实际日期准确填写
+   - 如遇"婚假"、"进修"、"备班1"、"跟班-办公"等特殊排班，按原文字保留
+   - 表格中" / "表示夜班下休`;
+
 const props = withDefaults(defineProps<{
   data: PublicAppData;
   saving: boolean;
@@ -26,6 +62,7 @@ const rawText = ref("");
 const validation = ref<ScheduleImportValidationResult | null>(null);
 const validatedRawText = ref("");
 const previewing = ref(false);
+const aiPromptCopied = ref(false);
 
 const canConfirm = computed(
   () =>
@@ -72,6 +109,19 @@ function clearInput(): void {
   validatedRawText.value = "";
 }
 
+async function copyAiImportPrompt(): Promise<void> {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(AI_IMPORT_PROMPT);
+    } else {
+      copyTextWithTextarea(AI_IMPORT_PROMPT);
+    }
+    aiPromptCopied.value = true;
+  } catch {
+    aiPromptCopied.value = false;
+  }
+}
+
 function confirmImport(): void {
   if (!canConfirm.value) {
     return;
@@ -82,6 +132,18 @@ function confirmImport(): void {
 
 function staffTypeLabel(type: StaffType): string {
   return STAFF_TYPE_LABELS[type] ?? type;
+}
+
+function copyTextWithTextarea(text: string): void {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "true");
+  textarea.style.position = "fixed";
+  textarea.style.left = "-9999px";
+  document.body.appendChild(textarea);
+  textarea.select();
+  document.execCommand("copy");
+  document.body.removeChild(textarea);
 }
 
 function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportValidationError[] {
@@ -101,6 +163,25 @@ function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportVali
     <section class="schedule-import-guide">
       <h2>导入排班</h2>
       <p>请从表格复制完整的周期说明和排班内容。系统会先校验格式、人员和班次，确认预览后才会写入。</p>
+    </section>
+
+    <section class="schedule-import-ai-prompt" data-testid="schedule-import-ai-prompt">
+      <div class="schedule-import-ai-header">
+        <h3>AI 识别提示词</h3>
+        <div class="schedule-import-ai-actions">
+          <a href="https://chat.deepseek.com/" target="_blank" rel="noreferrer">打开 DeepSeek</a>
+          <button data-testid="schedule-import-ai-prompt-copy" type="button" @click="copyAiImportPrompt">
+            {{ aiPromptCopied ? "已复制" : "复制提示词" }}
+          </button>
+        </div>
+      </div>
+      <p>
+        用户只需要在 DeepSeek 上传排班图片，并使用下面提供的提示词，即可生成预期格式的导入数据；生成后复制到下方输入框校验即可。
+      </p>
+      <pre class="schedule-import-ai-prompt-text" data-testid="schedule-import-ai-prompt-text">{{ AI_IMPORT_PROMPT }}</pre>
+    </section>
+
+    <section class="schedule-import-guide">
       <h3>导入数据格式示例：</h3>
       <pre class="schedule-import-example">当前排班周期为2026年7月20日（周一）至 7月26日（周日）：
 
