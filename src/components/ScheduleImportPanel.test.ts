@@ -96,8 +96,19 @@ describe("ScheduleImportPanel", () => {
 
     expect(wrapper.text()).toContain("导入数据格式示例");
     expect(wrapper.text()).toContain("当前排班周期为2026年7月20日");
-    expect(wrapper.text()).toContain("姓名");
-    expect(wrapper.text()).toContain("周一(7/20)");
+    const exampleTable = wrapper.get('[data-testid="schedule-import-example-table"]');
+    expect(exampleTable.findAll("thead th").map((cell) => cell.text())).toEqual([
+      "姓名",
+      "周一(7/20)",
+      "周二(7/21)",
+      "周三(7/22)",
+      "周四(7/23)",
+      "周五(7/24)",
+      "周六(7/25)",
+      "周日(7/26)"
+    ]);
+    expect(exampleTable.find("tbody").text()).toContain("段鸿露");
+    expect(exampleTable.find("tbody").text()).toContain("常班");
   });
 
   it("shows an AI prompt for generating import data from a schedule image", () => {
@@ -107,7 +118,9 @@ describe("ScheduleImportPanel", () => {
     expect(wrapper.get('[data-testid="schedule-import-ai-prompt"]').text()).toContain("上传排班图片");
     expect(wrapper.get('[data-testid="schedule-import-ai-prompt-text"]').text()).toContain("请提取上传图片中的排班表信息");
     expect(wrapper.get('[data-testid="schedule-import-ai-prompt-text"]').text()).toContain("忽略工号列");
-    expect(wrapper.get('[data-testid="schedule-import-ai-prompt-copy"]').text()).toContain("复制提示词");
+    const copyButton = wrapper.get('[data-testid="schedule-import-ai-prompt-copy"]');
+    expect(copyButton.text()).toContain("复制 AI 提示词");
+    expect(copyButton.attributes("aria-label")).toBe("复制 AI 识别提示词");
   });
 
   it("validates pasted text and renders preview with derived job ID", async () => {

@@ -891,8 +891,7 @@ body {
   cursor: pointer;
 }
 
-.schedule-import-ai-prompt-text,
-.schedule-import-example {
+.schedule-import-ai-prompt-text {
   overflow-x: auto;
   border: 1px solid #dbe3ef;
   background: #f8fafc;
@@ -901,6 +900,43 @@ body {
   font-size: 13px;
   line-height: 1.7;
   white-space: pre;
+}
+
+.schedule-import-example-period {
+  margin-bottom: 10px;
+}
+
+.schedule-import-example-wrap {
+  overflow-x: auto;
+  border: 1px solid #dbe3ef;
+  background: #f8fafc;
+  -webkit-overflow-scrolling: touch;
+}
+
+.schedule-import-example-table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.schedule-import-example-table th,
+.schedule-import-example-table td {
+  border: 1px solid #dbe3ef;
+  padding: 8px 10px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.schedule-import-example-table th {
+  background: #f1f5f9;
+  color: #334155;
+  font-weight: 800;
+}
+
+.schedule-import-example-table tbody th {
+  min-width: 72px;
+  text-align: left;
 }
 
 .schedule-import-input-card {
@@ -1822,6 +1858,7 @@ body {
   }
 
   .schedule-import-guide,
+  .schedule-import-ai-prompt,
   .schedule-import-input-card,
   .schedule-import-preview {
     padding: 12px;
