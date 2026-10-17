@@ -1633,9 +1633,9 @@ body {
 }
 
 .print-preview-content .print-month .print-month-detail-table .print-person-col {
-  width: 62px;
-  min-width: 62px;
-  max-width: 62px;
+  width: 76px;
+  min-width: 76px;
+  max-width: 76px;
 }
 
 .print-preview-content .print-month .print-month-detail-table .print-job-col {
@@ -1695,6 +1695,13 @@ body {
 }
 
 .print-preview-content .print-week .print-person strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.print-preview-content .print-month .print-person strong {
   overflow: visible;
   text-overflow: clip;
   white-space: normal;
@@ -2597,5 +2604,32 @@ body {
   body[data-print-mode="week"] .print-week-detail-table .print-cell-shifts {
     min-height: 12px;
     gap: 1px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table {
+    table-layout: fixed;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-sort-col {
+    width: 30px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-person-col {
+    width: 72px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-job-col {
+    width: 46px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-type-col {
+    width: 38px;
+  }
+
+  body[data-print-mode="month"] .print-month .print-person strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
   }
 }

@@ -739,7 +739,7 @@ describe("main.css print layout rules", () => {
     expect(sortColumn).toContain("width: 42px");
     expect(sortColumn).toContain("min-width: 42px");
     expect(sortColumn).toContain("max-width: 42px");
-    expect(personColumn).toContain("width: 62px");
+    expect(personColumn).toContain("width: 76px");
     expect(jobColumn).toContain("width: 44px");
     expect(typeColumn).toContain("width: 46px");
     expect(dayColumn).toContain("width: 34px");
@@ -838,5 +838,31 @@ describe("main.css print layout rules", () => {
       expect(rule).toContain("overflow-wrap: anywhere");
     }
     expect(printWeekPersonColumn).toContain("width: 78px");
+  });
+
+  it("preserves complete staff names and identity columns in monthly print", () => {
+    const printMedia = mediaBlock("print");
+    const previewMonthName = ruleBlockIn(css, ".print-preview-content .print-month .print-person strong");
+    const printMonthTable = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="month"] .print-month-detail-table'
+    );
+    const printMonthName = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="month"] .print-month .print-person strong'
+    );
+    const printMonthPersonColumn = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="month"] .print-month-detail-table .print-person-col'
+    );
+
+    expect(printMonthTable).toContain("table-layout: fixed");
+    expect(printMonthPersonColumn).toContain("width: 72px");
+    for (const rule of [previewMonthName, printMonthName]) {
+      expect(rule).toContain("overflow: visible");
+      expect(rule).toContain("text-overflow: clip");
+      expect(rule).toContain("white-space: normal");
+      expect(rule).toContain("overflow-wrap: anywhere");
+    }
   });
 });
