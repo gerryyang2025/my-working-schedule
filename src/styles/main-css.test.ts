@@ -775,6 +775,39 @@ describe("main.css print layout rules", () => {
     expect(printShiftChip).not.toContain("background: #ffffff");
   });
 
+  it("wraps long month shift labels inside their day cells", () => {
+    const printMedia = mediaBlock("print");
+    const previewCellShifts = ruleBlockIn(
+      css,
+      ".print-preview-content .print-month .print-cell-shifts"
+    );
+    const previewShiftChip = ruleBlockIn(
+      css,
+      ".print-preview-content .print-month .print-shift-chip"
+    );
+    const printCellShifts = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="month"] .print-month-detail-table .print-cell-shifts'
+    );
+    const printShiftChip = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="month"] .print-month-detail-table .print-shift-chip'
+    );
+
+    for (const rule of [previewCellShifts, printCellShifts]) {
+      expect(rule).toContain("width: 100%;");
+      expect(rule).toContain("min-width: 0;");
+      expect(rule).toContain("flex-wrap: wrap;");
+    }
+    for (const rule of [previewShiftChip, printShiftChip]) {
+      expect(rule).toContain("max-width: 100%;");
+      expect(rule).toContain("font-size: 8px;");
+      expect(rule).toContain("white-space: normal;");
+      expect(rule).toContain("overflow-wrap: anywhere;");
+      expect(rule).toContain("word-break: break-all;");
+    }
+  });
+
   it("clips long month print person labels inside narrow cells", () => {
     const printMedia = mediaBlock("print");
     const previewName = ruleBlockIn(css, ".print-preview-content .print-person strong");

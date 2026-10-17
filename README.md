@@ -174,6 +174,8 @@ CONFIRM_RESTORE=yes ./optools.sh data restore <backup-file>
 - `./optools.sh doctor` 执行完整生产运行体检，聚合检查 Node、静态资源、SQLite、Nginx、systemd 服务和 API 健康状态。
 - `deploy/cron/my-working-schedule-backup.cron.example` 定时备份 SQLite。
 
+构建安装会保留上一版本已经发布到 `dist/assets` 的哈希资源，再覆盖写入新版本资源。这样部署时已经打开的页面仍可加载其旧版按需模块（例如 PDF 生成组件），不会因新版本替换资源目录而提示动态模块加载失败。
+
 推荐部署命令：
 
 ```bash

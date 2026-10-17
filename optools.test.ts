@@ -374,6 +374,43 @@ printf 'asset\\n' > dist/assets/app.js
     expect(result.stdout).toContain(`installed runtime: ${installDir}`);
   });
 
+  it("preserves previously deployed asset chunks when installing a new frontend build", async () => {
+    const stateDir = await createStateDir();
+    const fakeBinDir = join(stateDir, "bin");
+    const installDir = join(stateDir, "install");
+    const buildSourceDir = join(stateDir, "build-output");
+    const fakeNpmPath = join(fakeBinDir, "npm");
+
+    await mkdir(fakeBinDir, { recursive: true });
+    await mkdir(join(installDir, "dist", "assets"), { recursive: true });
+    await writeFile(join(installDir, "dist", "index.html"), "<html>old</html>\n", "utf8");
+    await writeFile(join(installDir, "dist", "assets", "jspdf.es.min-old.js"), "old pdf chunk\n", "utf8");
+    await writeFile(
+      fakeNpmPath,
+      `#!/usr/bin/env bash
+mkdir -p "$BUILD_OUTPUT/assets"
+printf '<html>new</html>\n' > "$BUILD_OUTPUT/index.html"
+printf 'new app chunk\n' > "$BUILD_OUTPUT/assets/app-new.js"
+`,
+      "utf8"
+    );
+    await chmod(fakeNpmPath, 0o755);
+
+    const result = await runOptools(["build"], {
+      OPTOOLS_INSTALL_DIR: installDir,
+      OPTOOLS_BUILD_SOURCE_DIR: buildSourceDir,
+      BUILD_OUTPUT: buildSourceDir,
+      PATH: `${fakeBinDir}:${process.env.PATH ?? ""}`
+    });
+
+    expect(result.code, result.stderr).toBe(0);
+    expect(await readFile(join(installDir, "dist", "index.html"), "utf8")).toBe("<html>new</html>\n");
+    expect(await readFile(join(installDir, "dist", "assets", "app-new.js"), "utf8")).toBe("new app chunk\n");
+    expect(await readFile(join(installDir, "dist", "assets", "jspdf.es.min-old.js"), "utf8")).toBe(
+      "old pdf chunk\n"
+    );
+  });
+
   it("delegates nginx operations to the nginx helper script", async () => {
     const stateDir = await createStateDir();
     const fakeNginxHelper = join(stateDir, "nginx-service.sh");

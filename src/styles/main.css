@@ -1769,13 +1769,20 @@ body {
 }
 
 .print-preview-content .print-month .print-cell-shifts {
+  width: 100%;
+  min-width: 0;
+  flex-wrap: wrap;
   gap: 1px;
 }
 
 .print-preview-content .print-month .print-shift-chip {
+  max-width: 100%;
   padding: 0 1px;
-  font-size: 10px;
-  white-space: nowrap;
+  font-size: 8px;
+  line-height: 1.05;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-all;
 }
 
 .print-preview-content .print-month-summary {
@@ -2624,6 +2631,23 @@ body {
 
   body[data-print-mode="month"] .print-month-detail-table .print-type-col {
     width: 38px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-cell-shifts {
+    width: 100%;
+    min-width: 0;
+    flex-wrap: wrap;
+    gap: 1px;
+  }
+
+  body[data-print-mode="month"] .print-month-detail-table .print-shift-chip {
+    max-width: 100%;
+    padding: 0 1px;
+    font-size: 8px;
+    line-height: 1.05;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    word-break: break-all;
   }
 
   body[data-print-mode="month"] .print-month .print-person strong {

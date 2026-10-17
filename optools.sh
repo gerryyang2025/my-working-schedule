@@ -524,6 +524,12 @@ build_static_assets() {
   temp_dist_dir="${INSTALL_DIST_DIR}.tmp.$$"
   rm -rf "$temp_dist_dir"
   mkdir -p "$temp_dist_dir"
+
+  if [[ -d "$INSTALL_DIST_DIR/assets" ]]; then
+    mkdir -p "$temp_dist_dir/assets"
+    cp -a "$INSTALL_DIST_DIR/assets/." "$temp_dist_dir/assets/"
+  fi
+
   cp -a "$BUILD_SOURCE_DIR/." "$temp_dist_dir/"
   chmod -R a+rX "$temp_dist_dir"
   rm -rf "$INSTALL_DIST_DIR"
