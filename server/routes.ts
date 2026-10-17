@@ -447,18 +447,20 @@ function parseStaffPayload(body: unknown, id: string): StaffMember | null {
   }
 
   const { jobId, name, type, isAdmin, enabled, sortOrder } = body;
+  const bonusCoefficient = "bonusCoefficient" in body ? body.bonusCoefficient : 1;
   if (
     !isNonEmptyString(jobId) ||
     !isNonEmptyString(name) ||
     !isStaffType(type) ||
     !isBoolean(isAdmin) ||
+    !isNonNegativeNumber(bonusCoefficient) ||
     !isBoolean(enabled) ||
     !isNonNegativeInteger(sortOrder)
   ) {
     return null;
   }
 
-  return { id, jobId: jobId.trim(), name: name.trim(), type, isAdmin, enabled, sortOrder };
+  return { id, jobId: jobId.trim(), name: name.trim(), type, isAdmin, bonusCoefficient, enabled, sortOrder };
 }
 
 function parseStaffOrderPayload(body: unknown): string[] | null {

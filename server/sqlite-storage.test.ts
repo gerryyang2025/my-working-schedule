@@ -71,6 +71,7 @@ function createReplacementData(): AppData {
         name: "Replacement Nurse",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 1
       }
@@ -194,6 +195,46 @@ describe("SQLite schema and mapper", () => {
     }
   });
 
+  it("creates the staff bonus coefficient column", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      initializeSqliteSchema(db);
+
+      expect(listTableColumnNames(db, "staff")).toContain("bonus_coefficient");
+    } finally {
+      db.close();
+    }
+  });
+
+  it("migrates legacy staff rows with a default bonus coefficient of one", async () => {
+    const db = new Database(await createTempDbPath());
+    try {
+      db.exec(`
+        create table staff (
+          id text primary key,
+          job_id text not null unique,
+          name text not null,
+          type text not null check (type in ('nurse', 'clerk', 'head_nurse')),
+          is_admin integer not null check (is_admin in (0, 1)),
+          enabled integer not null check (enabled in (0, 1)),
+          sort_order integer not null
+        );
+
+        insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
+        values ('staff-legacy', '100001', 'Legacy Nurse', 'nurse', 0, 1, 1);
+      `);
+
+      initializeSqliteSchema(db);
+
+      const row = db.prepare("select bonus_coefficient from staff where id = ?").get("staff-legacy") as {
+        bonus_coefficient: number;
+      };
+      expect(row.bonus_coefficient).toBe(1);
+    } finally {
+      db.close();
+    }
+  });
+
   it("migrates legacy monthly settlement row tables to include attendance balance columns", async () => {
     const db = new Database(await createTempDbPath());
     try {
@@ -232,6 +273,7 @@ describe("SQLite schema and mapper", () => {
       initializeSqliteSchema(db);
 
       const seed = createSeedData();
+      seed.staff[1].bonusCoefficient = 0.8;
       seed.scheduleEntries = [
         {
           id: "2026-06-15__staff-nurse-001",

@@ -15,7 +15,7 @@ vi.mock("@/api/client", async (importOriginal) => ({
 
 function data(): PublicAppData {
   return {
-    staff: [{ id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 }],
+    staff: [{ id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, bonusCoefficient: 1, enabled: true, sortOrder: 1 }],
     shifts: [
       { id: "shift-normal", name: "常", shortName: "常", color: "#16a34a", countsAttendance: true, coefficient: 1, enabled: true, sortOrder: 1 },
       { id: "shift-rest", name: "休息", shortName: "休", color: "#64748b", countsAttendance: false, coefficient: 0, enabled: true, sortOrder: 2 }

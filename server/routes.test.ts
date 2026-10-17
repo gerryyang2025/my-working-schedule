@@ -97,6 +97,7 @@ function createStaffPayload(overrides: Partial<StaffMember> = {}) {
     name: "赵护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 99,
     ...overrides
@@ -128,8 +129,8 @@ function createHolidayPayload(overrides: Partial<Holiday> = {}) {
 function createImportData(): AppData {
   const data = createSeedData();
   data.staff = [
-    { id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 },
-    { id: "staff-nurse", jobId: "001351", name: "张曼曼", type: "nurse", isAdmin: false, enabled: true, sortOrder: 2 }
+    { id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, bonusCoefficient: 1, enabled: true, sortOrder: 1 },
+    { id: "staff-nurse", jobId: "001351", name: "张曼曼", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 2 }
   ];
   data.shifts = [
     { id: "shift-normal", name: "常", shortName: "常", color: "#16a34a", countsAttendance: true, coefficient: 1, enabled: true, sortOrder: 1 },
@@ -1170,6 +1171,19 @@ describe.sequential("API routes", () => {
     expect(response.body.settings.adminPassword).toBeUndefined();
   });
 
+  it("persists a custom staff bonus coefficient", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/staff/staff-intern-001")
+      .set(await adminHeaders(app))
+      .send(createStaffPayload({ jobId: "900001", name: "实习生", bonusCoefficient: 0.8 }))
+      .expect(200);
+
+    expect(response.body.staff).toContainEqual(
+      expect.objectContaining({ id: "staff-intern-001", bonusCoefficient: 0.8 })
+    );
+  });
+
   it("reorders staff with continuous sort orders and records an audit log", async () => {
     const app = createTestApp();
     const headers = await adminHeaders(app);
@@ -1250,6 +1264,7 @@ describe.sequential("API routes", () => {
       name: "测试人员",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 99
     });
@@ -2501,6 +2516,7 @@ describe.sequential("API routes", () => {
   it.each([
     ["blank job ID", { jobId: "   " }],
     ["blank name", { name: "   " }],
+    ["negative bonus coefficient", { bonusCoefficient: -0.1 }],
     ["fractional sort order", { sortOrder: 1.5 }]
   ])("rejects invalid staff payload values: %s", async (_label, overrides) => {
     const app = createTestApp();

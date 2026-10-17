@@ -35,6 +35,7 @@ const staff: StaffMember[] = [
     name: "李护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 2
   },
@@ -44,6 +45,7 @@ const staff: StaffMember[] = [
     name: "段护士长",
     type: "head_nurse",
     isAdmin: true,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 1
   },
@@ -53,6 +55,7 @@ const staff: StaffMember[] = [
     name: "停用护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: false,
     sortOrder: 3
   }

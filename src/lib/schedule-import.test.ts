@@ -9,9 +9,9 @@ import {
 function baseData(overrides: Partial<AppData> = {}): AppData {
   return {
     staff: [
-      { id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 },
-      { id: "staff-nurse", jobId: "001351", name: "张曼曼", type: "nurse", isAdmin: false, enabled: true, sortOrder: 2 },
-      { id: "staff-disabled", jobId: "009999", name: "停用人员", type: "nurse", isAdmin: false, enabled: false, sortOrder: 3 }
+      { id: "staff-head", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, bonusCoefficient: 1, enabled: true, sortOrder: 1 },
+      { id: "staff-nurse", jobId: "001351", name: "张曼曼", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 2 },
+      { id: "staff-disabled", jobId: "009999", name: "停用人员", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: false, sortOrder: 3 }
     ],
     shifts: [
       { id: "shift-normal", name: "常", shortName: "常", color: "#16a34a", countsAttendance: true, coefficient: 1, enabled: true, sortOrder: 1 },
@@ -136,7 +136,7 @@ describe("validateScheduleImportText", () => {
       data: baseData({
         staff: [
           ...baseData().staff,
-          { id: "staff-duplicate", jobId: "008888", name: "张曼曼", type: "nurse", isAdmin: false, enabled: true, sortOrder: 4 }
+          { id: "staff-duplicate", jobId: "008888", name: "张曼曼", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 4 }
         ]
       })
     });

@@ -47,8 +47,8 @@ export function replaceAppDataInSqlite(db: Database.Database, data: AppData): vo
     `);
 
     const insertStaff = db.prepare(`
-      insert into staff (id, job_id, name, type, is_admin, enabled, sort_order)
-      values (@id, @jobId, @name, @type, @isAdmin, @enabled, @sortOrder)
+      insert into staff (id, job_id, name, type, is_admin, bonus_coefficient, enabled, sort_order)
+      values (@id, @jobId, @name, @type, @isAdmin, @bonusCoefficient, @enabled, @sortOrder)
     `);
     for (const staff of next.staff) {
       insertStaff.run({ ...staff, isAdmin: staff.isAdmin ? 1 : 0, enabled: staff.enabled ? 1 : 0 });
@@ -182,13 +182,16 @@ type StaffRow = {
   name: string;
   type: StaffMember["type"];
   is_admin: number;
+  bonus_coefficient: number;
   enabled: number;
   sort_order: number;
 };
 
 function readStaff(db: Database.Database): StaffMember[] {
   const rows = db
-    .prepare("select id, job_id, name, type, is_admin, enabled, sort_order from staff order by sort_order asc, id asc")
+    .prepare(
+      "select id, job_id, name, type, is_admin, bonus_coefficient, enabled, sort_order from staff order by sort_order asc, id asc"
+    )
     .all() as StaffRow[];
 
   return rows.map((row) => ({
@@ -197,6 +200,7 @@ function readStaff(db: Database.Database): StaffMember[] {
     name: row.name,
     type: row.type,
     isAdmin: row.is_admin === 1,
+    bonusCoefficient: row.bonus_coefficient,
     enabled: row.enabled === 1,
     sortOrder: row.sort_order
   }));

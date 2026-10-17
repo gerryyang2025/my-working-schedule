@@ -38,8 +38,8 @@ function settlement(month: string, overrides: Partial<MonthlySettlement> = {}): 
 function data(overrides: Partial<AppData> = {}): AppData {
   return {
     staff: [
-      { id: "staff-nurse-001", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, enabled: true, sortOrder: 1 },
-      { id: "staff-head-001", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 2 }
+      { id: "staff-nurse-001", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 1 },
+      { id: "staff-head-001", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, bonusCoefficient: 1, enabled: true, sortOrder: 2 }
     ],
     shifts: [
       { id: "shift-a1", name: "A1组长", shortName: "A1", color: "#2563EB", countsAttendance: true, coefficient: 1.5, enabled: true, sortOrder: 1 }

@@ -44,6 +44,7 @@ const staffDraft = reactive<StaffMember>({
   name: "",
   type: "nurse",
   isAdmin: false,
+  bonusCoefficient: 1,
   enabled: true,
   sortOrder: 99
 });
@@ -153,6 +154,7 @@ function resetStaffDraft(): void {
     name: "",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 99
   });
@@ -205,7 +207,7 @@ function loadStaffDraft(staff: StaffMember): void {
     return;
   }
 
-  Object.assign(staffDraft, staff);
+  Object.assign(staffDraft, { ...staff, bonusCoefficient: staff.bonusCoefficient ?? 1 });
 }
 
 function loadShiftDraft(shift: Shift): void {
@@ -367,6 +369,7 @@ watch(
           <el-table-column prop="jobId" label="工号" width="90" />
           <el-table-column prop="name" label="姓名" />
           <el-table-column prop="type" label="类型" width="100" />
+          <el-table-column prop="bonusCoefficient" label="奖金系数" width="100" />
           <el-table-column prop="isAdmin" label="管理员" width="90" />
           <el-table-column prop="enabled" label="启用" width="80" />
           <el-table-column prop="sortOrder" label="排序" width="80" />
@@ -387,6 +390,7 @@ watch(
             </span>
             <span class="management-mobile-meta">
               <span>{{ staffTypeLabel(staff.type) }}</span>
+              <span>奖金系数 {{ staff.bonusCoefficient ?? 1 }}</span>
               <span>{{ staff.isAdmin ? "管理员" : "普通用户" }}</span>
               <span>{{ staff.enabled ? "启用" : "停用" }}</span>
             </span>
@@ -401,12 +405,24 @@ watch(
             <el-option label="文员" value="clerk" />
             <el-option label="护士长" value="head_nurse" />
           </el-select>
+          <label class="management-number-field">
+            <span>人员奖金系数</span>
+            <el-input-number
+              v-model="staffDraft.bonusCoefficient"
+              data-testid="staff-bonus-coefficient"
+              :min="0"
+              :precision="2"
+              :step="0.1"
+              :disabled="staffSaving"
+            />
+          </label>
           <el-checkbox v-model="staffDraft.isAdmin" :disabled="staffSaving">指定管理员</el-checkbox>
           <el-checkbox v-model="staffDraft.enabled" :disabled="staffSaving">启用</el-checkbox>
           <el-input-number v-model="staffDraft.sortOrder" :min="0" :step="1" :disabled="staffSaving" />
           <div class="management-actions">
             <el-button :disabled="staffSaving" @click="resetStaffDraft">新增人员</el-button>
             <el-button
+              data-testid="save-staff-button"
               type="primary"
               :disabled="staffSaving || !adminMode || !staffDraft.jobId || !staffDraft.name"
               :loading="staffSaving"

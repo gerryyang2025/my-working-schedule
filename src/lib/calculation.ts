@@ -126,6 +126,7 @@ function summarizeMonthlyStaff(
   const totals = summarizeShiftTotals(entries, shiftMap);
   const attendanceBalance = totals.attendanceShifts - requiredShifts;
   const isCoefficientExcluded = shouldExcludeCoefficient(staff);
+  const adjustedCoefficientTotal = roundCoefficient(totals.coefficientTotal * staff.bonusCoefficient);
 
   return {
     staffId: staff.id,
@@ -136,7 +137,7 @@ function summarizeMonthlyStaff(
     requiredShifts,
     attendanceBalance,
     overtimeShifts: 0,
-    coefficientTotal: isCoefficientExcluded ? null : totals.coefficientTotal,
+    coefficientTotal: isCoefficientExcluded ? null : adjustedCoefficientTotal,
     coefficientExcludedReason: isCoefficientExcluded ? "护士长绩效单独核算" : ""
   };
 }

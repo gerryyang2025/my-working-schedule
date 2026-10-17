@@ -22,6 +22,37 @@ describe("app data normalization", () => {
     });
   });
 
+  it("defaults legacy staff bonus coefficients to one", () => {
+    const legacyData = {
+      staff: [
+        {
+          id: "staff-nurse-001",
+          jobId: "100001",
+          name: "李护士",
+          type: "nurse",
+          isAdmin: false,
+          enabled: true,
+          sortOrder: 1
+        }
+      ],
+      shifts: [],
+      holidays: [],
+      scheduleEntries: [],
+      monthlySettlements: [],
+      settings: {
+        defaultRequiredShiftsPerWeek: 5,
+        version: 1
+      }
+    };
+
+    const result = normalizeAppData(legacyData);
+
+    expect(result.changed).toBe(true);
+    expect(result.data).toMatchObject({
+      staff: [{ bonusCoefficient: 1 }]
+    });
+  });
+
   it("normalizes legacy monthly settlement rows without required shifts and attendance balance", () => {
     const legacyData = {
       staff: [],

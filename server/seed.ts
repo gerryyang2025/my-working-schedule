@@ -9,6 +9,7 @@ export function createSeedData(): AppData {
         name: "段鸿露",
         type: "head_nurse",
         isAdmin: true,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 1
       },
@@ -18,6 +19,7 @@ export function createSeedData(): AppData {
         name: "李护士",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 2
       },
@@ -27,6 +29,7 @@ export function createSeedData(): AppData {
         name: "王文员",
         type: "clerk",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 3
       }

@@ -48,9 +48,24 @@ function isStaffMember(value: unknown): value is StaffMember {
     isString(value.name) &&
     (value.type === "nurse" || value.type === "clerk" || value.type === "head_nurse") &&
     isBoolean(value.isAdmin) &&
+    isNumber(value.bonusCoefficient) &&
+    value.bonusCoefficient >= 0 &&
     isBoolean(value.enabled) &&
     isNumber(value.sortOrder)
   );
+}
+
+function normalizeStaffMember(staff: unknown): StaffMember | null {
+  if (!isRecord(staff)) {
+    return null;
+  }
+
+  const candidate = {
+    ...staff,
+    bonusCoefficient: "bonusCoefficient" in staff ? staff.bonusCoefficient : 1
+  };
+
+  return isStaffMember(candidate) ? candidate : null;
 }
 
 function isShift(value: unknown): value is Shift {
@@ -184,22 +199,29 @@ function normalizeAppDataCandidate(candidate: unknown): { data: unknown; changed
     return { data: candidate, changed: false };
   }
 
-  if (!("monthlySettlements" in candidate)) {
-    return { data: { ...candidate, monthlySettlements: [] }, changed: true };
-  }
-
-  if (!Array.isArray(candidate.monthlySettlements)) {
+  if (!Array.isArray(candidate.staff)) {
     return { data: candidate, changed: false };
   }
 
-  const monthlySettlements = candidate.monthlySettlements.map(normalizeMonthlySettlement);
+  const staff = candidate.staff.map(normalizeStaffMember);
+  if (staff.some((member) => member === null)) {
+    return { data: candidate, changed: false };
+  }
+
+  const sourceSettlements = "monthlySettlements" in candidate ? candidate.monthlySettlements : [];
+  if (!Array.isArray(sourceSettlements)) {
+    return { data: candidate, changed: false };
+  }
+
+  const monthlySettlements = sourceSettlements.map(normalizeMonthlySettlement);
   if (monthlySettlements.some((settlement) => settlement === null)) {
     return { data: candidate, changed: false };
   }
 
+  const data = { ...candidate, staff, monthlySettlements };
   return {
-    data: { ...candidate, monthlySettlements },
-    changed: JSON.stringify(monthlySettlements) !== JSON.stringify(candidate.monthlySettlements)
+    data,
+    changed: JSON.stringify(data) !== JSON.stringify(candidate)
   };
 }
 

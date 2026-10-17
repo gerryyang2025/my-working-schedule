@@ -6,6 +6,7 @@ export interface StaffMember {
   name: string;
   type: StaffType;
   isAdmin: boolean;
+  bonusCoefficient: number;
   enabled: boolean;
   sortOrder: number;
 }

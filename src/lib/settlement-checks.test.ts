@@ -4,8 +4,8 @@ import { calculateSettlementChecks } from "./settlement-checks";
 
 const baseData: AppData = {
   staff: [
-    { id: "staff-active", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, enabled: true, sortOrder: 1 },
-    { id: "staff-disabled", jobId: "100002", name: "王护士", type: "nurse", isAdmin: false, enabled: false, sortOrder: 2 }
+    { id: "staff-active", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 1 },
+    { id: "staff-disabled", jobId: "100002", name: "王护士", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: false, sortOrder: 2 }
   ],
   shifts: [
     { id: "shift-day", name: "白班", shortName: "白", color: "#2563EB", countsAttendance: true, coefficient: 1, enabled: true, sortOrder: 1 },

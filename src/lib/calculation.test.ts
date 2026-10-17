@@ -18,6 +18,7 @@ const baseData: AppData = {
       name: "护士长",
       type: "head_nurse",
       isAdmin: true,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 1
     },
@@ -27,6 +28,7 @@ const baseData: AppData = {
       name: "护士",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 2
     },
@@ -36,6 +38,7 @@ const baseData: AppData = {
       name: "文员",
       type: "clerk",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 3
     }
@@ -120,9 +123,9 @@ function entry(date: string, staffId: string, shiftIds: string[]): ScheduleEntry
 function createData(overrides: Partial<AppData> = {}): AppData {
   return {
     staff: [
-      { id: "staff-head-001", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, enabled: true, sortOrder: 1 },
-      { id: "staff-nurse-001", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, enabled: true, sortOrder: 2 },
-      { id: "staff-clerk-001", jobId: "200001", name: "王文员", type: "clerk", isAdmin: false, enabled: true, sortOrder: 3 }
+      { id: "staff-head-001", jobId: "000228", name: "段鸿露", type: "head_nurse", isAdmin: true, bonusCoefficient: 1, enabled: true, sortOrder: 1 },
+      { id: "staff-nurse-001", jobId: "100001", name: "李护士", type: "nurse", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 2 },
+      { id: "staff-clerk-001", jobId: "200001", name: "王文员", type: "clerk", isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 3 }
     ],
     shifts: [
       { id: "shift-a1", name: "A1组长", shortName: "A1", color: "#2563EB", countsAttendance: true, coefficient: 1.5, enabled: true, sortOrder: 1 },
@@ -255,6 +258,7 @@ describe("calculateWeeklySummary", () => {
           name: "停用护士",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: false,
           sortOrder: 4
         }
@@ -281,6 +285,7 @@ describe("calculateWeeklySummary", () => {
           name: "停用护士",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: false,
           sortOrder: 4
         }
@@ -331,6 +336,21 @@ describe("calculateMonthlySummary", () => {
     expect(nurse.coefficientTotal).toBe(6.7);
     expect(clerk.attendanceShifts).toBe(1);
     expect(clerk.coefficientTotal).toBe(1.3);
+  });
+
+  it("applies the staff bonus coefficient to monthly totals without changing weekly statistics", () => {
+    const data: AppData = {
+      ...baseData,
+      staff: baseData.staff.map((staff) =>
+        staff.id === "staff-nurse" ? { ...staff, bonusCoefficient: 0.8 } : staff
+      )
+    };
+
+    const weeklyNurse = getRow(calculateWeeklySummary(data, "2026-06-17"), "staff-nurse");
+    const monthlyNurse = getMonthlyRow(calculateMonthlySummary(data, monthDays), "staff-nurse");
+
+    expect(weeklyNurse.coefficientTotal).toBe(6.7);
+    expect(monthlyNurse.coefficientTotal).toBe(5.36);
   });
 
   it("calculates monthly required shifts and attendance balance across partial weeks", () => {
@@ -422,6 +442,7 @@ describe("calculateMonthlySummary", () => {
           name: "停用护士",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: false,
           sortOrder: 4
         }
@@ -448,6 +469,7 @@ describe("calculateMonthlySummary", () => {
           name: "停用护士",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: false,
           sortOrder: 4
         }

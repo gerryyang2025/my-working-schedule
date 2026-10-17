@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 
-export const SQLITE_SCHEMA_VERSION = 5;
+export const SQLITE_SCHEMA_VERSION = 6;
 
 function tableHasColumn(db: Database.Database, tableName: string, columnName: string): boolean {
   const rows = db.prepare(`pragma table_info(${tableName})`).all() as Array<{ name: string }>;
@@ -85,6 +85,14 @@ function ensureMonthlySettlementRowsAttendanceBalanceSchema(db: Database.Databas
   }
 }
 
+function ensureStaffBonusCoefficientSchema(db: Database.Database): void {
+  if (!tableHasColumn(db, "staff", "bonus_coefficient")) {
+    db.prepare(
+      "alter table staff add column bonus_coefficient real not null default 1 check (bonus_coefficient >= 0)"
+    ).run();
+  }
+}
+
 export function initializeSqliteSchema(db: Database.Database): void {
   db.pragma("foreign_keys = ON");
   db.exec(`
@@ -99,6 +107,7 @@ export function initializeSqliteSchema(db: Database.Database): void {
       name text not null,
       type text not null check (type in ('nurse', 'clerk', 'head_nurse')),
       is_admin integer not null check (is_admin in (0, 1)),
+      bonus_coefficient real not null default 1 check (bonus_coefficient >= 0),
       enabled integer not null check (enabled in (0, 1)),
       sort_order integer not null
     );
@@ -218,6 +227,7 @@ export function initializeSqliteSchema(db: Database.Database): void {
   `);
 
   ensureUsersStaffBindingSchema(db);
+  ensureStaffBonusCoefficientSchema(db);
   ensureMonthlySettlementRowsAttendanceBalanceSchema(db);
 
   const migration = db.prepare("select version from schema_migrations where version = ?").get(SQLITE_SCHEMA_VERSION);
@@ -257,6 +267,7 @@ export function listMissingCoreTables(db: Database.Database): string[] {
 
 export function listMissingCoreColumns(db: Database.Database): string[] {
   const expected = [
+    { tableName: "staff", columnName: "bonus_coefficient" },
     { tableName: "monthly_settlement_rows", columnName: "required_shifts" },
     { tableName: "monthly_settlement_rows", columnName: "attendance_balance" }
   ];

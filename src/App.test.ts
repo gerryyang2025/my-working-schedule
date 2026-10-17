@@ -60,6 +60,7 @@ const testData: PublicAppData = {
       name: "李护士",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 1
     }
@@ -122,6 +123,7 @@ const twoStaffData: PublicAppData = {
       name: "王护士",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 2
     }
@@ -138,6 +140,7 @@ const mixedCaseStaffData: PublicAppData = {
       name: "陈文员",
       type: "clerk",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 3
     }
@@ -157,6 +160,7 @@ const hiddenStaffOrderData: PublicAppData = {
       name: "可见一",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 1
     },
@@ -166,6 +170,7 @@ const hiddenStaffOrderData: PublicAppData = {
       name: "隐藏二",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: false,
       sortOrder: 2
     },
@@ -175,6 +180,7 @@ const hiddenStaffOrderData: PublicAppData = {
       name: "可见三",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 3
     },
@@ -184,6 +190,7 @@ const hiddenStaffOrderData: PublicAppData = {
       name: "可见四",
       type: "clerk",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 4
     }
@@ -201,6 +208,7 @@ const queryStaffData: PublicAppData = {
       name: "赵历史",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: false,
       sortOrder: 4
     }
@@ -568,7 +576,7 @@ const ManagementDrawerStub = defineComponent({
       <button
         data-testid="drawer-save-staff"
         type="button"
-        @click="$emit('saveStaff', { id: 'staff-nurse-001', jobId: '100001', name: '李护士', type: 'nurse', isAdmin: false, enabled: true, sortOrder: 1 })"
+        @click="$emit('saveStaff', { id: 'staff-nurse-001', jobId: '100001', name: '李护士', type: 'nurse', isAdmin: false, bonusCoefficient: 1, enabled: true, sortOrder: 1 })"
       >
         save staff
       </button>
@@ -1407,6 +1415,7 @@ describe("App", () => {
         name: "过期人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 99
       }
@@ -1438,6 +1447,7 @@ describe("App", () => {
         name: "过期配置加载人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 33
       }
@@ -1449,6 +1459,7 @@ describe("App", () => {
         name: "较新保存人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 22
       }
@@ -1487,6 +1498,7 @@ describe("App", () => {
         name: "保存后过期人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 88
       }
@@ -1521,6 +1533,7 @@ describe("App", () => {
         name: "保存后过期人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 88
       }
@@ -1532,6 +1545,7 @@ describe("App", () => {
         name: "当前保存人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 77
       }
@@ -1589,6 +1603,7 @@ describe("App", () => {
         name: "较早保存人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 66
       }
@@ -1600,6 +1615,7 @@ describe("App", () => {
         name: "较新保存人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 55
       }
@@ -1680,6 +1696,7 @@ describe("App", () => {
         name: "较新刷新人员",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 44
       }
@@ -2045,6 +2062,7 @@ describe("App", () => {
       name: "李护士",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 1
     });

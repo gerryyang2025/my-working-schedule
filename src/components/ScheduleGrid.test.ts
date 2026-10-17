@@ -21,6 +21,7 @@ const staff: StaffMember[] = [
     name: "在职护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 1
   },
@@ -30,6 +31,7 @@ const staff: StaffMember[] = [
     name: "停用护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: false,
     sortOrder: 2
   }
@@ -42,6 +44,7 @@ const reorderableStaff: StaffMember[] = [
     name: "甲护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 1
   },
@@ -51,6 +54,7 @@ const reorderableStaff: StaffMember[] = [
     name: "乙护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 2
   },
@@ -60,6 +64,7 @@ const reorderableStaff: StaffMember[] = [
     name: "丙护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: true,
     sortOrder: 3
   }
@@ -264,6 +269,7 @@ describe("ScheduleGrid", () => {
           name: "段护士长",
           type: "head_nurse",
           isAdmin: true,
+          bonusCoefficient: 1,
           enabled: true,
           sortOrder: 3
         },
@@ -273,6 +279,7 @@ describe("ScheduleGrid", () => {
           name: "王文员",
           type: "clerk",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: true,
           sortOrder: 1
         },
@@ -282,6 +289,7 @@ describe("ScheduleGrid", () => {
           name: "李护士",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: true,
           sortOrder: 2
         }
@@ -348,6 +356,7 @@ describe("ScheduleGrid", () => {
           name: "王丽",
           type: "nurse",
           isAdmin: false,
+          bonusCoefficient: 1,
           enabled: true,
           sortOrder: 1
         },
@@ -357,6 +366,7 @@ describe("ScheduleGrid", () => {
           name: "段护士长",
           type: "head_nurse",
           isAdmin: true,
+          bonusCoefficient: 1,
           enabled: true,
           sortOrder: 2
         }

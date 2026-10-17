@@ -54,6 +54,13 @@ const InputStub = defineComponent({
   template: '<input :placeholder="placeholder" :value="modelValue" @input="$emit(\'update:modelValue\', $event.target.value)" />'
 });
 
+const NumberInputStub = defineComponent({
+  props: ["modelValue", "disabled"],
+  emits: ["update:modelValue"],
+  template:
+    '<input type="number" :value="modelValue" @input="$emit(\'update:modelValue\', Number($event.target.value))" />'
+});
+
 const ElSelectStub = defineComponent({
   name: "ElSelect",
   props: ["modelValue", "placeholder", "disabled", "multiple"],
@@ -105,6 +112,7 @@ const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
       name: "段鸿露",
       type: "head_nurse",
       isAdmin: true,
+      bonusCoefficient: 1,
       enabled: true,
       sortOrder: 1
     },
@@ -114,6 +122,7 @@ const data: Pick<PublicAppData, "staff" | "shifts" | "holidays"> = {
       name: "停用护士",
       type: "nurse",
       isAdmin: false,
+      bonusCoefficient: 1,
       enabled: false,
       sortOrder: 2
     }
@@ -232,7 +241,7 @@ function mountDrawer(options: { props?: Partial<DrawerProps> } = {}) {
         ElDatePicker: InputStub,
         ElDrawer: ElDrawerStub,
         ElInput: InputStub,
-        ElInputNumber: InputStub,
+        ElInputNumber: NumberInputStub,
         ElOption: ElOptionStub,
         ElPagination: ElPaginationStub,
         ElPopconfirm: ElPopconfirmStub,
@@ -260,10 +269,28 @@ describe("ManagementDrawer", () => {
     expect(wrapper.find(".management-mobile-list").exists()).toBe(true);
     expect(wrapper.get(".management-mobile-staff").text()).toContain("段鸿露");
     expect(wrapper.get(".management-mobile-staff").text()).toContain("000228");
+    expect(wrapper.get(".management-mobile-staff").text()).toContain("奖金系数 1");
     expect(wrapper.get(".management-mobile-shift").text()).toContain("A1");
     expect(wrapper.get(".management-mobile-shift").text()).toContain("系数 1.5");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("2026-06-19");
     expect(wrapper.get(".management-mobile-holiday").text()).toContain("端午节");
+  });
+
+  it("shows and saves the staff bonus coefficient", async () => {
+    const wrapper = mountDrawer();
+    const coefficientColumn = wrapper
+      .findAll(".el-table-column")
+      .find((column) => column.attributes("data-prop") === "bonusCoefficient");
+
+    expect(coefficientColumn?.attributes("data-label")).toBe("奖金系数");
+
+    await wrapper.get(".management-mobile-staff").trigger("click");
+    await wrapper.get('[data-testid="staff-bonus-coefficient"]').setValue("0.8");
+    await wrapper.get('[data-testid="save-staff-button"]').trigger("click");
+
+    expect(wrapper.emitted("saveStaff")).toEqual([
+      [expect.objectContaining({ id: "staff-head", bonusCoefficient: 0.8 })]
+    ]);
   });
 
   it("renders management content inline when mode is inline", () => {

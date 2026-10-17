@@ -85,6 +85,7 @@ function createData(scheduleEntries: ScheduleEntry[]): PublicAppData {
         name: "王护士",
         type: "nurse",
         isAdmin: false,
+        bonusCoefficient: 1,
         enabled: true,
         sortOrder: 1
       }
@@ -107,6 +108,7 @@ function disabledStaff(overrides: Partial<StaffMember> = {}): StaffMember {
     name: "停用护士",
     type: "nurse",
     isAdmin: false,
+    bonusCoefficient: 1,
     enabled: false,
     sortOrder: 2,
     ...overrides
