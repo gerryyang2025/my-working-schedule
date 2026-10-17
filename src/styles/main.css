@@ -1694,6 +1694,13 @@ body {
   white-space: nowrap;
 }
 
+.print-preview-content .print-week .print-person strong {
+  overflow: visible;
+  text-overflow: clip;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
 .print-preview-content .print-person small {
   display: block;
   max-width: 100%;
@@ -2505,5 +2512,90 @@ body {
     line-height: 1.1;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
+  }
+
+  body[data-print-mode="week"] .print-week .print-pdf-schedule-page {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body[data-print-mode="week"] .print-week .print-pdf-schedule-page h1 {
+    margin: 0 0 3px;
+    font-size: 15px;
+    line-height: 1.1;
+  }
+
+  body[data-print-mode="week"] .print-week .print-pdf-schedule-page > p {
+    margin: 0 0 2px;
+    font-size: 9px;
+    line-height: 1.1;
+  }
+
+  body[data-print-mode="week"] .print-week-detail {
+    margin: 3px 0 0;
+  }
+
+  body[data-print-mode="week"] .print-week-detail h2 {
+    margin: 0 0 3px;
+    font-size: 11px;
+    line-height: 1.1;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table {
+    table-layout: fixed;
+    font-size: 9px;
+    line-height: 1.05;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table th,
+  body[data-print-mode="week"] .print-week-detail-table td {
+    height: 14px;
+    padding: 2px 3px;
+    font-size: 9px;
+    line-height: 1.05;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-sort-col {
+    width: 30px;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-person-col {
+    width: 78px;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-job-col {
+    width: 50px;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-type-col {
+    width: 42px;
+  }
+
+  body[data-print-mode="week"] .print-week .print-person strong {
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-person strong,
+  body[data-print-mode="week"] .print-week-detail-table .print-shift-chip {
+    font-size: 9px;
+    line-height: 1.05;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-day-heading {
+    gap: 0;
+    line-height: 1.05;
+  }
+
+  body[data-print-mode="week"] .print-week-detail-table .print-cell-shifts {
+    min-height: 12px;
+    gap: 1px;
   }
 }

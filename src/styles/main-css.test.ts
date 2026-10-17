@@ -647,7 +647,7 @@ describe("main.css layout rules", () => {
   });
 });
 
-describe("main.css print month layout rules", () => {
+describe("main.css print layout rules", () => {
   it("styles in-page print panels with readable controls", () => {
     const panelRules = ruleBlocks(".print-panel")[0] || "";
     const headerRules = ruleBlocks(".print-panel-header")[0] || "";
@@ -775,7 +775,7 @@ describe("main.css print month layout rules", () => {
     expect(printShiftChip).not.toContain("background: #ffffff");
   });
 
-  it("clips long print person labels inside narrow cells", () => {
+  it("clips long month print person labels inside narrow cells", () => {
     const printMedia = mediaBlock("print");
     const previewName = ruleBlockIn(css, ".print-preview-content .print-person strong");
     const previewMeta = ruleBlockIn(css, ".print-preview-content .print-person small");
@@ -794,5 +794,49 @@ describe("main.css print month layout rules", () => {
         expect(rule).toContain(guard);
       }
     }
+  });
+
+  it("keeps weekly schedule rows compact enough for one printed page", () => {
+    const printMedia = mediaBlock("print");
+    const weekMeta = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="week"] .print-week .print-pdf-schedule-page > p'
+    );
+    const weekDetail = ruleBlockIn(printMedia, 'body[data-print-mode="week"] .print-week-detail');
+    const weekCells = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="week"] .print-week-detail-table th,\n  body[data-print-mode="week"] .print-week-detail-table td'
+    );
+    const weekRows = ruleBlockIn(
+      printMedia,
+      'body[data-print-mode="week"] .print-week-detail-table tr'
+    );
+
+    expect(weekMeta).toContain("margin: 0 0 2px");
+    expect(weekDetail).toContain("margin: 3px 0 0");
+    expect(weekCells).toContain("padding: 2px 3px");
+    expect(weekCells).toContain("font-size: 9px");
+    expect(weekRows).toContain("break-inside: avoid");
+    expect(weekRows).toContain("page-break-inside: avoid");
+  });
+
+  it("shows complete staff names in weekly preview and system print", () => {
+    const previewWeekName = ruleBlockIn(css, ".print-preview-content .print-week .print-person strong");
+    const printWeekName = ruleBlockIn(
+      mediaBlock("print"),
+      'body[data-print-mode="week"] .print-week .print-person strong'
+    );
+    const printWeekPersonColumn = ruleBlockIn(
+      mediaBlock("print"),
+      'body[data-print-mode="week"] .print-week-detail-table .print-person-col'
+    );
+
+    for (const rule of [previewWeekName, printWeekName]) {
+      expect(rule).toContain("overflow: visible");
+      expect(rule).toContain("text-overflow: clip");
+      expect(rule).toContain("white-space: normal");
+      expect(rule).toContain("overflow-wrap: anywhere");
+    }
+    expect(printWeekPersonColumn).toContain("width: 78px");
   });
 });
