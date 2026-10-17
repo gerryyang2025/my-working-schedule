@@ -343,6 +343,12 @@ export function saveShift(shift: Shift): Promise<PublicAppData> {
   });
 }
 
+export function deleteShift(id: string): Promise<PublicAppData> {
+  return requestJson<PublicAppData>(`/api/data/shift/${encodeURIComponent(id)}`, {
+    method: "DELETE"
+  });
+}
+
 export function saveHoliday(holiday: Holiday): Promise<PublicAppData> {
   return requestJson<PublicAppData>(`/api/data/holiday/${holiday.id}`, {
     method: "PUT",

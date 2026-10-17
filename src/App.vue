@@ -19,6 +19,7 @@ import {
   copyPreviousWeekSchedule,
   deleteUser,
   deleteStaff,
+  deleteShift,
   deleteHoliday,
   deleteMonthlySettlement,
   getCurrentUser,
@@ -1591,6 +1592,38 @@ async function handleSaveShift(shift: Shift): Promise<void> {
   }
 }
 
+async function handleDeleteShift(shiftId: string): Promise<void> {
+  if (shiftSaving.value) {
+    return;
+  }
+
+  const mutationContext = beginConfigMutation();
+  if (!mutationContext) {
+    return;
+  }
+
+  const { requestId, userId: requestUserId } = mutationContext;
+  shiftSaving.value = true;
+  try {
+    const savedData = await deleteShift(shiftId);
+    if (!canApplyConfigMutation(requestId, requestUserId)) {
+      return;
+    }
+
+    data.value = savedData;
+    shiftSaveVersion.value += 1;
+    await refreshLatestAuditLogsIfManaging();
+  } catch (caughtError) {
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      ElMessage.error(caughtError instanceof Error ? caughtError.message : "班次删除失败");
+    }
+  } finally {
+    if (canApplyConfigMutation(requestId, requestUserId)) {
+      shiftSaving.value = false;
+    }
+  }
+}
+
 async function handleSaveHoliday(holiday: Holiday): Promise<void> {
   if (holidaySaving.value) {
     return;
@@ -2338,6 +2371,7 @@ onBeforeUnmount(() => {
               @save-staff="handleSaveStaff"
               @delete-staff="handleDeleteStaff"
               @save-shift="handleSaveShift"
+              @delete-shift="handleDeleteShift"
               @save-holiday="handleSaveHoliday"
               @delete-holiday="handleDeleteHoliday"
               @save-user="handleSaveUser"

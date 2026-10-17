@@ -30,6 +30,7 @@ const emit = defineEmits<{
   saveStaff: [staff: StaffMember];
   deleteStaff: [staffId: string];
   saveShift: [shift: Shift];
+  deleteShift: [shiftId: string];
   saveHoliday: [holiday: Holiday];
   deleteHoliday: [holidayId: string];
   saveUser: [user: SaveAuthUserInput];
@@ -88,6 +89,7 @@ const activeManagementTab = ref("staff");
 
 const isExistingHolidayDraft = computed(() => props.data.holidays.some((holiday) => holiday.id === holidayDraft.id));
 const isExistingStaffDraft = computed(() => props.data.staff.some((staff) => staff.id === staffDraft.id));
+const isExistingShiftDraft = computed(() => props.data.shifts.some((shift) => shift.id === shiftDraft.id));
 const isExistingUserDraft = computed(() => props.users.some((user) => user.id === userDraft.id));
 const staffById = computed(() => new Map(props.data.staff.map((staff) => [staff.id, staff])));
 const bindableStaff = computed(() => props.data.staff.filter((staff) => staff.enabled || staff.id === userDraft.staffId));
@@ -481,6 +483,22 @@ watch(
             >
               保存班次
             </el-button>
+            <el-popconfirm
+              title="确认删除该班次？仅未被任何排班引用的班次可删除。"
+              width="360"
+              @confirm="emit('deleteShift', shiftDraft.id)"
+            >
+              <template #reference>
+                <el-button
+                  v-if="isExistingShiftDraft"
+                  data-testid="delete-shift-button"
+                  type="danger"
+                  :disabled="shiftSaving || !adminMode"
+                >
+                  删除班次
+                </el-button>
+              </template>
+            </el-popconfirm>
           </div>
         </div>
       </el-tab-pane>

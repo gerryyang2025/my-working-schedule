@@ -1,6 +1,6 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { defineComponent, nextTick, ref } from "vue";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.vue";
 import type { AuditLogEntry, AuditLogListResponse, AuthUser, ManagedAuthUser, PublicAppData } from "@/api/client";
 
@@ -9,6 +9,7 @@ const apiMocks = vi.hoisted(() => ({
   copyPreviousWeekSchedule: vi.fn(),
   deleteUser: vi.fn(),
   deleteStaff: vi.fn(),
+  deleteShift: vi.fn(),
   deleteHoliday: vi.fn(),
   deleteMonthlySettlement: vi.fn(),
   enterAdminMode: vi.fn(),
@@ -543,6 +544,7 @@ const ManagementDrawerStub = defineComponent({
     "saveStaff",
     "deleteStaff",
     "saveShift",
+    "deleteShift",
     "saveHoliday",
     "deleteHoliday",
     "saveUser",
@@ -583,6 +585,13 @@ const ManagementDrawerStub = defineComponent({
         @click="$emit('saveShift', { id: 'shift-a1', name: 'A1组长', shortName: 'A1', color: '#2563EB', countsAttendance: true, coefficient: 1.5, enabled: true, sortOrder: 1 })"
       >
         save shift
+      </button>
+      <button
+        data-testid="drawer-delete-shift"
+        type="button"
+        @click="$emit('deleteShift', 'shift-a1')"
+      >
+        delete shift
       </button>
       <button
         data-testid="drawer-save-holiday"
@@ -968,6 +977,11 @@ function expectPanelHidden(wrapper: ReturnType<typeof mountApp>, testId: string)
 }
 
 describe("App", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 5, 17));
+  });
+
   afterEach(() => {
     for (const wrapper of mountedWrappers.splice(0).reverse()) {
       wrapper.unmount();
@@ -1297,6 +1311,7 @@ describe("App", () => {
     apiMocks.saveStaff.mockResolvedValue(structuredClone(testData));
     apiMocks.deleteStaff.mockResolvedValue(structuredClone(testData));
     apiMocks.saveShift.mockResolvedValue(structuredClone(testData));
+    apiMocks.deleteShift.mockResolvedValue(structuredClone(testData));
     apiMocks.saveHoliday.mockResolvedValue(structuredClone(testData));
     apiMocks.deleteHoliday.mockResolvedValue(structuredClone(testData));
     apiMocks.saveUser.mockResolvedValue({
@@ -1323,6 +1338,7 @@ describe("App", () => {
       "drawer-save-staff",
       "drawer-delete-staff",
       "drawer-save-shift",
+      "drawer-delete-shift",
       "drawer-save-holiday",
       "drawer-delete-holiday",
       "drawer-save-user",
@@ -1335,6 +1351,7 @@ describe("App", () => {
     expect(apiMocks.saveStaff).not.toHaveBeenCalled();
     expect(apiMocks.deleteStaff).not.toHaveBeenCalled();
     expect(apiMocks.saveShift).not.toHaveBeenCalled();
+    expect(apiMocks.deleteShift).not.toHaveBeenCalled();
     expect(apiMocks.saveHoliday).not.toHaveBeenCalled();
     expect(apiMocks.deleteHoliday).not.toHaveBeenCalled();
     expect(apiMocks.saveUser).not.toHaveBeenCalled();
@@ -1345,6 +1362,7 @@ describe("App", () => {
 
   it("allows admins to save and delete shift and holiday configuration", async () => {
     apiMocks.saveShift.mockResolvedValue(structuredClone(testData));
+    apiMocks.deleteShift.mockResolvedValue(structuredClone(testData));
     apiMocks.saveHoliday.mockResolvedValue(structuredClone(testData));
     apiMocks.deleteHoliday.mockResolvedValue(structuredClone(testData));
     const wrapper = mountApp();
@@ -1353,6 +1371,9 @@ describe("App", () => {
     await wrapper.get('[data-testid="workbench-tab-config"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-save-shift"]').trigger("click");
+    await flushPromises();
+    await wrapper.get('[data-testid="drawer-delete-shift"]').trigger("click");
+    await flushPromises();
     await wrapper.get('[data-testid="drawer-save-holiday"]').trigger("click");
     await flushPromises();
     await wrapper.get('[data-testid="drawer-delete-holiday"]').trigger("click");
@@ -1365,6 +1386,7 @@ describe("App", () => {
         shortName: "A1"
       })
     );
+    expect(apiMocks.deleteShift).toHaveBeenCalledWith("shift-a1");
     expect(apiMocks.saveHoliday).toHaveBeenCalledWith(
       expect.objectContaining({
         id: "holiday-dragon",

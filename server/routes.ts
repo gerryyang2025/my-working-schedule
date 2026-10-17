@@ -1258,11 +1258,60 @@ export function createRoutes(storage: StorageAdapter, options: RouteOptions): Ro
         return;
       }
 
-      const nextData = await storage.update((data) => ({
-        ...data,
-        shifts: upsertById(data.shifts, shift)
-      }));
+      const nextData = await storage.update((data) => {
+        const normalizedName = shift.name.toLocaleLowerCase();
+        const normalizedShortName = shift.shortName.toLocaleLowerCase();
+        const duplicateName = data.shifts.some(
+          (item) => item.id !== shift.id && item.name.trim().toLocaleLowerCase() === normalizedName
+        );
+        if (duplicateName) {
+          throw new HttpResponseError(400, `班次名称已存在：${shift.name}`);
+        }
+
+        const duplicateShortName = data.shifts.some(
+          (item) => item.id !== shift.id && item.shortName.trim().toLocaleLowerCase() === normalizedShortName
+        );
+        if (duplicateShortName) {
+          throw new HttpResponseError(400, `班次简称已存在：${shift.shortName}`);
+        }
+
+        return {
+          ...data,
+          shifts: upsertById(data.shifts, shift)
+        };
+      });
       await recordAudit(request, "data.shift.save", "shift", shift.id, `保存班次：${shift.name}`);
+      response.json(toPublicData(nextData));
+    } catch (error) {
+      handleRouteError(error, response, next);
+    }
+  });
+
+  router.delete("/data/shift/:id", requireAdmin, async (request, response, next) => {
+    try {
+      const shiftId = getRouteParam(request, "id");
+      let deletedShiftName = "";
+      const nextData = await storage.update((data) => {
+        const shift = data.shifts.find((item) => item.id === shiftId);
+        if (!shift) {
+          throw new HttpResponseError(404, "班次不存在");
+        }
+
+        const usageCount = data.scheduleEntries.filter((entry) => entry.shiftIds.includes(shiftId)).length;
+        if (usageCount > 0) {
+          throw new HttpResponseError(
+            400,
+            `班次已被 ${usageCount} 条排班引用，不能删除，请先修改关联排班：${shift.name}`
+          );
+        }
+
+        deletedShiftName = shift.name;
+        return {
+          ...data,
+          shifts: data.shifts.filter((item) => item.id !== shiftId)
+        };
+      });
+      await recordAudit(request, "data.shift.delete", "shift", shiftId, `删除班次：${deletedShiftName}`);
       response.json(toPublicData(nextData));
     } catch (error) {
       handleRouteError(error, response, next);

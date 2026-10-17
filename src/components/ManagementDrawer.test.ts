@@ -293,6 +293,19 @@ describe("ManagementDrawer", () => {
     expect(wrapper.emitted("deleteStaff")).toEqual([["staff-head"]]);
   });
 
+  it("emits deleteShift only for an existing shift draft", async () => {
+    const wrapper = mountDrawer();
+
+    expect(wrapper.find('[data-testid="delete-shift-button"]').exists()).toBe(false);
+
+    await wrapper.get(".management-mobile-shift").trigger("click");
+    expect(getConfirmButtonFor(wrapper, '[data-testid="delete-shift-button"]')!.element.parentElement?.getAttribute("data-width")).toBe("360");
+    await wrapper.get('[data-testid="delete-shift-button"]').trigger("click");
+    await getConfirmButtonFor(wrapper, '[data-testid="delete-shift-button"]')!.trigger("click");
+
+    expect(wrapper.emitted("deleteShift")).toEqual([["shift-a1"]]);
+  });
+
   it("uses readable popconfirm widths for holiday deletion", async () => {
     const wrapper = mountDrawer();
 

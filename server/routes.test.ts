@@ -1301,6 +1301,94 @@ describe.sequential("API routes", () => {
     expect(response.body.shifts).toContainEqual({ id: "shift-test", ...createShiftPayload() });
   });
 
+  it("rejects duplicate shift names after trimming and ignoring case", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/shift/shift-duplicate-name")
+      .set(await adminHeaders(app))
+      .send(createShiftPayload({ name: "  a1组长  ", shortName: "A1副本" }))
+      .expect(400);
+
+    expect(response.body.message).toBe("班次名称已存在：a1组长");
+  });
+
+  it("rejects duplicate shift short names after trimming and ignoring case", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/shift/shift-duplicate-short-name")
+      .set(await adminHeaders(app))
+      .send(createShiftPayload({ name: "A1副本", shortName: "  a1  " }))
+      .expect(400);
+
+    expect(response.body.message).toBe("班次简称已存在：a1");
+  });
+
+  it("allows an existing shift to retain its own name and short name", async () => {
+    const app = createTestApp();
+    const response = await request(app)
+      .put("/api/data/shift/shift-a1")
+      .set(await adminHeaders(app))
+      .send(createShiftPayload({ name: "A1组长", shortName: "A1" }))
+      .expect(200);
+
+    expect(response.body.shifts).toContainEqual({ id: "shift-a1", ...createShiftPayload({ name: "A1组长", shortName: "A1" }) });
+  });
+
+  it("rejects shift deletes without admin mode", async () => {
+    await request(createTestApp()).delete("/api/data/shift/shift-a1").expect(401);
+  });
+
+  it("deletes an unused shift and records an audit log", async () => {
+    const data = createSeedData();
+    data.shifts.push({ id: "shift-unused", ...createShiftPayload({ name: "支援", shortName: "支援" }) });
+    const app = createTestApp(data);
+
+    const response = await request(app)
+      .delete("/api/data/shift/shift-unused")
+      .set(await adminHeaders(app))
+      .expect(200);
+
+    expect(response.body.shifts).not.toContainEqual(expect.objectContaining({ id: "shift-unused" }));
+    const auditResponse = await request(app)
+      .get("/api/audit-logs")
+      .set(await adminHeaders(app))
+      .query({ action: "data.shift.delete", keyword: "支援", limit: "20" })
+      .expect(200);
+    expect(auditResponse.body.rows).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          action: "data.shift.delete",
+          summary: "删除班次：支援"
+        })
+      ])
+    );
+  });
+
+  it("rejects deleting a shift referenced by schedule entries", async () => {
+    const data = createSeedData();
+    data.scheduleEntries.push({
+      id: "2026-06-15__staff-nurse-001",
+      date: "2026-06-15",
+      staffId: "staff-nurse-001",
+      shiftIds: ["shift-a1"],
+      note: ""
+    });
+    const app = createTestApp(data);
+
+    await request(app)
+      .delete("/api/data/shift/shift-a1")
+      .set(await adminHeaders(app))
+      .expect(400, { message: "班次已被 1 条排班引用，不能删除，请先修改关联排班：A1组长" });
+  });
+
+  it("returns 404 when deleting a missing shift", async () => {
+    const app = createTestApp();
+    await request(app)
+      .delete("/api/data/shift/shift-missing")
+      .set(await adminHeaders(app))
+      .expect(404, { message: "班次不存在" });
+  });
+
   it("upserts holidays", async () => {
     const app = createTestApp();
     const response = await request(app)
