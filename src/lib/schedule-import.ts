@@ -18,6 +18,7 @@ export interface ScheduleImportValidationError {
   columnLabel?: string;
   value?: string;
   message: string;
+  hint?: string;
 }
 
 export interface ScheduleImportDay extends CalendarDay {
@@ -100,30 +101,61 @@ const PERIOD_PATTERN =
 const HEADER_DAY_PATTERN = /^(周[一二三四五六日])\((\d{1,2})\/(\d{1,2})\)$/;
 
 type ParsedPeriod = Omit<ScheduleImportPeriod, "days">;
+interface ImportSourceLine {
+  lineNumber: number;
+  text: string;
+}
+interface ParsedImportTableRow extends ImportSourceLine {
+  cells: string[];
+}
 
 export function validateScheduleImportText(input: ScheduleImportValidationInput): ScheduleImportValidationResult {
-  const rawText = input.rawText.trim();
-  if (!rawText) {
+  const rawText = input.rawText;
+  if (!rawText.trim()) {
     return failure([{ scope: "period", message: "导入内容不能为空" }]);
   }
 
   const aliases = input.aliases ?? DEFAULT_SCHEDULE_IMPORT_ALIASES;
   const errors: ScheduleImportValidationError[] = [];
-  const lines = rawText
+  const lines: ImportSourceLine[] = rawText
     .replace(/\r\n/g, "\n")
     .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
+    .map((line, index) => ({ lineNumber: index + 1, text: line.trim() }))
+    .filter((line) => line.text.length > 0);
 
-  if (lines.length < 3) {
-    return failure([{ scope: "period", message: "导入内容不完整，请粘贴周期说明和排班表格" }]);
+  const periodLineIndex = lines.findIndex(({ text }) => PERIOD_PATTERN.test(text));
+  if (periodLineIndex < 0) {
+    const periodMention = lines.find(({ text }) => text.includes("当前排班周期"));
+    return failure([{
+      scope: "period",
+      rowNumber: periodMention?.lineNumber,
+      message: periodMention ? "排班周期说明格式不正确" : "未找到排班周期说明",
+      hint: "请提供“当前排班周期为YYYY年M月D日（周一）至 M月D日（周日）”格式的周期说明。"
+    }]);
   }
 
-  const period = parsePeriodLine(lines[0], errors);
-  const tableRows = parseImportTableRows(lines.slice(1));
-  const header = tableRows[0] ?? [];
-  const days = period ? parseHeader(header, period, errors) : [];
-  const bodyRows = tableRows.slice(1);
+  const periodLine = lines[periodLineIndex];
+  const period = parsePeriodLine(periodLine.text, errors, periodLine.lineNumber);
+  if (!period) {
+    return failure(errors);
+  }
+
+  const tableRows = parseImportTableRows(lines.slice(periodLineIndex + 1));
+  const headerIndex = tableRows.findIndex(({ cells }) =>
+    cells[0] === "姓名" || cells.some((cell) => HEADER_DAY_PATTERN.test(cell))
+  );
+  if (headerIndex < 0) {
+    return failure([{
+      scope: "header",
+      rowNumber: tableRows[0]?.lineNumber,
+      message: "未找到排班表格表头",
+      hint: "请在周期说明后粘贴包含“姓名”和周一至周日的 8 列表格；支持制表符或 Markdown 表格。"
+    }]);
+  }
+
+  const headerRow = tableRows[headerIndex];
+  const days = parseHeader(headerRow.cells, period, errors, headerRow.lineNumber);
+  const bodyRows = tableRows.slice(headerIndex + 1);
 
   const staffByName = buildStaffByName(input.data.staff, errors);
   const shiftResolver = createShiftResolver(input.data.shifts, aliases, errors);
@@ -132,7 +164,7 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
   if (period) {
     for (const settlement of input.data.monthlySettlements) {
       if (dateRangesOverlap(period.start, period.end, settlement.monthStart, settlement.monthEnd)) {
-        errors.push({ scope: "period", message: `${settlement.month} 已月结，不能导入排班` });
+        errors.push({ scope: "period", rowNumber: periodLine.lineNumber, message: `${settlement.month} 已月结，不能导入排班` });
       }
     }
   }
@@ -140,34 +172,51 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
   const seenImportNames = new Set<string>();
   const rows: ScheduleImportRowPreview[] = [];
 
-  bodyRows.forEach((row, index) => {
-    const rowNumber = index + 3;
+  bodyRows.forEach(({ cells: row, lineNumber: rowNumber }) => {
     if (row.length !== 8) {
-      errors.push({ scope: "row", rowNumber, message: `第${rowNumber}行列数不正确，应为 8 列` });
+      errors.push({
+        scope: "row",
+        rowNumber,
+        message: `第${rowNumber}行列数不正确，应为 8 列`,
+        hint: "每行应包含姓名和周一至周日 7 个班次，共 8 列。"
+      });
       return;
     }
 
     const staffName = row[0] ?? "";
     if (!staffName) {
-      errors.push({ scope: "row", rowNumber, message: `第${rowNumber}行人员姓名不能为空` });
+      errors.push({ scope: "row", rowNumber, columnLabel: "姓名", message: `第${rowNumber}行人员姓名不能为空` });
       return;
     }
     if (seenImportNames.has(staffName)) {
-      errors.push({ scope: "row", rowNumber, value: staffName, message: `导入数据中人员重复：${staffName}` });
+      errors.push({ scope: "row", rowNumber, columnLabel: "姓名", value: staffName, message: `导入数据中人员重复：${staffName}` });
       return;
     }
     seenImportNames.add(staffName);
 
     const staff = staffByName.get(staffName);
     if (!staff) {
-      errors.push({ scope: "row", rowNumber, value: staffName, message: `第${rowNumber}行人员不存在或未启用：${staffName}` });
+      errors.push({
+        scope: "row",
+        rowNumber,
+        columnLabel: "姓名",
+        value: staffName,
+        message: `第${rowNumber}行人员不存在或未启用：${staffName}`,
+        hint: "请核对姓名是否与系统中已启用人员的姓名完全一致。"
+      });
       return;
     }
 
     const cells = days.map((day, dayIndex) => {
       const rawValue = row[dayIndex + 1] ?? "";
       if (!rawValue) {
-        errors.push({ scope: "cell", rowNumber, columnLabel: day.columnLabel, message: `第${rowNumber}行 ${day.columnLabel} 班次不能为空` });
+        errors.push({
+          scope: "cell",
+          rowNumber,
+          columnLabel: day.columnLabel,
+          message: `第${rowNumber}行 ${day.columnLabel} 班次不能为空`,
+          hint: "请补充该日期的班次；没有排班时也请填写系统中对应的休息或假期班次。"
+        });
         return null;
       }
 
@@ -205,7 +254,7 @@ export function validateScheduleImportText(input: ScheduleImportValidationInput)
     }
   });
 
-  if (errors.length > 0 || !period || days.length !== 7) {
+  if (errors.length > 0 || days.length !== 7) {
     return failure(errors);
   }
 
@@ -281,26 +330,26 @@ function failure(errors: ScheduleImportValidationError[]): ScheduleImportFailure
   return { ok: false, errors };
 }
 
-function parseImportTableRows(lines: string[]): string[][] {
+function parseImportTableRows(lines: ImportSourceLine[]): ParsedImportTableRow[] {
   return lines
-    .filter((line) => !isMarkdownSeparatorRow(line))
+    .filter(({ text }) => !/^```/.test(text) && !isMarkdownSeparatorRow(text))
     .map((line) => {
-      if (line.includes("\t")) {
-        return line.split("\t").map((cell) => cell.trim());
+      if (line.text.includes("\t")) {
+        return { ...line, cells: line.text.split("\t").map((cell) => cell.trim()) };
       }
 
-      if (line.includes("|")) {
-        const cells = line.split("|").map((cell) => cell.trim());
+      if (line.text.includes("|")) {
+        const cells = line.text.split("|").map((cell) => cell.trim());
         if (cells[0] === "") {
           cells.shift();
         }
         if (cells[cells.length - 1] === "") {
           cells.pop();
         }
-        return cells;
+        return { ...line, cells };
       }
 
-      return [line.trim()];
+      return { ...line, cells: [line.text] };
     });
 }
 
@@ -316,10 +365,15 @@ function isMarkdownSeparatorRow(line: string): boolean {
   return cells.length > 0 && cells.every((cell) => /^:?-{3,}:?$/.test(cell));
 }
 
-function parsePeriodLine(line: string, errors: ScheduleImportValidationError[]): ParsedPeriod | null {
+function parsePeriodLine(line: string, errors: ScheduleImportValidationError[], lineNumber: number): ParsedPeriod | null {
   const match = line.match(PERIOD_PATTERN);
   if (!match) {
-    errors.push({ scope: "period", message: "排班周期格式不正确" });
+    errors.push({
+      scope: "period",
+      rowNumber: lineNumber,
+      message: "排班周期格式不正确",
+      hint: "请核对年份、日期及星期，并按示例提供完整的周一至周日周期说明。"
+    });
     return null;
   }
 
@@ -339,24 +393,29 @@ function parsePeriodLine(line: string, errors: ScheduleImportValidationError[]):
   const end = toDateKey(endDate);
 
   if (start !== formatDateKey(startYear, startMonth, startDay)) {
-    errors.push({ scope: "period", message: `周期开始日期不存在：${formatDateKey(startYear, startMonth, startDay)}` });
+    errors.push({ scope: "period", rowNumber: lineNumber, message: `周期开始日期不存在：${formatDateKey(startYear, startMonth, startDay)}` });
     return null;
   }
   if (end !== formatDateKey(endYear, endMonth, endDay)) {
-    errors.push({ scope: "period", message: `周期结束日期不存在：${formatDateKey(endYear, endMonth, endDay)}` });
+    errors.push({ scope: "period", rowNumber: lineNumber, message: `周期结束日期不存在：${formatDateKey(endYear, endMonth, endDay)}` });
     return null;
   }
 
   if (WEEKDAY_NAMES[startDate.getDay()] !== startWeekday) {
-    errors.push({ scope: "period", message: `周期开始日期与星期不一致：${start} 不是${startWeekday}` });
+    errors.push({ scope: "period", rowNumber: lineNumber, message: `周期开始日期与星期不一致：${start} 不是${startWeekday}` });
   }
   if (WEEKDAY_NAMES[endDate.getDay()] !== endWeekday) {
-    errors.push({ scope: "period", message: `周期结束日期与星期不一致：${end} 不是${endWeekday}` });
+    errors.push({ scope: "period", rowNumber: lineNumber, message: `周期结束日期与星期不一致：${end} 不是${endWeekday}` });
   }
 
   const dateKeys = listDateKeys(start, end);
   if (dateKeys.length !== 7 || startDate.getDay() !== 1 || endDate.getDay() !== 0) {
-    errors.push({ scope: "period", message: "排班周期必须为周一至周日的 7 天" });
+    errors.push({
+      scope: "period",
+      rowNumber: lineNumber,
+      message: "排班周期必须为周一至周日的 7 天",
+      hint: "开始日期应为周一，结束日期应为同一周的周日。"
+    });
   }
 
   return {
@@ -366,13 +425,18 @@ function parsePeriodLine(line: string, errors: ScheduleImportValidationError[]):
   };
 }
 
-function parseHeader(header: string[], period: ParsedPeriod, errors: ScheduleImportValidationError[]): ScheduleImportDay[] {
+function parseHeader(header: string[], period: ParsedPeriod, errors: ScheduleImportValidationError[], lineNumber: number): ScheduleImportDay[] {
   if (header.length !== 8) {
-    errors.push({ scope: "header", message: "表头列数不正确，应为 8 列" });
+    errors.push({
+      scope: "header",
+      rowNumber: lineNumber,
+      message: "表头列数不正确，应为 8 列",
+      hint: "表头应包含姓名及周一至周日 7 个日期列。"
+    });
     return [];
   }
   if (header[0] !== "姓名") {
-    errors.push({ scope: "header", columnLabel: header[0], message: "表头第一列必须为姓名" });
+    errors.push({ scope: "header", rowNumber: lineNumber, columnLabel: header[0], message: "表头第一列必须为姓名" });
     return [];
   }
 
@@ -385,14 +449,14 @@ function parseHeader(header: string[], period: ParsedPeriod, errors: ScheduleImp
   header.slice(1).forEach((columnLabel, index) => {
     const match = columnLabel.match(HEADER_DAY_PATTERN);
     if (!match) {
-      errors.push({ scope: "header", columnLabel, message: `表头日期格式不正确：${columnLabel}` });
+      errors.push({ scope: "header", rowNumber: lineNumber, columnLabel, message: `表头日期格式不正确：${columnLabel}` });
       return;
     }
 
     const expectedWeekday = EXPECTED_HEADER_WEEKDAYS[index];
     const weekday = match[1];
     if (weekday !== expectedWeekday) {
-      errors.push({ scope: "header", columnLabel, message: `表头星期顺序不正确：${columnLabel} 应为 ${expectedWeekday}` });
+      errors.push({ scope: "header", rowNumber: lineNumber, columnLabel, message: `表头星期顺序不正确：${columnLabel} 应为 ${expectedWeekday}` });
     }
 
     const dateKey = dateKeys[index];
@@ -400,7 +464,7 @@ function parseHeader(header: string[], period: ParsedPeriod, errors: ScheduleImp
     const month = Number(match[2]);
     const dayOfMonth = Number(match[3]);
     if (date.getMonth() + 1 !== month || date.getDate() !== dayOfMonth) {
-      errors.push({ scope: "header", columnLabel, message: `表头日期与周期不一致：${columnLabel}` });
+      errors.push({ scope: "header", rowNumber: lineNumber, columnLabel, message: `表头日期与周期不一致：${columnLabel}` });
     }
 
     days.push({
@@ -433,7 +497,12 @@ function buildStaffByName(staff: StaffMember[], errors: ScheduleImportValidation
 
   for (const name of duplicateNames) {
     staffByName.delete(name);
-    errors.push({ scope: "row", value: name, message: `系统中存在重复启用人员姓名：${name}` });
+    errors.push({
+      scope: "row",
+      value: name,
+      message: `系统中存在重复启用人员姓名：${name}`,
+      hint: "请先在人员配置中处理重名，再重新校验导入数据。"
+    });
   }
 
   return staffByName;
@@ -461,7 +530,12 @@ function createShiftResolver(
     const uniqueShiftIds = new Set(matches.map((match) => match.shift.id));
     if (uniqueShiftIds.size > 1) {
       ambiguousValues.add(value);
-      errors.push({ scope: "cell", value, message: `系统中存在重复启用班次名称：${value}` });
+      errors.push({
+        scope: "cell",
+        value,
+        message: `系统中存在重复启用班次名称：${value}`,
+        hint: "请先在班次配置中处理重复简称或名称，再重新校验。"
+      });
     }
   }
 
@@ -487,7 +561,14 @@ function createShiftResolver(
       }
     }
 
-    errors.push({ scope: "cell", rowNumber, columnLabel, value: rawValue, message: `第${rowNumber}行 ${columnLabel} 班次不存在或未启用：${rawValue}` });
+    errors.push({
+      scope: "cell",
+      rowNumber,
+      columnLabel,
+      value: rawValue,
+      message: `第${rowNumber}行 ${columnLabel} 班次不存在或未启用：${rawValue}`,
+      hint: "请核对班次是否已在系统中创建并启用，或检查输入文字是否与班次名称/简称一致。"
+    });
     return null;
   };
 }

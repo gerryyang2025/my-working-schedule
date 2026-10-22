@@ -1006,12 +1006,63 @@ body {
 
 .schedule-import-errors {
   display: grid;
-  gap: 6px;
+  gap: 8px;
   border: 1px solid #fecaca;
   background: #fef2f2;
   color: #991b1b;
   padding: 12px;
   line-height: 1.6;
+}
+
+.schedule-import-errors-summary {
+  margin: 0;
+  font-weight: 800;
+}
+
+.schedule-import-errors ul {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedule-import-errors li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: start;
+  gap: 2px 10px;
+}
+
+.schedule-import-error-location,
+.schedule-import-error-location-text {
+  width: max-content;
+  max-width: 100%;
+  border: 1px solid #fecaca;
+  background: #ffffff;
+  color: #991b1b;
+  padding: 1px 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.5;
+}
+
+.schedule-import-error-location {
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.schedule-import-errors li > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.schedule-import-errors li > small {
+  grid-column: 2;
+  color: #7f1d1d;
+  font-size: 12px;
 }
 
 .schedule-import-summary,

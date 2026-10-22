@@ -44,7 +44,9 @@ const AI_IMPORT_PROMPT = `请提取上传图片中的排班表信息，按以下
 5. 注意事项：
    - 日期和星期需根据图片中实际日期准确填写
    - 如遇"婚假"、"进修"、"备班1"、"跟班-办公"等特殊排班，按原文字保留
-   - 表格中" / "表示夜班下休`;
+   - 表格中" / "表示夜班下休
+
+6. 输出限制：不要添加说明、前言或结尾；第一行必须是周期说明，随后直接输出表格；不要用代码块包裹`;
 
 const IMPORT_EXAMPLE_DAYS = [
   "周一(7/20)",
@@ -78,6 +80,7 @@ const emit = defineEmits<{
 }>();
 
 const rawText = ref("");
+const importInput = ref<HTMLTextAreaElement | null>(null);
 const validation = ref<ScheduleImportValidationResult | null>(null);
 const validatedRawText = ref("");
 const previewing = ref(false);
@@ -151,6 +154,58 @@ function confirmImport(): void {
 
 function staffTypeLabel(type: StaffType): string {
   return STAFF_TYPE_LABELS[type] ?? type;
+}
+
+function errorLocation(error: ScheduleImportValidationError): string {
+  const parts: string[] = [];
+  if (error.rowNumber) {
+    parts.push(`第 ${error.rowNumber} 行`);
+  }
+
+  if (error.scope === "period") {
+    parts.push("周期说明");
+  } else if (error.scope === "header") {
+    parts.push(error.columnLabel ? `表头「${error.columnLabel}」` : "表头");
+  } else if (error.rowNumber && error.columnLabel) {
+    parts.push(`「${error.columnLabel}」列`);
+  } else if (error.rowNumber) {
+    parts.push("整行");
+  } else {
+    parts.push(error.scope === "cell" ? "班次配置" : "人员配置");
+  }
+
+  return parts.join(" · ") || "导入数据";
+}
+
+function errorDescription(error: ScheduleImportValidationError): string {
+  let description = error.message.replace(/^第\d+行\s*/, "");
+  if (error.columnLabel && description.startsWith(error.columnLabel)) {
+    description = description.slice(error.columnLabel.length).trimStart();
+  }
+  return description;
+}
+
+function focusErrorLine(error: ScheduleImportValidationError): void {
+  const input = importInput.value;
+  if (!input) {
+    return;
+  }
+
+  input.focus();
+  if (!error.rowNumber) {
+    return;
+  }
+
+  const lines = rawText.value.replace(/\r\n/g, "\n").split("\n");
+  if (error.rowNumber > lines.length) {
+    return;
+  }
+
+  let start = 0;
+  for (let index = 0; index < error.rowNumber - 1; index += 1) {
+    start += lines[index].length + 1;
+  }
+  input.setSelectionRange(start, start + lines[error.rowNumber - 1].length);
 }
 
 function copyTextWithTextarea(text: string): void {
@@ -234,6 +289,7 @@ function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportVali
       <label class="schedule-import-input-label" for="schedule-import-input">粘贴排班数据</label>
       <textarea
         id="schedule-import-input"
+        ref="importInput"
         v-model="rawText"
         class="schedule-import-input"
         data-testid="schedule-import-input"
@@ -246,14 +302,28 @@ function scheduleImportErrorsFromError(caughtError: unknown): ScheduleImportVali
       </div>
     </section>
 
-    <div v-if="validation && !validation.ok" class="schedule-import-errors" data-testid="schedule-import-errors" role="alert">
-      <span
-        v-for="error in validation.errors"
-        :key="`${error.scope}-${error.rowNumber ?? 0}-${error.columnLabel ?? ''}-${error.message}`"
-      >
-        {{ error.message }}
-      </span>
-    </div>
+    <section v-if="validation && !validation.ok" class="schedule-import-errors" data-testid="schedule-import-errors" role="alert">
+      <p class="schedule-import-errors-summary">发现 {{ validation.errors.length }} 处问题；点击位置可选中输入框中的对应行。</p>
+      <ul>
+        <li
+          v-for="error in validation.errors"
+          :key="`${error.scope}-${error.rowNumber ?? 0}-${error.columnLabel ?? ''}-${error.message}`"
+        >
+          <button
+            v-if="error.rowNumber"
+            type="button"
+            class="schedule-import-error-location"
+            :aria-label="`定位到输入内容第 ${error.rowNumber} 行`"
+            @click="focusErrorLine(error)"
+          >
+            {{ errorLocation(error) }}
+          </button>
+          <strong v-else class="schedule-import-error-location-text">{{ errorLocation(error) }}</strong>
+          <span>{{ errorDescription(error) }}</span>
+          <small v-if="error.hint">{{ error.hint }}</small>
+        </li>
+      </ul>
+    </section>
 
     <section v-if="validation?.ok" class="schedule-import-preview" data-testid="schedule-import-preview">
       <h3 data-testid="schedule-import-period">
